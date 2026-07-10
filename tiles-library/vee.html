@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Vee</title>
+<style>
+  /* Vee — the mentor, sealed. Ported from the Patron "Nova · AI Mentor" chat.
+     A sealed tile has no network, so Nova's live LLM chat can't run here.
+     What survives offline is the heart of it: a "drop a thought, nothing gets
+     lost" void + the mentor's reflection prompts. Reskinned to Vitality mint,
+     no external assets, persisting through the dashboard bridge (window.Vitality). */
+  :root{
+    --bg:#050506;--surface:#0e0e11;--border:#1d1d22;--brand:#6EE7B7;
+    --brand-soft:rgba(110,231,183,.08);--brand-line:rgba(110,231,183,.35);
+    --muted:#84848c;--muted-strong:#a8a8b0;--fg:#ededf0;--neg:#ff6b6b;--neg-line:rgba(255,107,107,.4);
+    --track:#17171b;--radius-md:12px;--radius-pill:999px;
+    --font-display:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;
+    --font-mono:ui-monospace,SFMono-Regular,Menlo,"JetBrains Mono",monospace;
+    --duration:.2s;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-display);display:flex;justify-content:center;padding:40px 20px}
+  .shell{width:100%;max-width:620px}
+  .header{display:flex;align-items:center;gap:14px;margin-bottom:22px}
+  .orb{width:44px;height:44px;flex-shrink:0;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#c8ffe8,var(--brand) 46%,#2b8f6b 100%);
+    box-shadow:0 0 26px rgba(110,231,183,.35);animation:orbBreathe 3.6s ease-in-out infinite}
+  @keyframes orbBreathe{0%,100%{transform:scale(1);opacity:.92}50%{transform:scale(1.06);opacity:1}}
+  @media(prefers-reduced-motion:reduce){.orb{animation:none}}
+  .title{font-size:24px;font-weight:600;letter-spacing:-.01em;margin:0}
+  .subtitle{color:var(--muted);font-family:var(--font-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;margin:5px 0 0}
+  .card{border:1px solid var(--border);border-radius:16px;background:var(--surface);padding:18px}
+  .cardName{font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:14px}
+  .draft{width:100%;min-height:96px;resize:vertical;background:var(--bg);border:1px solid var(--border);color:var(--fg);border-radius:var(--radius-md);padding:13px 15px;font:inherit;line-height:1.55}
+  .draft:focus{outline:none;border-color:var(--brand)}
+  .draft::placeholder{color:#55555c}
+  .hint{color:var(--neg);font-size:12px;font-family:var(--font-mono);min-height:14px;margin:6px 2px 0}
+  .composerRow{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:10px}
+  .prompts{display:flex;flex-wrap:wrap;gap:8px;flex:1;min-width:0}
+  .prompt{font-size:12.5px;color:var(--muted-strong);background:var(--bg);border:1px solid var(--border);padding:7px 13px;border-radius:var(--radius-pill);cursor:pointer;transition:border-color var(--duration),color var(--duration)}
+  .prompt:hover{border-color:var(--brand);color:var(--fg)}
+  .btn{border:1px solid var(--border);background:var(--bg);color:var(--fg);border-radius:10px;padding:10px 16px;font:inherit;cursor:pointer}
+  .btn-primary{background:var(--brand);color:#04140d;border:none;font-weight:600}
+  .voidHead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:28px 0 0}
+  .sectionTitle{font-weight:600;font-size:17px;margin:0}
+  .count{font-family:var(--font-mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  .feed{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+  .note{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:13px 15px;border:1px solid var(--border);border-left:3px solid var(--brand-line);border-radius:var(--radius-md);background:var(--surface)}
+  .noteBody{min-width:0}
+  .noteText{margin:0;font-size:14.5px;line-height:1.55;white-space:pre-wrap;word-break:break-word}
+  .noteMeta{display:block;margin-top:8px;font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .xBtn{background:transparent;border:1px solid var(--border);color:var(--muted);width:26px;height:26px;border-radius:50%;cursor:pointer;flex-shrink:0;line-height:1}
+  .xBtn:hover{color:var(--neg);border-color:var(--neg-line)}
+  .empty{color:var(--muted);font-size:13px;padding:14px 0}
+</style>
+</head>
+<body>
+<main><div class="shell" id="app"></div></main>
+<script>
+/* Vee — offline notes / journal void. No network and no browser storage:
+   everything is kept through the dashboard bridge (window.Vitality). */
+const PROMPTS=[
+  "What's on your mind right now?",
+  'What went well today?',
+  "What are you avoiding?",
+  'One thing you are grateful for.',
+  'What would make tomorrow easier?'
+];
+let notes=[];
+const $=id=>document.getElementById(id);
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function persist(){window.Vitality.save(notes);}
+function when(ts){const d=new Date(ts);return d.toLocaleDateString(undefined,{month:'short',day:'numeric'})+' · '+d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});}
+function newId(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+
+function headerHtml(){return '<header class="header"><div class="orb" aria-hidden="true"></div><div><h1 class="title">Vee</h1><p class="subtitle">the void · nothing gets lost</p></div></header>';}
+function composerHtml(){
+  const chips=PROMPTS.map((p,i)=>'<button class="prompt" data-prompt="'+i+'">'+esc(p)+'</button>').join('');
+  return '<section class="card"><span class="cardName">Drop a thought</span>'
+    +'<textarea class="draft" id="draft" placeholder="Say it here. Nothing gets lost — Vee keeps it."></textarea>'
+    +'<div class="hint" id="hint"></div>'
+    +'<div class="composerRow"><div class="prompts">'+chips+'</div><button class="btn btn-primary" id="drop">Drop</button></div></section>';
+}
+function feedInner(){
+  if(!notes.length)return '<p class="empty">The void is empty. Drop your first thought — nothing gets lost.</p>';
+  return notes.slice().sort((a,b)=>b.ts-a.ts).map(n=>
+    '<div class="note"><div class="noteBody"><p class="noteText">'+esc(n.text)+'</p><span class="noteMeta">'+when(n.ts)+'</span></div>'
+    +'<button class="xBtn" data-del="'+n.id+'" title="Remove">×</button></div>'
+  ).join('');
+}
+function voidHtml(){return '<div class="voidHead"><h2 class="sectionTitle">The void</h2><span class="count" id="count"></span></div><div class="feed" id="feed"></div>';}
+function countText(){return notes.length?notes.length+(notes.length===1?' thought':' thoughts'):'empty';}
+function renderFeed(){$('feed').innerHTML=feedInner();$('count').textContent=countText();}
+function render(){$('app').innerHTML=headerHtml()+composerHtml()+voidHtml();renderFeed();}
+
+function drop(){
+  const el=$('draft'),text=(el.value||'').trim();
+  if(!text){$('hint').textContent='Write something first.';el.focus();return;}
+  notes.push({id:newId(),text,ts:Date.now()});
+  persist();el.value='';$('hint').textContent='';renderFeed();el.focus();
+}
+
+document.addEventListener('click',e=>{
+  if(e.target.closest('#drop')){drop();return;}
+  const chip=e.target.closest('[data-prompt]');
+  if(chip){
+    const p=PROMPTS[Number(chip.getAttribute('data-prompt'))]||'';
+    const el=$('draft');el.value=el.value&&!/\n$/.test(el.value)?el.value+'\n'+p+'\n':p+'\n';
+    $('hint').textContent='';el.focus();el.selectionStart=el.selectionEnd=el.value.length;return;
+  }
+  const del=e.target.closest('[data-del]');
+  if(del){const id=del.getAttribute('data-del');notes=notes.filter(n=>n.id!==id);persist();renderFeed();}
+});
+document.addEventListener('input',e=>{if(e.target.id==='draft'&&$('hint').textContent)$('hint').textContent='';});
+document.addEventListener('keydown',e=>{if(e.target.id==='draft'&&(e.metaKey||e.ctrlKey)&&e.key==='Enter'){e.preventDefault();drop();}});
+
+(async()=>{const d=await window.Vitality.load();notes=Array.isArray(d)?d:[];render();})();
+</script>
+</body>
+</html>

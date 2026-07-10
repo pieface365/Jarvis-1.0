@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Fuel</title>
+<style>
+  /* Vitality reskin of the Patron "Macros" tile — sealed & bridge-backed. */
+  :root{
+    --bg:#050506;--surface:#0e0e11;--border:#1d1d22;--brand:#6EE7B7;
+    --brand-soft:rgba(110,231,183,.08);--brand-line:rgba(110,231,183,.35);
+    --muted:#84848c;--muted-strong:#a8a8b0;--fg:#ededf0;--neg:#ff6b6b;--neg-line:rgba(255,107,107,.4);
+    --track:#17171b;--radius-md:12px;--radius-pill:999px;
+    --font-display:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;
+    --font-mono:ui-monospace,SFMono-Regular,Menlo,"JetBrains Mono",monospace;
+    --space-3:10px;--space-4:14px;--space-5:18px;--space-8:28px;--duration:.2s;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-display);display:flex;justify-content:center;padding:40px 20px}
+  .shell{width:100%;max-width:620px}
+  .header{margin-bottom:22px}
+  .title{font-size:24px;font-weight:600;letter-spacing:-.01em;margin:0}
+  .subtitle{color:var(--muted);font-family:var(--font-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;margin:6px 0 0}
+  .card{border:1px solid var(--border);border-radius:16px;background:var(--surface);padding:18px}
+  .cardName{font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:14px}
+  .calHead{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+  .calMath{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap}
+  .calCell{display:flex;flex-direction:column;gap:2px}
+  .calCell .n{font-weight:600;font-size:30px;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+  .calCell .l{font-family:var(--font-mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  .calOp{font-size:22px;color:var(--muted)}
+  .calCell.remain .n{color:var(--brand)}
+  .calCell.remain.over .n{color:var(--neg)}
+  .goalEdit{display:flex;align-items:center;gap:8px}
+  .fieldInput{background:var(--bg);border:1px solid var(--border);color:var(--fg);border-radius:10px;padding:9px 11px;font:inherit}
+  .fieldInput:focus{outline:none;border-color:var(--brand)}
+  .goalEdit .fieldInput{width:92px}
+  .bar{height:10px;border-radius:var(--radius-pill);background:var(--track);overflow:hidden}
+  .barFill{height:100%;border-radius:var(--radius-pill);background:var(--brand);transition:width var(--duration) ease}
+  .barFill.over{background:var(--neg)}
+  .macroGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}
+  @media(max-width:560px){.macroGrid{grid-template-columns:repeat(2,1fr)}}
+  .macroBox{display:flex;flex-direction:column;gap:4px;padding:14px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--bg)}
+  .macroBox[data-accent="cal"]{border-color:var(--brand-line);background:var(--brand-soft)}
+  .macroVal{font-weight:600;font-size:22px;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+  .macroLabel{font-family:var(--font-mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  .sectionTitle{font-weight:600;font-size:17px;margin:28px 0 0}
+  .search{margin:18px 0 10px}
+  .search .fieldInput{width:100%}
+  .results,.logList{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+  .foodRow,.logRow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface)}
+  .foodName{font-weight:600;font-size:14px}
+  .meta{font-family:var(--font-mono);font-size:11px;color:var(--muted)}
+  .nums{font-family:var(--font-mono);font-size:11px;color:var(--muted-strong)}
+  .gramInput{width:74px}
+  .btn{border:1px solid var(--border);background:var(--bg);color:var(--fg);border-radius:10px;padding:9px 13px;font:inherit;cursor:pointer}
+  .btn-primary{background:var(--brand);color:#04140d;border:none;font-weight:600}
+  .xBtn{background:transparent;border:1px solid var(--border);color:var(--muted);width:26px;height:26px;border-radius:50%;cursor:pointer;flex-shrink:0}
+  .xBtn:hover{color:var(--neg);border-color:var(--neg-line)}
+  .empty{color:var(--muted);font-size:13px;padding:12px 0}
+  .hint{color:var(--neg);font-size:12px;font-family:var(--font-mono);min-height:14px;margin-top:4px}
+</style>
+</head>
+<body>
+<main><div class="shell" id="app"></div></main>
+<script>
+/* Fuel — daily food + macro tracker. Ported from the Patron "Macros" standalone:
+   reskinned to Vitality mint, sealed (no external assets), and persisting through
+   the dashboard bridge (window.Vitality) instead of localStorage. */
+const FOODS=[
+  {name:'Chicken breast',cal:165,p:31,c:0,f:3.6},{name:'Beef mince (5%)',cal:137,p:21,c:0,f:5},
+  {name:'Salmon',cal:208,p:20,c:0,f:13},{name:'Egg',cal:143,p:13,c:1.1,f:9.5},
+  {name:'Greek yogurt',cal:59,p:10,c:3.6,f:0.4},{name:'Whey protein',cal:400,p:80,c:8,f:6},
+  {name:'White rice',cal:130,p:2.7,c:28,f:0.3},{name:'Oats',cal:389,p:17,c:66,f:7},
+  {name:'Pasta (cooked)',cal:157,p:6,c:31,f:0.9},{name:'Potato',cal:77,p:2,c:17,f:0.1},
+  {name:'Sweet potato',cal:86,p:1.6,c:20,f:0.1},{name:'Banana',cal:89,p:1.1,c:23,f:0.3},
+  {name:'Apple',cal:52,p:0.3,c:14,f:0.2},{name:'Broccoli',cal:34,p:2.8,c:7,f:0.4},
+  {name:'Almonds',cal:579,p:21,c:22,f:50},{name:'Peanut butter',cal:588,p:25,c:20,f:50},
+  {name:'Olive oil',cal:884,p:0,c:0,f:100},{name:'Avocado',cal:160,p:2,c:9,f:15},
+  {name:'Cheddar cheese',cal:402,p:25,c:1.3,f:33},{name:'Milk (whole)',cal:61,p:3.2,c:4.8,f:3.3},
+  {name:'Bread (slice)',cal:265,p:9,c:49,f:3.2},{name:'Tuna (canned)',cal:116,p:26,c:0,f:1}
+];
+let store={};
+const $=id=>document.getElementById(id);
+function todayKey(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function persist(){window.Vitality.save(store);}
+function todaysLog(){return store[todayKey()]||[];}
+function setTodaysLog(l){store[todayKey()]=l;persist();}
+function goalCal(){return store.goalCal!=null?store.goalCal:2000;}
+function setGoalCal(n){store.goalCal=n;persist();}
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+const round=n=>Math.round(n);
+let query='',matches=[];
+function totals(){return todaysLog().reduce((t,e)=>{t.cal+=e.cal;t.p+=e.p;t.c+=e.c;t.f+=e.f;return t;},{cal:0,p:0,c:0,f:0});}
+function summaryHtml(){
+  const t=totals(),goal=goalCal(),remaining=goal-t.cal,over=remaining<0,pct=Math.min(100,goal>0?(t.cal/goal)*100:0);
+  const cell=(cls,n,l)=>'<div class="calCell '+cls+'"><span class="n">'+round(n)+'</span><span class="l">'+l+'</span></div>';
+  const head='<div class="calHead"><div class="calMath">'+cell('',goal,'goal')+'<span class="calOp">−</span>'+cell('',t.cal,'food')+'<span class="calOp">=</span>'+cell('remain'+(over?' over':''),Math.abs(remaining),over?'over':'remaining')+'</div>'
+    +'<div class="goalEdit"><span class="calCell"><span class="l">daily goal</span></span><input class="fieldInput" id="goal" type="number" min="0" step="50" value="'+goal+'" /></div></div>';
+  const bar='<div class="bar"><div class="barFill'+(over?' over':'')+'" style="width:'+pct+'%"></div></div>';
+  const box=(a,v,u,l)=>'<div class="macroBox" data-accent="'+a+'"><span class="macroVal">'+round(v)+(u||'')+'</span><span class="macroLabel">'+l+'</span></div>';
+  return '<section class="card"><span class="cardName">Today</span>'+head+bar+'<div class="macroGrid">'+box('p',t.p,'g','protein')+box('c',t.c,'g','carbs')+box('f',t.f,'g','fat')+box('cal',t.cal,'','calories')+'</div></section>';
+}
+function resultsInner(){
+  const q=query.trim().toLowerCase();
+  matches=q?FOODS.filter(f=>f.name.toLowerCase().includes(q)).slice(0,8):[];
+  if(!q)return '<p class="empty">Start typing to find a food…</p>';
+  if(!matches.length)return '<p class="empty">No match. (Add it to the FOODS list.)</p>';
+  return matches.map((f,i)=>'<div class="foodRow"><div><div class="foodName">'+esc(f.name)+'</div><div class="meta">'+f.cal+' kcal · '+f.p+'P / '+f.c+'C / '+f.f+'F per 100g</div></div><div style="display:flex;align-items:center;gap:8px"><input class="fieldInput gramInput" type="number" min="0" placeholder="g" data-grams="'+i+'" /><button class="btn btn-primary" data-add="'+i+'">Add</button></div></div>').join('');
+}
+function searchHtml(){return '<h2 class="sectionTitle">Add food</h2><div class="search"><input class="fieldInput" id="q" type="text" placeholder="Search foods (e.g. chicken, rice, banana)" value="'+esc(query)+'" autocomplete="off" /></div><div class="hint" id="hint"></div><div class="results" id="results">'+resultsInner()+'</div>';}
+function logHtml(){
+  const log=todaysLog();
+  if(!log.length)return '<h2 class="sectionTitle">Logged today</h2><p class="empty">Nothing logged yet.</p>';
+  const rows=log.map((e,i)=>'<div class="logRow"><div><div class="foodName">'+esc(e.name)+' <span class="meta">'+e.grams+'g</span></div><div class="nums">'+round(e.cal)+' kcal · '+round(e.p)+'P / '+round(e.c)+'C / '+round(e.f)+'F</div></div><button class="xBtn" data-del="'+i+'" title="Remove">×</button></div>').join('');
+  return '<h2 class="sectionTitle">Logged today</h2><div class="logList">'+rows+'</div>';
+}
+function headerHtml(){return '<header class="header"><h1 class="title">Fuel</h1><p class="subtitle">protein · carbs · fat</p></header>';}
+function render(){$('app').innerHTML=headerHtml()+summaryHtml()+searchHtml()+logHtml();}
+document.addEventListener('input',e=>{
+  if(e.target.id==='q'){query=e.target.value;$('results').innerHTML=resultsInner();$('hint').textContent='';}
+  if(e.target.id==='goal'){const n=Number(e.target.value);setGoalCal(isFinite(n)&&n>=0?n:0);render();$('goal').focus();}
+});
+document.addEventListener('click',e=>{
+  const add=e.target.closest('[data-add]');
+  if(add){
+    const f=matches[Number(add.getAttribute('data-add'))];
+    const gEl=document.querySelector('[data-grams="'+add.getAttribute('data-add')+'"]');
+    const grams=Number(gEl&&gEl.value);
+    if(!f||!isFinite(grams)||grams<=0){const h=$('hint');if(h)h.textContent='Enter how many grams.';return;}
+    const k=grams/100,log=todaysLog();
+    log.push({name:f.name,grams,cal:f.cal*k,p:f.p*k,c:f.c*k,f:f.f*k});
+    setTodaysLog(log);query='';render();return;
+  }
+  const del=e.target.closest('[data-del]');
+  if(del){const log=todaysLog();log.splice(Number(del.getAttribute('data-del')),1);setTodaysLog(log);render();}
+});
+(async()=>{const d=await window.Vitality.load();store=(d&&typeof d==='object'&&!Array.isArray(d))?d:{};render();})();
+</script>
+</body>
+</html>

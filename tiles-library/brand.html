@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<meta name="theme-color" content="#050506" />
+<title>Brand</title>
+<style>
+  /* Vitality reskin of the Patron "Creator" tile — sealed & bridge-backed.
+     Live TikTok scrape / YouTube API stripped; it is now a manual snapshot
+     logger (enter followers · views · uploads → growth deltas + sparklines
+     build themselves). Persists through the window.Vitality bridge. */
+  :root{
+    --bg:#050506;--surface:#0e0e11;--fg:#ededf0;
+    --brand:#6EE7B7;--brand-2:#a7f3d0;--brand-ink:#04140d;
+    --brand-soft:rgba(110,231,183,.08);--brand-line:rgba(110,231,183,.35);--brand-glow:rgba(110,231,183,.30);
+    --accent:#6EE7B7;--accent-rgb:110,231,183;
+    --pos:#6EE7B7;--pos-rgb:110,231,183;--neg:#ff6b6b;--amber:#fbbf24;--red:#ff6b6b;
+    --pos-soft:rgba(110,231,183,.12);--neg-soft:rgba(255,107,107,.14);
+    --muted:#84848c;--muted-strong:#a8a8b0;
+    --border:#1d1d22;--border-strong:#2a2a33;
+    --card:#0e0e11;--card-elevated:#141419;
+    --card-shadow:0 1px 0 rgba(255,255,255,.03) inset,0 18px 44px -30px rgba(0,0,0,.85);
+    --track:#17171b;
+    --space-2:.5rem;--space-3:.75rem;--space-4:1rem;--space-5:1.25rem;--space-8:2rem;--space-16:4rem;
+    --radius-sm:8px;--radius-md:11px;--radius-lg:14px;--radius-xl:18px;--radius-pill:999px;
+    --text-xs:.75rem;--text-sm:.875rem;--text-base:1rem;--text-lg:1.125rem;--text-xl:1.375rem;--text-3xl:2.25rem;
+    --ease:cubic-bezier(.2,.8,.2,1);--ease-premium:cubic-bezier(.16,1,.3,1);--duration:200ms;
+    --font-inter:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;
+    --font-serif:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;
+    --font-mono:ui-monospace,SFMono-Regular,Menlo,"JetBrains Mono",monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:var(--bg);color:var(--fg);font:var(--text-base)/1.5 var(--font-inter);-webkit-font-smoothing:antialiased;min-height:100vh}
+  @media(max-width:480px){input,select,textarea{font-size:16px}}
+  .page{min-height:100vh;padding:var(--space-8) var(--space-5) var(--space-16)}
+  .shell{max-width:860px;margin:0 auto}
+
+  /* Header */
+  .header{display:flex;justify-content:space-between;align-items:flex-start;gap:var(--space-4);margin-bottom:var(--space-8);flex-wrap:wrap}
+  .headerLeft{display:flex;flex-direction:column;gap:var(--space-4)}
+  .detailHero{display:flex;align-items:center;gap:var(--space-3)}
+  .detailEmoji{font-size:42px;line-height:1}
+  .detailHeroText{display:flex;flex-direction:column;gap:6px}
+  .title{font-family:var(--font-serif);font-weight:600;font-size:var(--text-3xl);line-height:1;letter-spacing:-.03em;margin:0}
+  .detailChip{align-self:flex-start;font-family:var(--font-mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--brand);background:var(--brand-soft);border:1px solid var(--brand-line);padding:3px 9px;border-radius:var(--radius-pill)}
+  .detailBlurb{font-size:13px;color:var(--muted-strong);margin:0;max-width:52ch;line-height:1.5}
+  .editBtn{appearance:none;background:transparent;border:1px solid var(--border);color:var(--muted-strong);font-family:inherit;font-size:11px;letter-spacing:.04em;padding:7px 14px;border-radius:var(--radius-pill);cursor:pointer;transition:color var(--duration) var(--ease-premium),border-color var(--duration) var(--ease-premium)}
+  .editBtn:hover{color:var(--fg);border-color:var(--border-strong)}
+
+  /* Eyebrow */
+  .eyebrow{display:inline-flex;align-items:center;gap:var(--space-2);font-family:var(--font-mono);font-size:11px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--muted-strong)}
+  .eyebrowMark{font-family:var(--font-mono);font-size:10px;color:var(--brand)}
+  .eyebrowRule{width:24px;height:1px;background:var(--border-strong)}
+
+  /* Section card */
+  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-xl);padding:var(--space-5);margin-bottom:var(--space-4);box-shadow:var(--card-shadow)}
+  .cardHead{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);margin-bottom:var(--space-4);flex-wrap:wrap}
+
+  /* Schedule */
+  .scheduleList{display:flex;flex-direction:column;gap:var(--space-3)}
+  .scheduleRow{position:relative;display:flex;align-items:center;justify-content:space-between;gap:var(--space-4);padding:var(--space-4);background:var(--card-elevated);border:1px solid var(--border);border-radius:var(--radius-lg);flex-wrap:wrap;transition:border-color var(--duration) var(--ease-premium)}
+  .scheduleRow:hover{border-color:var(--border-strong)}
+  .scheduleRowHit{border-color:var(--brand-line);background:var(--brand-soft)}
+  .scheduleInfo{flex:1;min-width:200px;display:flex;flex-direction:column;gap:10px}
+  .scheduleTitleRow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .platformBadge{font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--brand);background:var(--brand-soft);border:1px solid var(--brand-line);padding:2px 7px;border-radius:var(--radius-sm)}
+  .scheduleLabel{font-family:var(--font-serif);font-weight:600;font-size:var(--text-lg);letter-spacing:-.01em}
+  .scheduleSpec{font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .scheduleGear{margin-left:auto;appearance:none;background:transparent;border:0;color:var(--muted);font-size:14px;cursor:pointer;padding:2px 6px;border-radius:var(--radius-sm)}
+  .scheduleGear:hover{color:var(--fg)}
+  .setupPill{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border:1px solid var(--brand-line);background:var(--brand-soft);color:var(--brand);border-radius:var(--radius-pill);font-size:12px;cursor:pointer;font-family:inherit}
+  .setupDot{width:7px;height:7px;border-radius:50%;background:var(--brand);box-shadow:0 0 8px var(--brand-glow)}
+  .setupPill b{font-family:var(--font-mono);font-size:11px;letter-spacing:.04em}
+  .scheduleProgressRow{display:flex;align-items:center;gap:var(--space-3)}
+  .scheduleCount{font-family:var(--font-serif);font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;letter-spacing:-.02em}
+  .scheduleCountNum{font-size:30px}
+  .scheduleCountSlash{font-size:18px;color:var(--muted);margin:0 2px}
+  .scheduleCountTarget{font-size:18px;color:var(--muted-strong)}
+  .scheduleBar{flex:1;height:5px;background:var(--track);border-radius:var(--radius-pill);overflow:hidden}
+  .progressFill{height:100%;background:var(--brand);border-radius:var(--radius-pill);transition:width .6s var(--ease-premium);box-shadow:0 0 12px var(--brand-glow)}
+  .progressFillDone{background:linear-gradient(90deg,var(--brand),var(--brand-2))}
+  .scheduleControls{display:flex;align-items:center;gap:var(--space-3)}
+  .scheduleLogGroup{display:inline-flex;border:1px solid var(--border-strong);border-radius:var(--radius-pill);overflow:hidden;flex-shrink:0}
+  .scheduleMinus,.scheduleLogBtn{appearance:none;background:transparent;border:0;color:var(--fg);font-family:inherit;font-size:13px;padding:8px 12px;cursor:pointer;white-space:nowrap;transition:background var(--duration) var(--ease-premium)}
+  .scheduleMinus{border-right:1px solid var(--border-strong);font-size:16px;line-height:1}
+  .scheduleMinus:disabled{opacity:.3;cursor:not-allowed}
+  .scheduleLogBtn{color:var(--brand);font-weight:700}
+  .scheduleMinus:hover:not(:disabled),.scheduleLogBtn:hover{background:var(--brand-soft)}
+  .countdownChip{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:11px;letter-spacing:.04em;padding:6px 11px;border:1px solid;border-radius:var(--radius-pill);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .cdDot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+  .dlToggle{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted-strong);cursor:pointer}
+  .addBtnGhost{width:100%;margin-top:var(--space-3);appearance:none;background:transparent;border:1px dashed var(--border-strong);border-radius:var(--radius-lg);color:var(--muted);font-family:inherit;font-size:12px;letter-spacing:.06em;text-transform:uppercase;padding:12px;cursor:pointer;transition:color var(--duration) var(--ease-premium),border-color var(--duration) var(--ease-premium),background var(--duration) var(--ease-premium)}
+  .addBtnGhost:hover{color:var(--brand);border-color:var(--brand-line);background:var(--brand-soft);border-style:solid}
+
+  /* Inline editors */
+  .editor{flex-basis:100%;margin-top:var(--space-2);padding-top:var(--space-3);border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:var(--space-3);align-items:flex-end}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .fieldLabel{font-family:var(--font-mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+  .input,.select{appearance:none;background:var(--card-elevated);border:1px solid var(--border-strong);border-radius:var(--radius-md);color:var(--fg);font-family:inherit;font-size:13px;padding:9px 11px;outline:none;transition:border-color var(--duration) var(--ease-premium),box-shadow var(--duration) var(--ease-premium)}
+  .input:focus,.select:focus{border-color:var(--brand-line);box-shadow:0 0 0 3px var(--brand-soft)}
+  .input::placeholder{color:var(--muted)}
+  .editorActions{margin-left:auto;display:flex;gap:8px}
+  .btnSm{appearance:none;border:1px solid var(--border);background:transparent;color:var(--muted-strong);font-family:inherit;font-size:12px;padding:7px 13px;border-radius:var(--radius-pill);cursor:pointer}
+  .btnSm:hover{color:var(--fg);border-color:var(--border-strong)}
+  .btnDanger:hover{color:var(--red);border-color:var(--brand-line)}
+
+  /* Accounts */
+  .ccReach{font-family:var(--font-serif);font-weight:600;font-variant-numeric:tabular-nums;font-size:var(--text-xl);letter-spacing:-.02em}
+  .ccReachLabel{font-family:var(--font-mono);font-weight:400;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-left:4px}
+  .headRight{display:flex;align-items:center;gap:var(--space-4)}
+  .accountGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-3)}
+  @media(max-width:720px){.accountGrid{grid-template-columns:1fr}}
+  .accountCard{display:flex;flex-direction:column;gap:10px;padding:var(--space-4);background:var(--card-elevated);border:1px solid var(--border);border-radius:var(--radius-lg);transition:border-color var(--duration) var(--ease-premium),transform var(--duration) var(--ease-premium)}
+  .accountCard:hover{border-color:var(--border-strong);transform:translateY(-1px)}
+  .accountTop{display:flex;align-items:center;gap:10px}
+  .avatar{width:36px;height:36px;border-radius:50%;flex-shrink:0;display:grid;place-items:center;background:var(--brand-soft);border:1px solid var(--brand-line)}
+  .avatarFallback{font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--brand)}
+  .accountHandle{font-size:13px;color:var(--muted-strong);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+  .accountNumRow{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+  .accountNum{font-family:var(--font-serif);font-weight:600;font-size:30px;font-variant-numeric:tabular-nums;line-height:1;letter-spacing:-.03em}
+  .accountNumLabel{font-family:var(--font-mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  .delta{font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:var(--radius-pill)}
+  .deltaUp{color:var(--pos);background:var(--pos-soft)}
+  .deltaDown{color:var(--red);background:var(--neg-soft)}
+  .deltaMuted{font-size:10px;color:var(--muted);font-style:italic}
+  .deltaFlat{font-size:11px;color:var(--muted)}
+  .spark{width:100%;display:block}
+  .accountList{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+  .accountEditRow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .accountEditRow .select{width:76px}
+  .accountEditRow input[data-f="handle"]{flex:1;min-width:130px}
+  .accountEditRow input[type="number"]{width:96px}
+  .addForm{display:flex;gap:8px;margin-top:var(--space-3);flex-wrap:wrap}
+  .addForm .input{flex:1;min-width:120px}
+
+  /* Analytics */
+  .statsHero{display:grid;grid-template-columns:1fr 1.1fr;gap:var(--space-4);align-items:center;padding:var(--space-4);background:var(--card-elevated);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:var(--space-4)}
+  @media(max-width:680px){.statsHero{grid-template-columns:1fr}}
+  .statsHeroLabel{font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+  .statsHeroNum{font-family:var(--font-serif);font-weight:600;font-size:52px;line-height:1;font-variant-numeric:tabular-nums;margin:6px 0 10px;letter-spacing:-.03em}
+  .statsHeroMeta{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .statsHeroMilestone{font-family:var(--font-mono);font-size:11px;color:var(--muted);letter-spacing:.04em}
+  .statsHeroSpark{height:64px}
+  .platformGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:var(--space-3)}
+  @media(max-width:600px){.platformGrid{grid-template-columns:1fr}}
+  .platformCard{display:flex;flex-direction:column;gap:8px;padding:var(--space-4);background:var(--card-elevated);border:1px solid var(--border);border-radius:var(--radius-lg)}
+  .platformCardHead{display:flex;align-items:center;gap:8px}
+  .platformCardNumWrap{display:flex;align-items:baseline;gap:8px}
+  .platformCardNum{font-family:var(--font-serif);font-weight:600;font-size:28px;font-variant-numeric:tabular-nums;line-height:1;letter-spacing:-.03em}
+  .platformCardFoot{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:2px}
+  .secondaryStat{font-family:var(--font-mono);font-size:11px;color:var(--muted-strong);font-variant-numeric:tabular-nums}
+
+  /* Links */
+  .linkList{list-style:none;margin:0 0 var(--space-3);padding:0;display:flex;flex-direction:column;gap:8px}
+  .linkRow{display:grid;grid-template-columns:1fr 1.4fr auto auto;gap:8px;align-items:center}
+  @media(max-width:600px){.linkRow{grid-template-columns:1fr 1fr}}
+  .linkOpen{display:grid;place-items:center;width:34px;height:34px;border:1px solid var(--border);border-radius:var(--radius-md);color:var(--brand);text-decoration:none;transition:border-color var(--duration) var(--ease-premium)}
+  .linkOpen:hover{border-color:var(--brand-line)}
+  .emptyText{font-size:13px;color:var(--muted);line-height:1.6;margin:0}
+  .noteLine{font-size:11px;color:var(--muted);margin:var(--space-3) 0 0;font-style:italic}
+  .delBtn{appearance:none;background:transparent;border:1px solid var(--border);color:var(--muted);font-size:14px;line-height:1;width:30px;height:30px;border-radius:var(--radius-md);cursor:pointer}
+  .delBtn:hover{color:var(--red);border-color:var(--brand-line)}
+  .primaryBtn{appearance:none;background:var(--brand);border:0;color:var(--brand-ink);font-family:inherit;font-weight:700;font-size:13px;padding:9px 16px;border-radius:var(--radius-pill);cursor:pointer;transition:filter var(--duration) var(--ease-premium),box-shadow var(--duration) var(--ease-premium)}
+  .primaryBtn:hover{filter:brightness(1.08);box-shadow:0 0 22px var(--brand-glow)}
+  @media(prefers-reduced-motion:reduce){.progressFill{transition:none}}
+</style>
+</head>
+<body>
+<main class="page"><div class="shell" id="app"></div></main>
+<script>
+/* Brand — creator / brand-metrics tile. Ported from the Patron "Creator"
+   standalone: reskinned to Vitality mint, sealed (no external assets, no
+   network), and persisting through the dashboard bridge (window.Vitality).
+   The live TikTok-scrape / YouTube-API refresh was removed; every number is
+   entered by hand and each edit snapshots into history → growth + sparklines. */
+
+/* ============================ Platform maps ============================ */
+const PLATFORM_SHORT={tiktok:'TT',instagram:'IG',youtube:'YT',youtube_long:'YT',x:'X',linkedin:'IN',threads:'TH',substack:'SS',patreon:'PT',etsy:'ET',shopify:'SH',website:'WB',other:'··'};
+const PLATFORM_LABELS={tiktok:'TikTok',instagram:'Instagram',youtube:'YouTube',youtube_long:'YouTube (long)',x:'X / Twitter',linkedin:'LinkedIn',threads:'Threads',substack:'Substack',patreon:'Patreon',etsy:'Etsy',shopify:'Shopify',website:'Website',other:'Other'};
+const ALL_PLATFORMS=['tiktok','instagram','youtube','youtube_long','x','linkedin','threads','substack','patreon','etsy','shopify','website','other'];
+const UNITS=['posts','videos','shorts','episodes','newsletters'];
+const DAY=86400000;
+
+/* ============================ Helpers ============================ */
+function fmtCount(n){if(n>=1e6)return (n/1e6).toFixed(1).replace(/\.0$/,'')+'M';if(n>=1e3)return (n/1e3).toFixed(1).replace(/\.0$/,'')+'K';return Math.round(n).toLocaleString();}
+function nextMilestone(n){const ms=[1e3,5e3,1e4,2e4,5e4,1e5,25e4,5e5,1e6];for(const m of ms)if(m>n)return m;return Math.ceil(n/1e6)*1e6+1e6;}
+function latestSnap(hist,f){if(!hist||!hist.length)return undefined;for(let i=hist.length-1;i>=0;i--){const v=hist[i][f];if(typeof v==='number')return v;}return undefined;}
+function deltaSinceDays(hist,f,days){if(!hist||hist.length<2)return null;const now=Date.now();const cutoff=now-days*DAY;let base=null;for(const s of hist){if(s.t>=cutoff&&typeof s[f]==='number'){base=s;break;}}if(!base){for(let i=hist.length-1;i>=0;i--){if(typeof hist[i][f]==='number'){base=hist[i];break;}}}const last=latestSnap(hist,f);if(base==null||typeof last!=='number'||typeof base[f]!=='number')return null;return last-base[f];}
+function combinedSeries(accounts,f){const longest=accounts.reduce((m,a)=>Math.max(m,(a.history||[]).length),0);if(longest<2)return[];const out=[];for(let i=0;i<longest;i++){let total=0,any=false;for(const a of accounts){const h=a.history||[];if(!h.length)continue;const v=h[Math.min(i,h.length-1)][f];if(typeof v==='number'){total+=v;any=true;}}if(any)out.push(total);}return out;}
+const WEEKDAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+function minutesToTime(m){m=m||0;return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');}
+function timeToMinutes(v){const p=(v||'').split(':');const h=parseInt(p[0],10),m=parseInt(p[1],10);if(!isFinite(h)||!isFinite(m))return 0;return Math.max(0,Math.min(1439,h*60+m));}
+function nextDeadline(s,now){
+  if(!s.deadline)return null;
+  const min=s.deadline.minutes||0;const d=new Date(now);
+  d.setHours(Math.floor(min/60),min%60,0,0);
+  if(s.period==='weekly'){const wd=s.deadline.weekday||0;let diff=(wd-d.getDay()+7)%7;d.setDate(d.getDate()+diff);if(d.getTime()<=now.getTime())d.setDate(d.getDate()+7);return d;}
+  if(d.getTime()<=now.getTime())d.setDate(d.getDate()+1);
+  return d;
+}
+function formatCountdown(ms){
+  if(ms<=0)return 'overdue';
+  const s=Math.floor(ms/1000),d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60),sec=s%60;
+  if(d>0)return d+'d '+h+'h';
+  if(h>0)return h+'h '+String(m).padStart(2,'0')+'m';
+  return m+'m '+String(sec).padStart(2,'0')+'s';
+}
+function clamp01(x){return Math.max(0,Math.min(1,x));}
+function deadlineUrgency(remaining,period){if(remaining<=0)return 1;const th=period==='weekly'?36*3600000:6*3600000;return clamp01(1-remaining/th);}
+const _ACC=[110,231,183],_AMB=[251,191,36],_RED=[255,107,107];
+function _lerp(a,b,t){return Math.round(a+(b-a)*t);}
+function urgencyColor(u){let c;if(u<.5){const t=u/.5;c=[_lerp(_ACC[0],_AMB[0],t),_lerp(_ACC[1],_AMB[1],t),_lerp(_ACC[2],_AMB[2],t)];}else{const t=(u-.5)/.5;c=[_lerp(_AMB[0],_RED[0],t),_lerp(_AMB[1],_RED[1],t),_lerp(_AMB[2],_RED[2],t)];}return c.join(',');}
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+function genId(p){return p+'_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6);}
+
+/* Sparkline SVG (inline, no external assets) */
+function sparkSvg(values,height,color){
+  if(!values||values.length<2)return '';
+  height=height||40;color=color||'var(--accent)';const W=240,padY=4;
+  const min=Math.min.apply(null,values),max=Math.max.apply(null,values),range=(max-min)||1;
+  const pts=values.map((v,i)=>((i/(values.length-1))*W).toFixed(1)+','+(height-padY-((v-min)/range)*(height-padY*2)).toFixed(1)).join(' ');
+  const lastY=(height-padY-((values[values.length-1]-min)/range)*(height-padY*2)).toFixed(1);
+  const gid='g'+Math.random().toString(36).slice(2,8);
+  return '<svg class="spark" height="'+height+'" viewBox="0 0 '+W+' '+height+'" preserveAspectRatio="none" aria-hidden>'
+    +'<defs><linearGradient id="'+gid+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="'+color+'" stop-opacity=".25"/><stop offset="100%" stop-color="'+color+'" stop-opacity="0"/></linearGradient></defs>'
+    +'<polygon points="0,'+height+' '+pts+' '+W+','+height+'" fill="url(#'+gid+')"/>'
+    +'<polyline points="'+pts+'" fill="none" stroke="'+color+'" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
+    +'<circle cx="'+W+'" cy="'+lastY+'" r="3" fill="'+color+'"/></svg>';
+}
+
+/* ============================ State ============================ */
+let state={};
+const ui={editAccounts:false,editSchedule:null};
+function save(){window.Vitality.save(state);}
+function seed(){
+  const now=Date.now();
+  return {
+    schedules:[{id:genId('sch'),platform:'youtube',label:'YouTube',target:1,unit:'videos',period:'weekly',done:0}],
+    accounts:[
+      {id:genId('acc'),platform:'instagram',handle:'@yourhandle',followers:8500,history:[{t:now-2*DAY,count:8380},{t:now,count:8500}]},
+      {id:genId('acc'),platform:'tiktok',handle:'yourhandle',followers:3200,lifetimeViews:145000,videoCount:40,history:[{t:now,count:3200,views:145000,videos:40}]},
+      {id:genId('acc'),platform:'youtube',handle:'YourChannel',followers:1200,lifetimeViews:90000,videoCount:25,history:[{t:now,count:1200,views:90000,videos:25}]},
+    ],
+    links:[],
+    setupDismissed:false,
+  };
+}
+
+/* Snapshot the account's current numbers into its history → growth + sparklines. */
+function pushHist(a){
+  const snap={t:Date.now()};
+  if(typeof a.followers==='number')snap.count=a.followers;
+  if(typeof a.lifetimeViews==='number')snap.views=a.lifetimeViews;
+  if(typeof a.videoCount==='number')snap.videos=a.videoCount;
+  if(snap.count==null&&snap.views==null&&snap.videos==null)return;
+  const last=a.history&&a.history[a.history.length-1];
+  if(last&&Date.now()-last.t<60000){a.history[a.history.length-1]=snap;}
+  else{a.history=(a.history||[]).concat(snap);if(a.history.length>60)a.history.shift();}
+}
+
+/* ============================ Mutations ============================ */
+const A={
+  logSchedule(id,d){const s=state.schedules.find(x=>x.id===id);if(!s)return;s.done=Math.max(0,(s.done||0)+d);state.setupDismissed=true;save();render();},
+  addSchedule(){state.schedules.push({id:genId('sch'),platform:'youtube',label:'New schedule',target:1,unit:'videos',period:'weekly',done:0});save();render();},
+  updateSchedule(id,patch){const s=state.schedules.find(x=>x.id===id);if(s)Object.assign(s,patch);save();render();},
+  removeSchedule(id){state.schedules=state.schedules.filter(x=>x.id!==id);ui.editSchedule=null;save();render();},
+  addAccount(platform,handle){state.accounts.push({id:genId('acc'),platform,handle:handle.trim(),followers:null,history:[]});save();render();},
+  updateAccount(id,patch){
+    const a=state.accounts.find(x=>x.id===id);if(!a)return;
+    const before={f:a.followers,v:a.lifetimeViews,n:a.videoCount};
+    Object.assign(a,patch);
+    const changed=('followers'in patch&&a.followers!==before.f)||('lifetimeViews'in patch&&a.lifetimeViews!==before.v)||('videoCount'in patch&&a.videoCount!==before.n);
+    if(changed)pushHist(a);
+    save();render();
+  },
+  removeAccount(id){state.accounts=state.accounts.filter(x=>x.id!==id);save();render();},
+  addLink(label,url){state.links.push({id:genId('lnk'),label:label.trim()||'Link',url:url.trim()});save();render();},
+  updateLink(id,patch){const l=state.links.find(x=>x.id===id);if(l)Object.assign(l,patch);save();render();},
+  removeLink(id){state.links=state.links.filter(x=>x.id!==id);save();render();},
+};
+
+/* ============================ Views ============================ */
+function headerHtml(){
+  return '<header class="header"><div class="headerLeft">'
+    +'<div class="detailHero"><span class="detailEmoji">🎬</span><div class="detailHeroText"><h1 class="title">Brand</h1><span class="detailChip">creator metrics</span></div></div>'
+    +'<p class="detailBlurb">Log followers, views and posting cadence by hand — growth deltas and sparklines build themselves.</p>'
+    +'</div></header>';
+}
+
+function scheduleSection(){
+  const rows=state.schedules.map(s=>{
+    const done=s.done||0,target=s.target||0,hit=target>0&&done>=target,pct=target>0?Math.min(100,done/target*100):0;
+    const period=s.period==='weekly'?'/ wk':'/ day';
+    let cd='';
+    if(s.deadline){const dl=nextDeadline(s,new Date());if(dl){const rem=dl.getTime()-Date.now();const u=deadlineUrgency(rem,s.period);const rgb=urgencyColor(u);cd='<span class="countdownChip" id="cd-'+s.id+'" title="Time left to post" style="color:rgb('+rgb+');border-color:rgba('+rgb+',.4);background:rgba('+rgb+',.08)"><span class="cdDot" style="background:rgb('+rgb+')"></span>'+(rem<=0?'overdue':formatCountdown(rem))+'</span>';}}
+    let editor='';
+    if(ui.editSchedule===s.id){
+      editor='<div class="editor">'
+        +'<div class="field"><span class="fieldLabel">Label</span><input class="input" data-sch="'+s.id+'" data-f="label" value="'+esc(s.label)+'"></div>'
+        +'<div class="field"><span class="fieldLabel">Platform</span><select class="select" data-sch="'+s.id+'" data-f="platform">'+ALL_PLATFORMS.map(p=>'<option value="'+p+'"'+(p===s.platform?' selected':'')+'>'+PLATFORM_LABELS[p]+'</option>').join('')+'</select></div>'
+        +'<div class="field"><span class="fieldLabel">Target</span><input class="input" type="number" min="1" style="width:70px" data-sch="'+s.id+'" data-f="target" value="'+target+'"></div>'
+        +'<div class="field"><span class="fieldLabel">Unit</span><select class="select" data-sch="'+s.id+'" data-f="unit">'+UNITS.map(u=>'<option value="'+u+'"'+(u===s.unit?' selected':'')+'>'+u+'</option>').join('')+'</select></div>'
+        +'<div class="field"><span class="fieldLabel">Period</span><select class="select" data-sch="'+s.id+'" data-f="period"><option value="daily"'+(s.period==='daily'?' selected':'')+'>per day</option><option value="weekly"'+(s.period==='weekly'?' selected':'')+'>per week</option></select></div>'
+        +'<div class="field"><span class="fieldLabel">Posting deadline</span><label class="dlToggle"><input type="checkbox" data-sch="'+s.id+'" data-f="deadlineOn"'+(s.deadline?' checked':'')+'> set a time</label></div>'
+        +(s.deadline?((s.period==='weekly'?'<div class="field"><span class="fieldLabel">Day</span><select class="select" data-sch="'+s.id+'" data-f="deadlineWeekday">'+WEEKDAYS.map((w,i)=>'<option value="'+i+'"'+((s.deadline.weekday||0)===i?' selected':'')+'>'+w+'</option>').join('')+'</select></div>':'')+'<div class="field"><span class="fieldLabel">Time</span><input class="input" type="time" data-sch="'+s.id+'" data-f="deadlineTime" value="'+minutesToTime(s.deadline.minutes||0)+'"></div>'):'')
+        +'<div class="editorActions">'+(state.schedules.length>1?'<button class="btnSm btnDanger" data-act="rmSchedule" data-id="'+s.id+'">Remove</button>':'')+'<button class="btnSm" data-act="closeSchedule">Done</button></div>'
+        +'</div>';
+    }
+    return '<div class="scheduleRow '+(hit?'scheduleRowHit':'')+'">'
+      +'<div class="scheduleInfo"><div class="scheduleTitleRow"><span class="platformBadge">'+PLATFORM_SHORT[s.platform]+'</span><span class="scheduleLabel">'+esc(s.label)+'</span><span class="scheduleSpec">'+target+' '+esc(s.unit)+' '+period+'</span><button class="scheduleGear" data-act="editSchedule" data-id="'+s.id+'">⚙</button></div>'
+      +'<div class="scheduleProgressRow"><span class="scheduleCount"><span class="scheduleCountNum">'+done+'</span><span class="scheduleCountSlash">/</span><span class="scheduleCountTarget">'+target+'</span></span><div class="scheduleBar"><div class="progressFill '+(hit?'progressFillDone':'')+'" style="width:'+pct+'%"></div></div></div></div>'
+      +'<div class="scheduleControls">'+cd+'<div class="scheduleLogGroup"><button class="scheduleMinus" data-act="logMinus" data-id="'+s.id+'"'+(done<=0?' disabled':'')+'>−</button><button class="scheduleLogBtn" data-act="logPlus" data-id="'+s.id+'">+ shipped</button></div></div>'
+      +editor+'</div>';
+  }).join('');
+  const setup=(!state.setupDismissed&&state.schedules[0])?'<button class="setupPill" data-act="editSchedule" data-id="'+state.schedules[0].id+'"><span class="setupDot"></span>Finish setup · <b>1 left</b> →</button>':'';
+  return '<section class="card"><div class="cardHead"><span class="eyebrow"><span class="eyebrowMark">·01</span><span class="eyebrowRule"></span>Schedule</span>'+setup+'</div>'
+    +'<div class="scheduleList">'+rows+'</div><button class="addBtnGhost" data-act="addSchedule">+ Add schedule</button></section>';
+}
+
+function accountCardCompact(a){
+  const isYT=a.platform==='youtube'||a.platform==='youtube_long';
+  const delta=deltaSinceDays(a.history,'count',7);
+  const series=(a.history||[]).map(s=>s.count).filter(v=>typeof v==='number');
+  let deltaHtml='';
+  if(delta!==null&&delta!==0)deltaHtml='<span class="delta '+(delta>=0?'deltaUp':'deltaDown')+'">'+(delta>=0?'▲':'▼')+' '+Math.abs(delta).toLocaleString()+'</span>';
+  return '<article class="accountCard"><div class="accountTop"><span class="avatar"><span class="avatarFallback">'+PLATFORM_SHORT[a.platform]+'</span></span><span class="accountHandle" title="'+esc(a.handle)+'">'+esc(a.handle||'—')+'</span></div>'
+    +'<div class="accountNumRow"><span class="accountNum">'+(typeof a.followers==='number'?a.followers.toLocaleString():'—')+'</span><span class="accountNumLabel">'+(isYT?'subs':'followers')+'</span>'+deltaHtml+'</div>'
+    +(series.length>=2?sparkSvg(series,30):'')+'</article>';
+}
+function accountEditRow(a){
+  return '<li class="accountEditRow">'
+    +'<select class="select" data-acc="'+a.id+'" data-f="platform">'+ALL_PLATFORMS.map(p=>'<option value="'+p+'"'+(p===a.platform?' selected':'')+'>'+PLATFORM_SHORT[p]+'</option>').join('')+'</select>'
+    +'<input class="input" data-acc="'+a.id+'" data-f="handle" value="'+esc(a.handle)+'" placeholder="@handle">'
+    +'<input class="input" type="number" min="0" data-acc="'+a.id+'" data-f="followers" value="'+(a.followers==null?'':a.followers)+'" placeholder="followers">'
+    +'<input class="input" type="number" min="0" data-acc="'+a.id+'" data-f="lifetimeViews" value="'+(a.lifetimeViews==null?'':a.lifetimeViews)+'" placeholder="total views">'
+    +'<input class="input" type="number" min="0" data-acc="'+a.id+'" data-f="videoCount" value="'+(a.videoCount==null?'':a.videoCount)+'" placeholder="uploads">'
+    +'<button class="delBtn" data-act="rmAccount" data-id="'+a.id+'">×</button></li>';
+}
+function accountsSection(){
+  const reach=state.accounts.reduce((s,a)=>s+(typeof a.followers==='number'?a.followers:0),0);
+  let body;
+  if(ui.editAccounts){
+    body=(state.accounts.length?'<ul class="accountList">'+state.accounts.map(accountEditRow).join('')+'</ul>':'<p class="emptyText">Add the platforms where this brand lives — pick one and enter your @handle.</p>')
+      +'<form class="addForm" data-act="addAccountForm"><select class="select" id="newPlat">'+ALL_PLATFORMS.map(p=>'<option value="'+p+'">'+PLATFORM_LABELS[p]+'</option>').join('')+'</select><input class="input" id="newHandle" placeholder="@handle or name"><button type="submit" class="primaryBtn">+ Add</button></form>'
+      +'<p class="noteLine">Every count is entered by hand — update the number each week and the growth deltas + sparklines build themselves.</p>';
+  } else if(state.accounts.length===0){
+    body='<p class="emptyText">No accounts linked yet. Tap <b>+ Add account</b> to add the platforms where this brand lives.</p>';
+  } else body='<div class="accountGrid">'+state.accounts.map(accountCardCompact).join('')+'</div>';
+  return '<section class="card"><div class="cardHead"><span class="eyebrow"><span class="eyebrowMark">·02</span><span class="eyebrowRule"></span>Accounts</span>'
+    +'<div class="headRight">'+(reach>0?'<span class="ccReach">'+reach.toLocaleString()+'<span class="ccReachLabel">reach</span></span>':'')
+    +'<button class="editBtn" data-act="toggleEdit">'+(ui.editAccounts?'Done':(state.accounts.length?'Edit':'+ Add account'))+'</button></div></div>'
+    +body+'</section>';
+}
+
+function platformAnalytics(a){
+  const isYT=a.platform==='youtube'||a.platform==='youtube_long';
+  const followers=a.followers||0;
+  const weekly=deltaSinceDays(a.history,'count',7);
+  const views=latestSnap(a.history,'views')!=null?latestSnap(a.history,'views'):a.lifetimeViews;
+  const videos=latestSnap(a.history,'videos')!=null?latestSnap(a.history,'videos'):a.videoCount;
+  const avg=(typeof views==='number'&&typeof videos==='number'&&videos>0)?Math.round(views/videos):undefined;
+  const series=(a.history||[]).map(s=>s.count).filter(v=>typeof v==='number');
+  const viewsLabel=isYT?'views':'likes';
+  let deltaHtml;
+  if(weekly===null)deltaHtml='<span class="deltaMuted">log again next week for this stat</span>';
+  else if(weekly===0)deltaHtml='<span class="deltaFlat">· flat this week</span>';
+  else deltaHtml='<span class="delta '+(weekly>=0?'deltaUp':'deltaDown')+'">'+(weekly>=0?'↑':'↓')+' '+Math.abs(weekly).toLocaleString()+' this week</span>';
+  let foot='';
+  if(typeof views==='number')foot+='<span class="secondaryStat">'+fmtCount(views)+' '+viewsLabel+'</span>';
+  if(typeof videos==='number')foot+='<span class="secondaryStat">'+videos+' uploads</span>';
+  if(typeof avg==='number')foot+='<span class="secondaryStat">'+fmtCount(avg)+' avg '+viewsLabel+'</span>';
+  return '<article class="platformCard"><div class="platformCardHead"><span class="platformBadge">'+PLATFORM_SHORT[a.platform]+'</span><span class="accountHandle">'+esc(a.handle)+'</span></div>'
+    +'<div class="platformCardNumWrap"><span class="platformCardNum">'+followers.toLocaleString()+'</span><span class="accountNumLabel">'+(isYT?'subscribers':'followers')+'</span></div>'
+    +deltaHtml+(series.length>=2?sparkSvg(series,36):'')+'<div class="platformCardFoot">'+foot+'</div></article>';
+}
+function analyticsSection(){
+  const reach=state.accounts.reduce((s,a)=>s+(typeof a.followers==='number'?a.followers:0),0);
+  const weekly=state.accounts.reduce((acc,a)=>{const d=deltaSinceDays(a.history,'count',7);return d===null?acc:(acc===null?0:acc)+d;},null);
+  const monthly=state.accounts.reduce((acc,a)=>{const d=deltaSinceDays(a.history,'count',30);return d===null?acc:(acc===null?0:acc)+d;},null);
+  const series=combinedSeries(state.accounts,'count');
+  const milestone=nextMilestone(reach);
+  const platforms=state.accounts.filter(a=>(typeof a.followers==='number'||a.lifetimeViews!=null||a.videoCount!=null));
+  const hasData=reach>0||platforms.length>0;
+  let body;
+  if(!hasData)body='<p class="emptyText">Add an account above and enter your followers, views and uploads — reach, growth trends and per-platform breakdowns show up here.</p>';
+  else{
+    function chip(v,suffix){if(v===null)return '<span class="deltaMuted">log again for '+suffix+'</span>';if(v===0)return '<span class="deltaFlat">· flat '+suffix+'</span>';return '<span class="delta '+(v>=0?'deltaUp':'deltaDown')+'">'+(v>=0?'↑':'↓')+' '+Math.abs(v).toLocaleString()+' '+suffix+'</span>';}
+    body='<div class="statsHero"><div><span class="statsHeroLabel">Total reach</span><div class="statsHeroNum">'+reach.toLocaleString()+'</div>'
+      +'<div class="statsHeroMeta">'+chip(weekly,'this week')+chip(monthly,'this month')+(reach<milestone?'<span class="statsHeroMilestone">'+fmtCount(milestone-reach)+' to '+fmtCount(milestone)+'</span>':'')+'</div></div>'
+      +(series.length>=2?'<div class="statsHeroSpark">'+sparkSvg(series,64)+'</div>':'<div></div>')+'</div>'
+      +'<div class="platformGrid">'+platforms.map(platformAnalytics).join('')+'</div>';
+  }
+  return '<section class="card"><div class="cardHead"><span class="eyebrow"><span class="eyebrowMark">·03</span><span class="eyebrowRule"></span>Analytics</span></div>'+body+'</section>';
+}
+
+function linksSection(){
+  let body;
+  if(state.links.length===0)body='<p class="emptyText">Your link-in-bio. Store, latest video, free guide, booking — drop a name and URL and it\'s one tap from here.</p>';
+  else body='<ul class="linkList">'+state.links.map(l=>'<li class="linkRow"><input class="input" data-lnk="'+l.id+'" data-f="label" value="'+esc(l.label)+'" placeholder="Label"><input class="input" data-lnk="'+l.id+'" data-f="url" value="'+esc(l.url)+'" placeholder="paste a URL"><a class="linkOpen" href="'+esc(l.url||'#')+'" target="_blank" rel="noopener noreferrer">↗</a><button class="delBtn" data-act="rmLink" data-id="'+l.id+'">×</button></li>').join('')+'</ul>';
+  return '<section class="card"><div class="cardHead"><span class="eyebrow"><span class="eyebrowMark">·04</span><span class="eyebrowRule"></span>Links</span></div>'+body
+    +'<form class="addForm" data-act="addLinkForm"><input class="input" id="newLabel" placeholder="Label (e.g. Store)"><input class="input" id="newUrl" placeholder="paste a URL"><button type="submit" class="primaryBtn">+ Add</button></form>'
+    +'<p class="noteLine">Store, latest video, free guide, booking — keep every important link one tap from here.</p></section>';
+}
+
+let clockTimer=null;
+function tickClocks(){
+  const now=new Date();
+  state.schedules.forEach(s=>{
+    if(!s.deadline)return;
+    const el=document.getElementById('cd-'+s.id);if(!el)return;
+    const dl=nextDeadline(s,now);if(!dl)return;
+    const rem=dl.getTime()-now.getTime();const u=deadlineUrgency(rem,s.period);const rgb=urgencyColor(u);
+    el.style.color='rgb('+rgb+')';el.style.borderColor='rgba('+rgb+',.4)';el.style.background='rgba('+rgb+',.08)';
+    const dot=el.querySelector('.cdDot');if(dot)dot.style.background='rgb('+rgb+')';
+    if(el.lastChild&&el.lastChild.nodeType===3)el.lastChild.textContent=(rem<=0?'overdue':formatCountdown(rem));
+  });
+}
+function startClock(){if(clockTimer)clearInterval(clockTimer);if(state.schedules.some(s=>s.deadline))clockTimer=setInterval(tickClocks,1000);}
+function render(){document.getElementById('app').innerHTML=headerHtml()+scheduleSection()+accountsSection()+analyticsSection()+linksSection();startClock();}
+
+/* ============================ Events ============================ */
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]');if(!b)return;
+  const act=b.dataset.act,id=b.dataset.id;
+  if(act==='logPlus')A.logSchedule(id,1);
+  else if(act==='logMinus')A.logSchedule(id,-1);
+  else if(act==='addSchedule')A.addSchedule();
+  else if(act==='editSchedule'){ui.editSchedule=id;state.setupDismissed=true;save();render();}
+  else if(act==='closeSchedule'){ui.editSchedule=null;render();}
+  else if(act==='rmSchedule')A.removeSchedule(id);
+  else if(act==='toggleEdit'){ui.editAccounts=!ui.editAccounts;render();}
+  else if(act==='rmAccount')A.removeAccount(id);
+  else if(act==='rmLink')A.removeLink(id);
+});
+document.addEventListener('submit',e=>{
+  const f=e.target.closest('[data-act]');if(!f)return;e.preventDefault();
+  if(f.dataset.act==='addAccountForm'){const p=document.getElementById('newPlat').value,h=document.getElementById('newHandle').value;if(h.trim())A.addAccount(p,h);}
+  else if(f.dataset.act==='addLinkForm'){const l=document.getElementById('newLabel').value,u=document.getElementById('newUrl').value;if(u.trim()||l.trim())A.addLink(l,u);}
+});
+document.addEventListener('change',e=>{
+  const t=e.target;
+  if(t.dataset.sch){const sid=t.dataset.sch,f=t.dataset.f,s=state.schedules.find(x=>x.id===sid);
+    if(f==='deadlineOn'){A.updateSchedule(sid,{deadline:t.checked?Object.assign({minutes:1140},(s&&s.period==='weekly')?{weekday:0}:{}):null});}
+    else if(f==='deadlineTime'){const dl=Object.assign({minutes:0},s&&s.deadline||{});dl.minutes=timeToMinutes(t.value);A.updateSchedule(sid,{deadline:dl});}
+    else if(f==='deadlineWeekday'){const dl=Object.assign({minutes:1140},s&&s.deadline||{});dl.weekday=parseInt(t.value,10)||0;A.updateSchedule(sid,{deadline:dl});}
+    else{const patch={};let v=t.value;if(f==='target')v=Math.max(1,parseInt(v,10)||1);patch[f]=v;if(f==='period'&&v==='weekly'&&s&&s.deadline&&s.deadline.weekday==null)patch.deadline=Object.assign({},s.deadline,{weekday:0});A.updateSchedule(sid,patch);}
+  }
+  else if(t.dataset.acc){const f=t.dataset.f,patch={};
+    if(f==='followers'||f==='lifetimeViews'||f==='videoCount'){const x=t.value.trim();patch[f]=x===''?null:Math.max(0,parseInt(x,10)||0);}
+    else patch[f]=t.value;
+    A.updateAccount(t.dataset.acc,patch);
+  }
+  else if(t.dataset.lnk){const patch={};patch[t.dataset.f]=t.value;A.updateLink(t.dataset.lnk,patch);}
+});
+
+/* ============================ Boot (bridge-backed) ============================ */
+(async()=>{
+  const d=await window.Vitality.load();
+  state=(d&&typeof d==='object'&&!Array.isArray(d)&&Array.isArray(d.accounts))?d:seed();
+  state.schedules=state.schedules||[];
+  state.accounts=state.accounts||[];
+  state.links=state.links||[];
+  render();
+})();
+</script>
+</body>
+</html>
