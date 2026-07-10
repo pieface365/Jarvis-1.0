@@ -26,8 +26,7 @@ export default function DashboardHeader({ firstName, greeting, date }: Dashboard
 
   useEffect(() => {
     const now = new Date()
-    const hour = now.getHours()
-    setAutoWord(hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening')
+    setAutoWord('Good Morning')
     setFullDate(now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }))
     setTodayDate(now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }))
   }, [])
