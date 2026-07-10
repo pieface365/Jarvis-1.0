@@ -5,5 +5,5 @@
  *        greeting. No backend, no settings screen — just this line.
  */
 export const site = {
-  name: '',
+  name: 'Nishk',
 }
