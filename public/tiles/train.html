@@ -420,7 +420,7 @@ const PROGRAM = {
     motto:'Progressive overload is non-negotiable — log every set and beat it next week. One more rep or 5 more lbs. Core every day.',
     exercises:[
     { id:'band_pullaparts', name:'Band Pull-Aparts + Arm Circles', tier:'w', sets:2, reps:15, kg:0, rest:30 },
-    { id:'smith_bench',   name:'Smith Machine Bench Press',        tier:1, sets:4, reps:6,  kg:135, rest:180 },
+    { id:'incl_db_press', name:'Incline Dumbbell Press',           tier:1, sets:4, reps:6,  kg:70,  perHand:true, rest:180 },
     { id:'incline_smith', name:'Incline Smith Press',              tier:1, sets:4, reps:8,  kg:95,  rest:150 },
     { id:'db_lat_raise',  name:'Dumbbell Lateral Raises',          tier:1, sets:4, reps:15, kg:15,  perHand:true, rest:60 },
     { id:'cable_fly',     name:'Cable Chest Fly',                  tier:1, sets:3, reps:12, kg:40,  rest:75 },
@@ -1050,12 +1050,24 @@ function migrateToLb(d){
   d.unit='lb';
   return d;
 }
+/* Small program edits patch saved v:2 state in place (a full rebuild via a
+   v bump would wipe logged history for a one-lift change). */
+function patchProgramEdits(d){
+  const mon = d.days && d.days.mon;
+  if(mon && mon.ex){
+    /* 2026-07-11: Mon's Smith bench became incline DB press */
+    const i = mon.ex.findIndex(e=>e.id==='smith_bench');
+    if(i>=0) mon.ex[i] = { id:'incl_db_press', name:'Incline Dumbbell Press', tier:1, sets:4, reps:6, kg:70, dur:null, perHand:true, rest:180,
+      lastKg:null, pinned:false, collapsed:false, deload:false, note:'', log:Array(4).fill(null), hist:[] };
+  }
+  return d;
+}
 (async()=>{
   let d=null;
   try{ d = await window.Vitality.load(); }catch(e){ d=null; }
   /* v check: saved state from older program layouts (PPL/UL split, or the
      v-less first weekly cut) doesn't fit this plan, so those rebuild. */
-  STATE = (d && typeof d==='object' && !Array.isArray(d) && d.days && d.v===2) ? migrateToLb(d) : buildState();
+  STATE = (d && typeof d==='object' && !Array.isArray(d) && d.days && d.v===2) ? patchProgramEdits(migrateToLb(d)) : buildState();
   render(); wireFresh();
   spawnParticles(document.querySelector('#vt-backdrop .wb-particles'));
 })();
