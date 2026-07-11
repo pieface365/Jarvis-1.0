@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Vitals</title>
+<style>
+  /* Vitality reskin of the Patron "Recovery" tile — sealed & bridge-backed.
+     Recovery ring + sleep ring, readiness status, trend chart and tips, all
+     from a manual daily vitals entry. No external assets and no browser
+     storage; history persists through the dashboard bridge (window.Vitality). */
+  :root{
+    --bg:#050506;--surface:#0e0e11;--border:#1d1d22;--brand:#6EE7B7;
+    --brand-soft:rgba(110,231,183,.08);--brand-line:rgba(110,231,183,.35);
+    --muted:#84848c;--muted-strong:#a8a8b0;--fg:#ededf0;
+    --pos:#6EE7B7;--warn:#f5c451;--neg:#ff6b6b;--track:#17171b;
+    --radius-md:12px;--radius-lg:16px;--radius-pill:999px;
+    --font-display:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;
+    --font-mono:ui-monospace,SFMono-Regular,Menlo,"JetBrains Mono",monospace;
+    --duration:.2s;--ease:cubic-bezier(.2,.8,.2,1);--ease-premium:cubic-bezier(.16,1,.3,1);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-display);display:flex;justify-content:center;padding:40px 20px}
+  .shell{width:100%;max-width:640px}
+  .header{margin-bottom:22px}
+  .title{font-size:24px;font-weight:600;letter-spacing:-.01em;margin:0}
+  .subtitle{color:var(--muted);font-family:var(--font-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;margin:6px 0 0}
+  .card{border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);padding:18px;margin-bottom:14px}
+  .cardName{font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:14px}
+
+  /* entry form */
+  .entryGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  @media(max-width:560px){.entryGrid{grid-template-columns:repeat(2,1fr)}}
+  .field{display:flex;flex-direction:column;gap:6px}
+  .fLabel{font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .fieldInput{background:var(--bg);border:1px solid var(--border);color:var(--fg);border-radius:10px;padding:9px 11px;font:inherit;width:100%}
+  .fieldInput:focus{outline:none;border-color:var(--brand)}
+  .hint{color:var(--muted);font-size:12px;font-family:var(--font-mono);min-height:14px;margin-top:10px}
+
+  /* hero rings */
+  .hero{display:flex;align-items:center;justify-content:center;gap:34px;flex-wrap:wrap;text-align:center}
+  .recRing{position:relative;width:150px;height:150px;display:grid;place-items:center;flex-shrink:0;overflow:visible}
+  .recRing[data-tone="good"]{color:var(--pos)}.recRing[data-tone="watch"]{color:var(--warn)}.recRing[data-tone="low"]{color:var(--neg)}.recRing[data-tone="muted"]{color:var(--muted)}
+  .recRing::before{content:'';position:absolute;inset:-16px;border-radius:50%;background:radial-gradient(closest-side,currentColor,transparent 70%);opacity:.28;filter:blur(14px);pointer-events:none;z-index:0;animation:recPulse 3.6s var(--ease) infinite}
+  .recRing[data-tone="muted"]::before{opacity:.08;animation:none}
+  @keyframes recPulse{0%,100%{opacity:.22}50%{opacity:.4}}
+  .recRing svg{position:absolute;inset:0;transform:rotate(-90deg);overflow:visible;z-index:1}
+  .recTrack{fill:none;stroke:var(--track);stroke-width:10}
+  .recFill{fill:none;stroke:currentColor;stroke-width:10;stroke-linecap:round;transition:stroke-dashoffset 800ms var(--ease-premium);filter:drop-shadow(0 0 4px currentColor) drop-shadow(0 0 11px currentColor)}
+  .ringWrap{display:flex;flex-direction:column;align-items:center;gap:10px}
+  .ringSub{font-weight:600;font-size:1.1rem;font-variant-numeric:tabular-nums;color:var(--fg)}
+  .recInner{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;max-width:120px}
+  .recNum{color:var(--fg);font-weight:700;font-size:2.2rem;line-height:1;font-variant-numeric:tabular-nums}
+  .recNum small{font-size:.95rem;color:var(--muted-strong)}
+  .recCap{font-family:var(--font-mono);font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-top:5px;text-align:center;white-space:nowrap}
+  .statusBlock{text-align:center;margin-top:18px}
+  .statusWord{font-weight:700;font-size:1.25rem}
+  .statusWord[data-tone="good"]{color:var(--pos)}.statusWord[data-tone="watch"]{color:var(--warn)}.statusWord[data-tone="low"]{color:var(--neg)}.statusWord[data-tone="muted"]{color:var(--muted-strong)}
+  .statusLine{font-size:14px;color:var(--muted-strong);line-height:1.5;margin-top:6px;max-width:44ch;margin-left:auto;margin-right:auto}
+
+  /* stat chips */
+  .statRow{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+  .stat{flex:1;min-width:96px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-md);padding:12px 14px}
+  .statLabel{font-family:var(--font-mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+  .statVal{font-weight:700;font-size:1.15rem;margin-top:4px;font-variant-numeric:tabular-nums}
+  .statVal small{font-size:11px;color:var(--muted);font-weight:400}
+
+  /* chart */
+  .chartHead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
+  .seg{display:inline-flex;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-pill);padding:3px;gap:2px}
+  .segBtn{appearance:none;background:transparent;border:0;color:var(--muted);font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;padding:5px 11px;border-radius:var(--radius-pill);cursor:pointer}
+  .segBtn.on{background:var(--brand-soft);color:var(--brand)}
+  .chart{width:100%;height:130px;display:block;overflow:visible;margin-top:12px}
+  .legend{display:flex;gap:16px;margin-top:8px}
+  .legItem{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .legDot{width:12px;height:3px;border-radius:2px}
+  .noteLine{font-size:12px;color:var(--muted);font-style:italic;margin-top:6px;line-height:1.5}
+
+  /* tips */
+  .tip{display:flex;gap:12px;padding:13px 14px;border-radius:var(--radius-md);background:var(--bg);border:1px solid var(--border);margin-bottom:10px}
+  .tip:last-child{margin-bottom:0}
+  .tipIcon{font-size:18px;flex-shrink:0;line-height:1.4}
+  .tipText{font-size:13.5px;line-height:1.5;color:var(--muted-strong)}
+  .tipText b{color:var(--fg)}
+  @media (prefers-reduced-motion:reduce){.recRing::before{animation:none}.recFill{transition:none}}
+</style>
+</head>
+<body>
+<main><div class="shell" id="app"></div></main>
+<script>
+/* Vitals — daily recovery & sleep tracker. Ported from the Patron "Recovery"
+   standalone: reskinned to Vitality mint, sealed (no external assets), and
+   persisting through the dashboard bridge (window.Vitality) instead of
+   browser storage. In the suite the source read a shared health record; the
+   sealed tile takes a manual daily entry (HRV / RHR / sleep) and feeds the
+   same recovery-estimate math, rings, trend chart and readiness tips. */
+let store={};     /* keyed by YYYY-MM-DD -> {hrv,rhr,sleepHours,sleepPerf} */
+let range=14;
+const $=id=>document.getElementById(id);
+const round=n=>Math.round(n);
+const clamp01=x=>Math.max(0,Math.min(1,x));
+function persist(){window.Vitality.save(store);}
+function todayKey(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function num(v){const n=Number(v);return (v===''||v==null||!isFinite(n))?null:n;}
+function todaysEntry(){return store[todayKey()]||{};}
+
+/* recovery estimate — same weighting as the source dashboard */
+function estRecovery(h){
+  if(!h) return null;
+  const parts=[],w=[];
+  if(typeof h.hrv==='number'){ parts.push(clamp01((h.hrv-20)/(90-20))*100); w.push(0.5); }
+  if(typeof h.rhr==='number'){ parts.push(clamp01((80-h.rhr)/(80-42))*100); w.push(0.25); }
+  if(typeof h.sleepPerf==='number'){ parts.push(Math.min(100,h.sleepPerf)); w.push(0.25); }
+  else if(typeof h.sleepHours==='number'){ parts.push(clamp01(h.sleepHours/8)*100); w.push(0.25); }
+  if(!parts.length) return null;
+  const sw=w.reduce((a,b)=>a+b,0); let s=0; for(let i=0;i<parts.length;i++)s+=parts[i]*w[i];
+  return Math.max(1,Math.min(99,Math.round(s/sw)));
+}
+function tone(r){ if(r==null)return 'muted'; if(r>=67)return 'good'; if(r>=34)return 'watch'; return 'low'; }
+function sleepTone(p){ if(p==null)return 'muted'; if(p>=85)return 'good'; if(p>=60)return 'watch'; return 'low'; }
+function fmtHM(h){ if(h==null)return '—'; const hh=Math.floor(h),mm=Math.round((h-hh)*60); return hh+'h '+String(mm).padStart(2,'0')+'m'; }
+
+/* every dated entry, oldest -> newest, with derived recovery */
+function entries(){
+  return Object.keys(store).filter(k=>/^\d{4}-\d{2}-\d{2}$/.test(k)).sort().map(k=>{
+    const e=store[k]||{};
+    return {dateKey:k,hrv:num(e.hrv),rhr:num(e.rhr),sleepHours:num(e.sleepHours),sleepPerf:num(e.sleepPerf),recovery:estRecovery(e)};
+  });
+}
+
+function ringWrap(value,toneStr,cap,sub){
+  const circ=2*Math.PI*64;
+  const ring='<div class="recRing" data-tone="'+toneStr+'"><svg viewBox="0 0 150 150" aria-hidden="true"><circle cx="75" cy="75" r="64" class="recTrack"/>'
+    +(value!=null?'<circle cx="75" cy="75" r="64" class="recFill" style="stroke-dasharray:'+circ+';stroke-dashoffset:'+(circ*(1-value/100))+'"/>':'')
+    +'</svg><div class="recInner"><div class="recNum">'+(value!=null?Math.round(value):'—')+(value!=null?'<small>%</small>':'')+'</div><div class="recCap">'+cap+'</div></div></div>';
+  return '<div class="ringWrap">'+ring+(sub?'<div class="ringSub">'+sub+'</div>':'')+'</div>';
+}
+
+/* ---------- trend chart ---------- */
+function chartSvg(){
+  const hist=entries().slice(-range);
+  if(hist.length<2) return '<p class="noteLine">Trends appear once you have 2+ days of vitals — check in daily and the chart fills in.</p>';
+  const W=320,H=120,padY=10;
+  const recs=hist.map(d=>typeof d.recovery==='number'?d.recovery:null);
+  const sleeps=hist.map(d=>typeof d.sleepHours==='number'?d.sleepHours:null);
+  const maxSleep=Math.max(9,...sleeps.filter(v=>v!=null));
+  const xOf=i=>hist.length===1?W/2:(i/(hist.length-1))*W;
+  const yRec=v=>H-padY-(v/100)*(H-padY*2);
+  const ySleep=v=>H-padY-(v/maxSleep)*(H-padY*2);
+  let bars='';
+  const bw=Math.max(4,(W/hist.length)*0.5);
+  hist.forEach((d,i)=>{ if(typeof d.sleepHours==='number'){ const x=xOf(i)-bw/2,y=ySleep(d.sleepHours); bars+='<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+(H-padY-y).toFixed(1)+'" rx="2" fill="#84848c" opacity=".30"/>'; } });
+  const pts=[]; recs.forEach((v,i)=>{ if(v!=null)pts.push([xOf(i),yRec(v)]); });
+  const line=pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
+  const dots=pts.map(p=>'<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="2.6" fill="#6EE7B7"/>').join('');
+  return '<svg class="chart" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" aria-hidden="true">'
+    + bars
+    + (pts.length>1?'<path d="'+line+'" fill="none" stroke="#6EE7B7" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="filter:drop-shadow(0 0 5px rgba(110,231,183,.6))"/>':'')
+    + dots + '</svg>'
+    + '<div class="legend"><span class="legItem"><span class="legDot" style="background:#6EE7B7"></span>Recovery %</span><span class="legItem"><span class="legDot" style="background:#84848c"></span>Sleep hours</span></div>';
+}
+
+/* ---------- tips ---------- */
+function tips(rec,h){
+  const out=[];
+  if(rec!=null){
+    if(rec>=67) out.push(['&#9889;','<b>Green light.</b> You\'re primed — good day for a hard session or a PR attempt.']);
+    else if(rec>=34) out.push(['&#128993;','<b>Moderate.</b> Train, but keep it smart — quality over max intensity today.']);
+    else out.push(['&#128721;','<b>Low recovery.</b> Go easy — light movement, hydration, and protect tonight\'s sleep.']);
+  }
+  if(h&&typeof h.sleepHours==='number'&&h.sleepHours<7) out.push(['&#128564;','<b>Short sleep ('+fmtHM(h.sleepHours)+').</b> Aim for 7–9h tonight — it\'s the biggest lever on tomorrow\'s recovery.']);
+  if(h&&typeof h.hrv==='number'&&h.hrv<35) out.push(['&#128201;','<b>HRV is low ('+Math.round(h.hrv)+'ms).</b> A sign of stress or fatigue — prioritise rest and easy days.']);
+  if(h&&typeof h.rhr==='number'&&h.rhr>65) out.push(['&#10084;&#65039;','<b>Resting HR is elevated ('+Math.round(h.rhr)+'bpm).</b> Could be stress, poor sleep, or coming down with something.']);
+  if(!out.length) out.push(['&#9989;','Enter today\'s HRV, resting HR or sleep above and your readiness, trends and tips fill in here.']);
+  return out;
+}
+
+/* ---------- render ---------- */
+function entryHtml(){
+  const e=todaysEntry();
+  const val=k=>e[k]!=null?e[k]:'';
+  const f=(id,label,ph,step)=>'<label class="field"><span class="fLabel">'+label+'</span><input class="fieldInput" id="'+id+'" type="number" min="0" step="'+step+'" inputmode="decimal" placeholder="'+ph+'" value="'+val(id.replace('in-',''))+'" /></label>';
+  return '<section class="card"><span class="cardName">Today\'s vitals</span><div class="entryGrid">'
+    + f('in-hrv','HRV · ms','—','1')
+    + f('in-rhr','Resting HR · bpm','—','1')
+    + f('in-sleepHours','Sleep · hours','—','0.1')
+    + f('in-sleepPerf','Sleep score · %','—','1')
+    + '</div><div class="hint" id="hint">Fill in what your band or app shows — recovery is estimated from HRV, resting HR and sleep.</div></section>';
+}
+function outputHtml(){
+  const h=todaysEntry();
+  const rec=estRecovery(h);
+  const t=tone(rec);
+  const statusWord=t==='good'?'Primed':t==='watch'?'Moderate':t==='low'?'Run down':'Awaiting data';
+  const statusLine=rec==null?'Enter your HRV or sleep above to estimate today\'s readiness.'
+    : t==='good'?'You\'re well recovered and ready to push.'
+    : t==='watch'?'Partially recovered — train smart today.'
+    : 'Your body needs rest — keep it light.';
+  const recRing=ringWrap(rec,t,'Recovery','');
+  const hasSleep=(typeof h.sleepPerf==='number'||typeof h.sleepHours==='number');
+  const sleepRing=hasSleep
+    ? ringWrap(typeof h.sleepPerf==='number'?h.sleepPerf:null,sleepTone(num(h.sleepPerf)),'Sleep',typeof h.sleepHours==='number'?fmtHM(h.sleepHours):'')
+    : ringWrap(null,'muted','Sleep','');
+  const hero='<section class="card"><span class="cardName">Today</span>'
+    +'<div class="hero">'+recRing+sleepRing+'</div>'
+    +'<div class="statusBlock"><div class="statusWord" data-tone="'+t+'">'+statusWord+'</div><p class="statusLine">'+statusLine+'</p></div>'
+    +'<div class="statRow">'
+    +'<div class="stat"><div class="statLabel">HRV</div><div class="statVal">'+(typeof h.hrv==='number'?Math.round(h.hrv)+'<small> ms</small>':'—')+'</div></div>'
+    +'<div class="stat"><div class="statLabel">Resting HR</div><div class="statVal">'+(typeof h.rhr==='number'?Math.round(h.rhr)+'<small> bpm</small>':'—')+'</div></div>'
+    +'<div class="stat"><div class="statLabel">Sleep</div><div class="statVal">'+(typeof h.sleepHours==='number'?fmtHM(h.sleepHours):'—')+'</div></div>'
+    +'</div></section>';
+  const trends='<section class="card"><div class="chartHead"><span class="cardName" style="margin:0">Trends</span>'
+    +'<div class="seg">'+[7,14,30].map(n=>'<button class="segBtn '+(range===n?'on':'')+'" data-range="'+n+'">'+n+'d</button>').join('')+'</div></div>'
+    + chartSvg() + '</section>';
+  const guide='<section class="card"><span class="cardName">Today\'s guidance</span>'
+    + tips(rec,h).map(x=>'<div class="tip"><span class="tipIcon">'+x[0]+'</span><span class="tipText">'+x[1]+'</span></div>').join('')
+    +'</section>';
+  return hero+trends+guide;
+}
+function renderOutput(){$('out').innerHTML=outputHtml();}
+function render(){
+  $('app').innerHTML='<header class="header"><h1 class="title">Vitals</h1><p class="subtitle">readiness · sleep · trends</p></header>'
+    + entryHtml() + '<div id="out"></div>';
+  renderOutput();
+}
+
+/* entry inputs stay mounted (never re-rendered) so focus is preserved */
+document.addEventListener('input',e=>{
+  if(e.target && e.target.id && e.target.id.indexOf('in-')===0){
+    const e2={};
+    ['hrv','rhr','sleepHours','sleepPerf'].forEach(k=>{const v=num($('in-'+k).value); if(v!=null)e2[k]=v;});
+    store[todayKey()]=e2;
+    persist();
+    renderOutput();
+  }
+});
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-range]');
+  if(b){ range=parseInt(b.getAttribute('data-range'),10)||14; renderOutput(); }
+});
+
+(async()=>{const d=await window.Vitality.load();store=(d&&typeof d==='object'&&!Array.isArray(d))?d:{};render();})();
+</script>
+</body>
+</html>
