@@ -81,20 +81,24 @@ export async function healthGet(pathAndQuery: string, token: string): Promise<an
 }
 
 /**
- * List a data type's points for the last `days` days. Tries a server-side
- * civil-time filter first; the filter grammar is lightly documented, so on a
- * 400 it falls back to an unfiltered page and lets the caller date-filter.
+ * List a data type's recent points. No server-side filter: the filter grammar
+ * matched nothing in practice (200 + empty), so we paginate newest-first and
+ * let the caller date-filter. Pages can be empty yet still carry a
+ * nextPageToken, so emptiness never stops the walk — only a missing token or
+ * the caps do.
  */
-export async function listDataPoints(dataType: string, filter: string | null, token: string): Promise<any[]> {
+export async function listDataPoints(dataType: string, token: string): Promise<any[]> {
   const base = `/users/me/dataTypes/${dataType}/dataPoints`
-  if (filter) {
-    try {
-      const j = await healthGet(`${base}?pageSize=200&filter=${encodeURIComponent(filter)}`, token)
-      return j.dataPoints || []
-    } catch (e: any) {
-      if (e?.status !== 400) throw e
-    }
+  const all: any[] = []
+  let pageToken = ''
+  for (let page = 0; page < 8 && all.length < 400; page++) {
+    const j = await healthGet(
+      `${base}?pageSize=200${pageToken ? '&pageToken=' + encodeURIComponent(pageToken) : ''}`,
+      token,
+    )
+    all.push(...(j.dataPoints || []))
+    pageToken = j.nextPageToken
+    if (!pageToken) break
   }
-  const j = await healthGet(`${base}?pageSize=200`, token)
-  return j.dataPoints || []
+  return all
 }
