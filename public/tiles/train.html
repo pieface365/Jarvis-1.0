@@ -70,6 +70,21 @@
   .daytab .tnum { font-variant-numeric: tabular-nums; opacity:.6; font-size:10px; margin-left:5px; }
   .daytab.on .tnum { opacity:.55; }
 
+  /* consistency ring — the left-aligned mini tile above the weekday tabs.
+     Fills as days hit 7/7; a perfect week goes solid mint with a check. */
+  .weekCard { display:flex; align-items:center; gap:14px; margin-top:14px; padding:13px 15px; border:1px solid var(--line); border-radius:13px; background:var(--row); width:fit-content; max-width:100%; transition: border-color .4s var(--ease), box-shadow .6s var(--ease); }
+  .weekCard.full { border-color: var(--mint); box-shadow: 0 0 26px rgba(110,231,183,.22); background: rgba(110,231,183,.05); }
+  .weekRing { flex:none; width:56px; height:56px; }
+  .weekRing svg { width:100%; height:100%; display:block; }
+  .weekRingNum { font-family: var(--vt-mono); font-size:12.5px; font-weight:600; fill: var(--text); }
+  .weekTitle { font-family: var(--serif); font-style:italic; font-size:17px; line-height:1.2; }
+  .weekCard.full .weekTitle { color: var(--mint); }
+  .weekSub { font-size:11.5px; color: var(--muted); margin-top:2px; max-width:340px; }
+  .weekDays { display:flex; gap:5px; margin-top:7px; }
+  .weekDays .wd { width:18px; height:18px; border-radius:50%; border:1px solid var(--hair); display:grid; place-items:center; font-family: var(--vt-mono); font-size:9px; color: var(--muted); }
+  .weekDays .wd.on { background: var(--mint); border-color: var(--mint); color: var(--ink); font-weight:700; }
+  .weekDays .wd.today:not(.on) { border-color: var(--mint); color: var(--mint); }
+
   /* the plan's motto, under the weekday tabs */
   .motto { font-family: var(--serif); font-style:italic; font-size:13.5px; line-height:1.5; color: var(--muted); margin:14px 0 0; padding-left:11px; border-left:2px solid var(--mint); }
 
@@ -352,6 +367,7 @@
 <div class="shell">
   <div class="sheet" id="sheet">
     <div class="eyebrow">Weekly training plan</div>
+    <div class="weekCard" id="weekCard"></div>
     <div class="daytabs" id="daytabs"></div>
     <p class="motto" id="motto"></p>
     <div class="daydots" id="daydots"></div>
@@ -576,7 +592,9 @@ function buildState(){
     })};
   });
   /* v bumps when the program's day structure changes, so stale saves rebuild */
-  return { v:2, active:(SEED&&SEED.active)||'mon', unit:'lb', submitted:false, days };
+  /* weekLog: 'YYYY-MM-DD' -> true for each date every exercise got fully
+     logged — feeds the consistency ring (7/7 fills the circle). */
+  return { v:2, active:(SEED&&SEED.active)||'mon', unit:'lb', submitted:false, weekLog:{}, days };
 }
 /* STATE is filled by the async boot below once the dashboard bridge resolves. */
 let STATE = null;
@@ -614,8 +632,49 @@ const IC = {
 function dotsIcon(){ return '<svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="18" cy="12" r="1.7"/></svg>'; }
 function gripIcon(){ return '<svg viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>'; }
 
+/* ---- consistency ring (7/7 days fills the circle) ------------------ */
+/* Monday-start week containing today, as date keys. */
+function weekDates(){
+  const now = new Date(); const dow = (now.getDay()+6)%7; // Mon=0
+  return Array.from({length:7}, (_,i)=>{ const d=new Date(now); d.setDate(now.getDate()-dow+i); return ymd(d); });
+}
+/* A date earns its mark when every set of the day being worked is logged.
+   Marks are sticky — undoing a set later doesn't take the day away. */
+function markConsistency(){
+  if(!STATE.weekLog) STATE.weekLog = {};
+  const d = curDay();
+  if(d.restDay || d.off) return;
+  const t = dayTotals(d);
+  if(t.total > 0 && t.logged >= t.total) STATE.weekLog[today] = true;
+}
+function renderWeek(){
+  const el = $('#weekCard'); if(!el) return;
+  const dates = weekDates();
+  const hit = dates.map(k => !!(STATE.weekLog && STATE.weekLog[k]));
+  const n = hit.filter(Boolean).length;
+  const full = n === 7;
+  const R = 24, C = 2*Math.PI*R;
+  const letters = ['M','T','W','T','F','S','S'];
+  el.className = 'weekCard' + (full ? ' full' : '');
+  el.innerHTML =
+    '<div class="weekRing">'
+    + '<svg viewBox="0 0 60 60">'
+    +   (full
+        ? '<circle cx="30" cy="30" r="27" fill="var(--mint)"/><path d="M20 30.5l7 7 13-13" fill="none" stroke="var(--ink)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>'
+        : '<circle cx="30" cy="30" r="'+R+'" fill="none" stroke="var(--hair)" stroke-width="5"/>'
+          + '<circle cx="30" cy="30" r="'+R+'" fill="none" stroke="var(--mint)" stroke-width="5" stroke-linecap="round" transform="rotate(-90 30 30)" stroke-dasharray="'+(C*n/7).toFixed(1)+' '+C.toFixed(1)+'"/>'
+          + '<text x="30" y="34.5" text-anchor="middle" class="weekRingNum">'+n+'/7</text>')
+    + '</svg></div>'
+    + '<div class="weekText">'
+    +   '<div class="weekTitle">'+(full ? 'Perfect week' : 'Consistency')+'</div>'
+    +   '<div class="weekSub">'+(full ? 'Every session, every exercise. 7/7.' : n+' of 7 days this week — complete every exercise to mark a day')+'</div>'
+    +   '<div class="weekDays">'+dates.map((k,i)=>'<span class="wd'+(hit[i]?' on':'')+(k===today?' today':'')+'">'+letters[i]+'</span>').join('')+'</div>'
+    + '</div>';
+}
+
 function render(){
-  renderTabs(); renderDots(); renderHead(); renderProgress(); renderBody(); saveState();
+  markConsistency();
+  renderWeek(); renderTabs(); renderDots(); renderHead(); renderProgress(); renderBody(); saveState();
 }
 function renderTabs(){
   const el = $('#daytabs');
@@ -1055,6 +1114,8 @@ function migrateToLb(d){
 /* Small program edits patch saved v:2 state in place (a full rebuild via a
    v bump would wipe logged history for a one-lift change). */
 function patchProgramEdits(d){
+  /* 2026-07-11: consistency ring — older v:2 saves predate weekLog */
+  if(!d.weekLog) d.weekLog = {};
   const mon = d.days && d.days.mon;
   if(mon && mon.ex){
     /* 2026-07-11: Mon's Smith bench became incline DB press */
