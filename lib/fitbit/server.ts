@@ -26,16 +26,31 @@ export function fitbitEnv() {
   return { clientId, clientSecret, redirectUri }
 }
 
+/** In-memory cache — the only writable "store" on serverless (Vercel), where
+ *  the filesystem is ephemeral. Lives as long as the lambda instance does;
+ *  worst case a cold start refreshes the access token again. */
+let memoryTokens: FitbitTokens | null = null
+
 export async function readTokens(): Promise<FitbitTokens | null> {
+  if (memoryTokens) return memoryTokens
   try {
     return JSON.parse(await fs.readFile(TOKEN_FILE, 'utf8'))
   } catch {
-    return null
+    /* No file (fresh deploy / serverless): fall back to a refresh token from
+       the environment. Google refresh tokens don't rotate on use, so a static
+       env var stays valid — connect locally once, copy it to Vercel. */
+    const rt = process.env.FITBIT_REFRESH_TOKEN
+    return rt ? { access_token: '', refresh_token: rt, expires_at: 0 } : null
   }
 }
 
 export async function writeTokens(t: FitbitTokens): Promise<void> {
-  await fs.writeFile(TOKEN_FILE, JSON.stringify(t, null, 2))
+  memoryTokens = t
+  try {
+    await fs.writeFile(TOKEN_FILE, JSON.stringify(t, null, 2))
+  } catch {
+    /* read-only filesystem (Vercel) — the in-memory copy carries the request */
+  }
 }
 
 /** Valid access token, refreshing through Google when expired. Null = not connected. */
