@@ -40,6 +40,50 @@ export default function FitbitSync({ userId }: { userId: string }) {
           store[date] = entry
         }
         if (changed) await tileStore.saveData(userId, 'vitals', store)
+
+        /* Hand today's readiness to the Train tile so it can adapt the day
+           (banner + one-tap deload). Same recovery formula as the Vitals
+           tile; hrvBase is the trailing 7-day average for a delta callout. */
+        const pad = (n: number) => String(n).padStart(2, '0')
+        const now = new Date()
+        const todayKey = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+        const h = store[todayKey]
+        const clamp01 = (x: number) => Math.max(0, Math.min(1, x))
+        const recovery = (() => {
+          if (!h) return null
+          const parts: number[] = []
+          const w: number[] = []
+          if (typeof h.hrv === 'number') { parts.push(clamp01((h.hrv - 20) / 70) * 100); w.push(0.5) }
+          if (typeof h.rhr === 'number') { parts.push(clamp01((80 - h.rhr) / 38) * 100); w.push(0.25) }
+          if (typeof h.sleepPerf === 'number') { parts.push(Math.min(100, h.sleepPerf)); w.push(0.25) }
+          else if (typeof h.sleepHours === 'number') { parts.push(clamp01(h.sleepHours / 8) * 100); w.push(0.25) }
+          if (!parts.length) return null
+          const sw = w.reduce((a, b) => a + b, 0)
+          return Math.max(1, Math.min(99, Math.round(parts.reduce((s, p, i) => s + p * w[i], 0) / sw)))
+        })()
+        if (recovery != null) {
+          const hrvs = Object.keys(store)
+            .filter((k) => k < todayKey)
+            .sort()
+            .slice(-7)
+            .map((k) => store[k]?.hrv)
+            .filter((v): v is number => typeof v === 'number')
+          const hrvBase = hrvs.length >= 3 ? Math.round((hrvs.reduce((a, b) => a + b, 0) / hrvs.length) * 10) / 10 : null
+          const readiness = {
+            date: todayKey, recovery,
+            hrv: h.hrv ?? null, rhr: h.rhr ?? null, sleepHours: h.sleepHours ?? null, hrvBase,
+          }
+          const train = await tileStore.loadData(userId, 'train')
+          if (train && typeof train === 'object' && !Array.isArray(train)) {
+            // existing state (any version — the tile's boot migrates): ride along
+            ;(train as any).readiness = readiness
+            await tileStore.saveData(userId, 'train', train)
+          } else {
+            // tile never opened in this browser: seed a bare object; the tile
+            // adopts .readiness off the raw load even when it rebuilds state
+            await tileStore.saveData(userId, 'train', { readiness })
+          }
+        }
       } catch {
         /* offline or dev server hiccup — the tile still works manually */
       }

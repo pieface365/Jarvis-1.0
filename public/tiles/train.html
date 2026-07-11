@@ -101,6 +101,25 @@
     .weekDays { justify-content:flex-start; margin-top:7px; }
   }
 
+  /* readiness banner — today's recovery (synced from Fitbit via the Vitals
+     pipeline) steering the session: green full-send / amber train-smart /
+     red deload with a one-tap apply. */
+  .ready { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:14px; padding:12px 15px; border-radius:13px; border:1px solid var(--line); background:var(--row); }
+  .ready .rdot { flex:none; width:10px; height:10px; border-radius:50%; }
+  .ready.green { border-color: rgba(110,231,183,.45); background: rgba(110,231,183,.05); }
+  .ready.green .rdot { background: var(--mint); box-shadow:0 0 10px rgba(110,231,183,.6); }
+  .ready.amber { border-color: rgba(245,158,11,.45); background: rgba(245,158,11,.05); }
+  .ready.amber .rdot { background: var(--gold); box-shadow:0 0 10px rgba(245,158,11,.5); }
+  .ready.red { border-color: rgba(224,106,108,.5); background: rgba(224,106,108,.06); }
+  .ready.red .rdot { background: var(--fail); box-shadow:0 0 10px rgba(224,106,108,.5); }
+  .ready .rmain { flex:1; min-width:200px; }
+  .ready .rline { font-family: var(--serif); font-style:italic; font-size:14.5px; line-height:1.35; }
+  .ready.green .rline b { color: var(--mint); } .ready.amber .rline b { color: var(--gold); } .ready.red .rline b { color: var(--fail); }
+  .ready .rmeta { font-family: var(--vt-mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase; color: var(--muted); margin-top:4px; }
+  .ready .rbtn { flex:none; background:none; border:1px solid var(--fail); color:var(--fail); border-radius:999px; padding:7px 13px; font-size:12px; font-weight:600; cursor:pointer; transition: background .18s, color .18s; }
+  .ready .rbtn:hover { background: rgba(224,106,108,.12); }
+  .ready .rbtn.on { background: var(--fail); color:#fff; }
+
   /* the plan's motto, under the weekday tabs */
   .motto { font-family: var(--serif); font-style:italic; font-size:13.5px; line-height:1.5; color: var(--muted); margin:14px 0 0; padding-left:11px; border-left:2px solid var(--mint); }
 
@@ -388,6 +407,7 @@
     <div class="eyebrow">Weekly training plan</div>
     <div class="daytabs" id="daytabs"></div>
     <p class="motto" id="motto"></p>
+    <div id="readiness"></div>
     <div class="daydots" id="daydots"></div>
     <div class="dayhead">
       <h1 class="daytitle" id="daytitle">Push</h1>
@@ -690,9 +710,46 @@ function renderWeek(){
     + '</div>';
 }
 
+/* ---- readiness: today's recovery steers the session ----------------- */
+/* STATE.readiness = {date, recovery, hrv, rhr, sleepHours, hrvBase} is
+   written by the dashboard's Fitbit sync. Tiers: sleep under 6h forces red;
+   otherwise recovery >=70 green, >=45 amber, else red. */
+function readinessTier(r){
+  if(typeof r.sleepHours==='number' && r.sleepHours < 6) return 'red';
+  if(r.recovery >= 70) return 'green';
+  if(r.recovery >= 45) return 'amber';
+  return 'red';
+}
+function mainLifts(day){ return day.ex.filter(e=>e.tier===1 && !e.dur); }
+function deloadApplied(day){ const m=mainLifts(day); return m.length>0 && m.every(e=>e.deload); }
+function renderReadiness(){
+  const el = $('#readiness'); if(!el) return;
+  const r = STATE.readiness;
+  if(!r || r.date !== today || typeof r.recovery !== 'number'){ el.innerHTML=''; return; }
+  const tier = readinessTier(r);
+  const d = curDay();
+  const line = tier==='green' ? '<b>Recovered — full send.</b> Chase the PRs today.'
+    : tier==='amber' ? '<b>Partially recovered — train smart.</b> Normal loads, cap the top sets.'
+    : (typeof r.sleepHours==='number' && r.sleepHours<6 ? '<b>Short sleep — take it easy.</b> ' : '<b>Run down — go light.</b> ')
+      + 'Drop the loads today; the week is won on recovery.';
+  const meta = ['Recovery '+r.recovery+'%'];
+  if(typeof r.sleepHours==='number'){ const hh=Math.floor(r.sleepHours), mm=Math.round((r.sleepHours-hh)*60); meta.push('Sleep '+hh+'h '+String(mm).padStart(2,'0')+'m'); }
+  if(typeof r.hrv==='number'){ let s='HRV '+Math.round(r.hrv)+'ms'; if(typeof r.hrvBase==='number' && r.hrvBase>0){ const d100=Math.round((r.hrv-r.hrvBase)/r.hrvBase*100); s+=' ('+(d100>=0?'+':'')+d100+'% vs week)'; } meta.push(s); }
+  if(typeof r.rhr==='number') meta.push('RHR '+Math.round(r.rhr));
+  const showBtn = tier==='red' && !d.restDay && !d.off && mainLifts(d).length>0;
+  const applied = showBtn && deloadApplied(d);
+  el.innerHTML = '<div class="ready '+tier+'"><span class="rdot"></span><div class="rmain">'
+    + '<div class="rline">'+line+'</div>'
+    + '<div class="rmeta">'+meta.join(' · ')+'</div></div>'
+    + (showBtn ? '<button class="rbtn'+(applied?' on':'')+'" id="rdeload">'+(applied?'deload on · undo':'deload today −10%')+'</button>' : '')
+    + '</div>';
+  const btn = $('#rdeload');
+  if(btn) btn.onclick = () => { const on = !deloadApplied(curDay()); mainLifts(curDay()).forEach(e=>{ e.deload = on; }); render(); };
+}
+
 function render(){
   markConsistency();
-  renderWeek(); renderTabs(); renderDots(); renderHead(); renderProgress(); renderBody(); saveState();
+  renderWeek(); renderReadiness(); renderTabs(); renderDots(); renderHead(); renderProgress(); renderBody(); saveState();
 }
 function renderTabs(){
   const el = $('#daytabs');
@@ -1155,6 +1212,9 @@ function patchProgramEdits(d){
   /* v check: saved state from older program layouts (PPL/UL split, or the
      v-less first weekly cut) doesn't fit this plan, so those rebuild. */
   STATE = (d && typeof d==='object' && !Array.isArray(d) && d.days && d.v===2) ? patchProgramEdits(migrateToLb(d)) : buildState();
+  /* readiness rides on the raw save even when the program state rebuilds
+     (the dashboard's Fitbit sync may write it before the tile ever opens) */
+  if(d && typeof d==='object' && !Array.isArray(d) && d.readiness && !STATE.readiness) STATE.readiness = d.readiness;
   render(); wireFresh();
   spawnParticles(document.querySelector('#vt-backdrop .wb-particles'));
 })();
