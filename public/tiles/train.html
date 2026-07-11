@@ -422,6 +422,7 @@ const PROGRAM = {
     { id:'band_pullaparts', name:'Band Pull-Aparts + Arm Circles', tier:'w', sets:2, reps:15, kg:0, rest:30 },
     { id:'incl_db_press', name:'Incline Dumbbell Press',           tier:1, sets:4, reps:6,  kg:70,  perHand:true, rest:180 },
     { id:'incline_smith', name:'Incline Smith Press',              tier:1, sets:4, reps:8,  kg:95,  rest:150 },
+    { id:'seated_chest_press', name:'Seated Flat Chest Press',     tier:1, sets:3, reps:10, kg:130, rest:120 },
     { id:'db_lat_raise',  name:'Dumbbell Lateral Raises',          tier:1, sets:4, reps:15, kg:15,  perHand:true, rest:60 },
     { id:'cable_fly',     name:'Cable Chest Fly',                  tier:1, sets:3, reps:12, kg:40,  rest:75 },
     { id:'oh_tri_ext',    name:'Overhead Tricep Extension (cable)',tier:1, sets:3, reps:12, kg:50,  rest:75 },
@@ -540,6 +541,7 @@ const LIB = {
   leg_curl:{ equipment:'Machine', primary:['Hamstrings'], secondary:[], gist:'Lying leg curl to isolate the hamstrings.', steps:['Pad just above the heels','Curl up fully, squeeze','Lower slow, full stretch'], cues:['Hips stay down','Slow on the way down'] },
   weighted_pullups:{ equipment:'Bodyweight', primary:['Lats'], secondary:['Biceps','Upper back'], gist:'Weighted pull-ups — pull strength that carries straight onto the wall.', steps:['Belt the plate, dead hang start','Pull your chest to the bar','Lower under full control'], cues:['Drive elbows down and back','Full stretch at the bottom'] },
   smith_row:{ equipment:'Smith machine', primary:['Upper back'], secondary:['Lats','Biceps'], gist:'Heavy Smith row for a thick, strong back.', steps:['Hinge to about 45 degrees, flat back','Row the bar to your lower ribs','Lower slow, no jerking'], cues:['Lead with the elbows','Squeeze the back at the top'] },
+  seated_chest_press:{ equipment:'Machine', primary:['Chest'], secondary:['Front delts','Triceps'], gist:'Seated machine press to finish the chest with a stable, flat pressing line.', steps:['Handles at mid-chest height','Press out to full lockout','Return slow to a deep stretch'], cues:['Shoulder blades pinned to the pad','Squeeze the chest at lockout'] },
   ab_roller:{ equipment:'Ab wheel', primary:['Abs'], secondary:['Lats','Hip flexors'], gist:'Ab roller for hard anti-extension core strength — climb-day bonus.', steps:['Kneel, wheel under your shoulders','Roll out as far as you can hold a flat back','Pull back with the abs, not the hips'], cues:['Ribs down, no sagging','Shorten the range before form breaks'] },
 };
 const SWAPS = {
@@ -1059,6 +1061,12 @@ function patchProgramEdits(d){
     const i = mon.ex.findIndex(e=>e.id==='smith_bench');
     if(i>=0) mon.ex[i] = { id:'incl_db_press', name:'Incline Dumbbell Press', tier:1, sets:4, reps:6, kg:70, dur:null, perHand:true, rest:180,
       lastKg:null, pinned:false, collapsed:false, deload:false, note:'', log:Array(4).fill(null), hist:[] };
+    /* 2026-07-11: seated flat chest press added to push day, after incline smith */
+    if(!mon.ex.some(e=>e.id==='seated_chest_press')){
+      const j = mon.ex.findIndex(e=>e.id==='incline_smith');
+      mon.ex.splice(j>=0?j+1:mon.ex.length, 0, { id:'seated_chest_press', name:'Seated Flat Chest Press', tier:1, sets:3, reps:10, kg:130, dur:null, perHand:false, rest:120,
+        lastKg:null, pinned:false, collapsed:false, deload:false, note:'', log:Array(3).fill(null), hist:[] });
+    }
   }
   return d;
 }
