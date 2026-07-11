@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import styles from './dashboard.module.css'
 import DashboardHeader from './DashboardHeader'
 import WelcomeBackdrop from '@/components/WelcomeBackdrop'
+import FitbitSync from '@/components/FitbitSync'
 import DashboardHeaderGem from './DashboardHeaderGem'
 import DashboardGrid from './DashboardGrid'
 import '@/components/veeTiles.css'
@@ -190,6 +191,7 @@ export default function Dashboard({ firstName, userId }: DashboardProps) {
   return (
     <main className={`${styles.page} ${styles.oneScreen} grain-overlay`} style={{ ['--wall-accent' as string]: wallAccent }}>
       <WelcomeBackdrop background={chrome?.background} />
+      <FitbitSync userId={userId} />
 
       <div className={styles.shell}>
         <div className={styles.headerRow}>

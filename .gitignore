@@ -91,3 +91,6 @@ supabase/.temp/
 public/*-preview.html
 /explain-*.png
 /pol-*.png
+
+# Fitbit OAuth tokens (personal — written by /api/fitbit/callback)
+.fitbit-tokens.json
