@@ -66,13 +66,35 @@ export async function getAccessToken(): Promise<string | null> {
   return next.access_token
 }
 
-export async function fitbitGet(pathname: string, token: string): Promise<any> {
-  const res = await fetch('https://api.fitbit.com' + pathname, {
-    headers: { Authorization: 'Bearer ' + token },
+/** GET against the Google Health API (the Fitbit Web API's replacement). */
+export async function healthGet(pathAndQuery: string, token: string): Promise<any> {
+  const res = await fetch('https://health.googleapis.com/v4' + pathAndQuery, {
+    headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' },
   })
   if (!res.ok) {
-    const body = (await res.text()).slice(0, 200)
-    throw new Error(`fitbit ${res.status} on ${pathname}: ${body}`)
+    const body = (await res.text()).slice(0, 300)
+    const err = new Error(`health api ${res.status} on ${pathAndQuery}: ${body}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
   }
   return res.json()
+}
+
+/**
+ * List a data type's points for the last `days` days. Tries a server-side
+ * civil-time filter first; the filter grammar is lightly documented, so on a
+ * 400 it falls back to an unfiltered page and lets the caller date-filter.
+ */
+export async function listDataPoints(dataType: string, filter: string | null, token: string): Promise<any[]> {
+  const base = `/users/me/dataTypes/${dataType}/dataPoints`
+  if (filter) {
+    try {
+      const j = await healthGet(`${base}?pageSize=200&filter=${encodeURIComponent(filter)}`, token)
+      return j.dataPoints || []
+    } catch (e: any) {
+      if (e?.status !== 400) throw e
+    }
+  }
+  const j = await healthGet(`${base}?pageSize=200`, token)
+  return j.dataPoints || []
 }

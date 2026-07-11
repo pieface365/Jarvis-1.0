@@ -7,9 +7,11 @@ import { fitbitEnv } from '@/lib/fitbit/server'
  * guarantee a refresh token so this is a one-time ceremony.
  */
 
+/* Google Health API scopes (the Fitbit Web API's replacement — Fitbit data
+   for migrated accounts is served from health.googleapis.com). */
 const SCOPES = [
-  'https://www.googleapis.com/auth/fitbit.heartrate.read', // resting HR + HRV
-  'https://www.googleapis.com/auth/fitbit.sleep.read', // duration + efficiency
+  'https://www.googleapis.com/auth/googlehealth.sleep.readonly',
+  'https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly', // HRV + resting HR
 ]
 
 export async function GET() {
