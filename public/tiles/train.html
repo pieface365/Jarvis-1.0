@@ -8,7 +8,7 @@
 
 <style>
   /* ====================================================================
-     Vitality workout logger — Push / Pull / Legs / Upper / Lower, fully self-contained.
+     Vitality workout logger — weekly lift + climb plan (Mon–Sun), fully self-contained.
      Extracted verbatim from the Logger Design Lab (chrome stripped).
      The whole Vitality look — fonts + mountains/glass/particles backdrop —
      is baked in below, so it renders with NO external file. Mint accent
@@ -69,6 +69,9 @@
   .daytab.on { background: var(--mint); color: var(--ink); }
   .daytab .tnum { font-variant-numeric: tabular-nums; opacity:.6; font-size:10px; margin-left:5px; }
   .daytab.on .tnum { opacity:.55; }
+
+  /* the plan's motto, under the weekday tabs */
+  .motto { font-family: var(--serif); font-style:italic; font-size:13.5px; line-height:1.5; color: var(--muted); margin:14px 0 0; padding-left:11px; border-left:2px solid var(--mint); }
 
   /* dotted per-exercise progress for the active day */
   .daydots { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:8px; margin-top:16px; min-height:9px; }
@@ -348,8 +351,9 @@
 
 <div class="shell">
   <div class="sheet" id="sheet">
-    <div class="eyebrow">Today's session</div>
+    <div class="eyebrow">Weekly training plan</div>
     <div class="daytabs" id="daytabs"></div>
+    <p class="motto">Progressive overload is non-negotiable — log every set and beat it next week. One more rep or 5 more lbs. Core every day.</p>
     <div class="daydots" id="daydots"></div>
     <div class="dayhead">
       <h1 class="daytitle" id="daytitle">Push</h1>
@@ -376,7 +380,7 @@
 <script>
 /* ====================================================================
    THE LOGGER. (Verbatim from the Logger Design Lab.)
-   Push / Pull / Legs / Upper / Lower program + per-set logging, fully self-contained.
+   Weekly lift + climb plan (Mon–Sun) + per-set logging, fully self-contained.
    ================================================================= */
 
 /* ---- date helpers (local time, never toISOString) ------------------ */
@@ -391,60 +395,69 @@ function daysAgo(k){ const [y,m,d]=k.split('-').map(Number); const t=new Date();
 const r1 = n => Math.round(n*10)/10;
 const ROMAN = ['i','ii','iii','iv','v','vi','vii','viii','ix','x'];
 function mmss(s){ return Math.floor(s/60)+':'+pad(s%60); }
-const TIER_LABEL = { 1:'tier 1', 2:'tier 2', 3:'tier 3', ab:'abs' };
+const TIER_LABEL = { 1:'main', 2:'main', 3:'main', ab:'core — daily', w:'warm-up', c:'climb' };
 
-/* ---- the program: 5-day Push / Pull / Legs / Upper / Lower split ---- */
-/* Three heavy days (PPL) then two volume days (Upper / Lower), plus rest.
-   Weights are in POUNDS (the `kg` field name is historical — every number
-   here and in saved state is lb). Realistic starting prescriptions; retune. */
+/* ---- the program: weekly lift + climb plan (Mon–Sun) ----------------- */
+/* Lifting (Smith/cable/DB) three days, climbing at Gravity Vault around it,
+   core every day. Weights are in POUNDS (the `kg` field name is historical —
+   every number here and in saved state is lb). Starting prescriptions; retune.
+   `dur` items (warm-ups, climbs) log as one tap instead of sets × reps.      */
+const CORE_DAILY = [
+  { id:'cable_crunch', name:'Cable Crunch', tier:'ab', sets:4, reps:15, kg:90, rest:60 },
+  { id:'leg_raises',   name:'Leg Raises',   tier:'ab', sets:3, reps:15, kg:0,  rest:60 },
+  { id:'pallof',       name:'Pallof Press', tier:'ab', sets:3, reps:12, kg:30, perHand:true, rest:60 },
+];
 const PROGRAM = {
-  push: { name:'Push', type:'Heavy', exercises:[
-    { id:'bench_bb',        name:'Barbell bench',        tier:1, sets:4, reps:6,  kg:185, rest:180 },
-    { id:'standing_ohp',    name:'Standing barbell OHP', tier:1, sets:3, reps:8,  kg:110, rest:150 },
-    { id:'incl_db_press',   name:'Incline DB press',     tier:2, sets:3, reps:10, kg:70,  perHand:true, rest:120 },
-    { id:'cable_fly',       name:'Cable chest fly',      tier:3, sets:3, reps:12, kg:40,  rest:75  },
-    { id:'cable_lat_raise', name:'Cable lateral raise',  tier:3, sets:4, reps:12, kg:20,  rest:60  },
-    { id:'tri_pushdown',    name:'Tricep rope pushdown', tier:3, sets:3, reps:12, kg:60,  rest:75  },
-    { id:'oh_tri_ext',      name:'Overhead cable tri ext', tier:3, sets:3, reps:12, kg:50, rest:75 },
+  mon: { name:'Mon', focus:'Push + Easy Climb', type:'Lift + climb', exercises:[
+    { id:'band_pullaparts', name:'Band Pull-Aparts + Arm Circles', tier:'w', sets:2, reps:15, kg:0, rest:30 },
+    { id:'smith_bench',   name:'Smith Machine Bench Press',        tier:1, sets:4, reps:6,  kg:135, rest:180 },
+    { id:'incline_smith', name:'Incline Smith Press',              tier:1, sets:4, reps:8,  kg:95,  rest:150 },
+    { id:'db_lat_raise',  name:'Dumbbell Lateral Raises',          tier:1, sets:4, reps:15, kg:15,  perHand:true, rest:60 },
+    { id:'cable_fly',     name:'Cable Chest Fly',                  tier:1, sets:3, reps:12, kg:40,  rest:75 },
+    { id:'oh_tri_ext',    name:'Overhead Tricep Extension (cable)',tier:1, sets:3, reps:12, kg:50,  rest:75 },
+    { id:'tri_pushdown',  name:'Tricep Pushdown',                  tier:1, sets:3, reps:15, kg:50,  rest:75 },
+    ...CORE_DAILY,
+    { id:'climb_easy',    name:'Easy traversing + downclimbing V0–V2', tier:'c', sets:1, reps:1, kg:0, dur:'30–40 min', rest:0 },
   ]},
-  pull: { name:'Pull', type:'Heavy', exercises:[
-    { id:'conv_dl',         name:'Conventional deadlift', tier:1, sets:3, reps:5,  kg:315, rest:210 },
-    { id:'pullup_weighted', name:'Weighted pull-ups',     tier:1, sets:4, reps:8,  kg:35,  rest:150 },
-    { id:'bb_row',          name:'Barbell row',           tier:1, sets:3, reps:8,  kg:175, rest:150 },
-    { id:'lat_pulldown',    name:'Lat pulldown',          tier:2, sets:3, reps:10, kg:140, rest:120 },
-    { id:'face_pull',       name:'Cable face pull',       tier:3, sets:3, reps:15, kg:50,  rest:60 },
-    { id:'bb_curl',         name:'Barbell curl',          tier:2, sets:3, reps:10, kg:75,  rest:75  },
-    { id:'hammer_curl',     name:'Hammer curl',           tier:3, sets:3, reps:12, kg:35,  perHand:true, rest:60 },
+  tue: { name:'Tue', focus:'Climb · Gravity Vault', type:'Climb', exercises:[
+    { id:'climb_warm',    name:'Easy boulders + mobility',         tier:'w', sets:1, reps:1, kg:0, dur:'15 min', rest:0 },
+    { id:'climb_session', name:'Bouldering session V3–V5',         tier:'c', sets:1, reps:1, kg:0, dur:'60–90 min', rest:0 },
+    ...CORE_DAILY,
   ]},
-  legs: { name:'Legs', type:'Heavy', exercises:[
-    { id:'back_squat',      name:'Barbell back squat',    tier:1, sets:4, reps:6,  kg:265, rest:210 },
-    { id:'rdl',             name:'Romanian deadlift',     tier:1, sets:3, reps:8,  kg:225, rest:150 },
-    { id:'leg_press',       name:'Leg press',             tier:2, sets:3, reps:10, kg:440, rest:120 },
-    { id:'lying_leg_curl',  name:'Lying leg curl',        tier:3, sets:3, reps:12, kg:110, rest:75  },
-    { id:'leg_ext',         name:'Leg extension',         tier:3, sets:3, reps:12, kg:130, rest:75  },
-    { id:'calf_raise',      name:'Calf raise',            tier:3, sets:4, reps:12, kg:200, rest:60  },
-    { id:'hang_leg_raise',  name:'Hanging leg raise',     tier:'ab', sets:3, reps:12, kg:0, rest:60 },
+  wed: { name:'Wed', focus:'Pull + Slab (opt)', type:'Lift + climb', exercises:[
+    { id:'band_scap',     name:'Band Pull-Aparts + Scap Pull-Ups', tier:'w', sets:2, reps:15, kg:0, rest:30 },
+    { id:'lat_pulldown',  name:'Lat Pulldown',                     tier:1, sets:4, reps:8,  kg:140, rest:150 },
+    { id:'seated_row',    name:'Seated Cable Row',                 tier:1, sets:4, reps:10, kg:130, rest:120 },
+    { id:'db_row',        name:'Single-Arm Dumbbell Row',          tier:1, sets:3, reps:10, kg:60,  perHand:true, rest:120 },
+    { id:'face_pull',     name:'Cable Face Pull',                  tier:1, sets:3, reps:15, kg:50,  rest:60 },
+    { id:'db_curl',       name:'Dumbbell Curl',                    tier:1, sets:3, reps:12, kg:30,  perHand:true, rest:60 },
+    { id:'hammer_curl',   name:'Hammer Curl',                      tier:1, sets:3, reps:12, kg:30,  perHand:true, rest:60 },
+    ...CORE_DAILY,
+    { id:'climb_slab',    name:'Slab technique climbing (optional)', tier:'c', sets:1, reps:1, kg:0, dur:'20–30 min', rest:0 },
   ]},
-  upper: { name:'Upper', type:'Volume', exercises:[
-    { id:'incl_bb_bench',    name:'Incline barbell bench', tier:1, sets:4, reps:8,  kg:145, rest:150 },
-    { id:'seated_row',       name:'Seated cable row',      tier:1, sets:3, reps:10, kg:130, rest:120 },
-    { id:'db_shoulder_press',name:'DB shoulder press',     tier:2, sets:3, reps:10, kg:50,  perHand:true, rest:120 },
-    { id:'pec_deck',         name:'Pec deck',              tier:3, sets:3, reps:12, kg:120, rest:75  },
-    { id:'db_lat_raise',     name:'DB lateral raise',      tier:3, sets:3, reps:15, kg:20,  perHand:true, rest:60 },
-    { id:'incl_db_curl',     name:'Incline DB curl',       tier:3, sets:3, reps:12, kg:25,  perHand:true, rest:60 },
-    { id:'skullcrusher',     name:'EZ-bar skullcrusher',   tier:3, sets:3, reps:12, kg:65,  rest:75  },
+  thu: { name:'Thu', focus:'Climb · Gravity Vault', type:'Climb', exercises:[
+    { id:'climb_warm',    name:'Easy boulders + mobility',         tier:'w', sets:1, reps:1, kg:0, dur:'15 min', rest:0 },
+    { id:'climb_session', name:'Bouldering session V3–V5',         tier:'c', sets:1, reps:1, kg:0, dur:'60–90 min', rest:0 },
+    ...CORE_DAILY,
   ]},
-  lower: { name:'Lower', type:'Volume', exercises:[
-    { id:'front_squat',      name:'Front squat',           tier:1, sets:3, reps:8,  kg:175, rest:180 },
-    { id:'hip_thrust',       name:'Barbell hip thrust',    tier:1, sets:3, reps:10, kg:265, rest:150 },
-    { id:'bulgarian',        name:'Bulgarian split squat', tier:2, sets:3, reps:10, kg:45,  perHand:true, rest:120 },
-    { id:'seated_leg_curl',  name:'Seated leg curl',       tier:3, sets:3, reps:12, kg:100, rest:75  },
-    { id:'seated_calf',      name:'Seated calf raise',     tier:3, sets:4, reps:15, kg:110, rest:60  },
-    { id:'cable_crunch',     name:'Cable crunch',          tier:'ab', sets:3, reps:15, kg:90, rest:60 },
+  fri: { name:'Fri', focus:'Legs + Easy Climb', type:'Lift + climb', exercises:[
+    { id:'leg_swings',    name:'Leg Swings + Bodyweight Squats',   tier:'w', sets:2, reps:15, kg:0, rest:30 },
+    { id:'smith_squat',   name:'Smith Machine Squat',              tier:1, sets:4, reps:6,  kg:185, rest:180 },
+    { id:'leg_press',     name:'Leg Press',                        tier:1, sets:3, reps:10, kg:270, rest:120 },
+    { id:'db_rdl',        name:'Dumbbell RDL',                     tier:1, sets:3, reps:10, kg:60,  perHand:true, rest:120 },
+    { id:'leg_curl',      name:'Lying Leg Curl',                   tier:1, sets:3, reps:12, kg:90,  rest:75 },
+    { id:'calf_raise',    name:'Calf Raises',                      tier:1, sets:4, reps:15, kg:90,  rest:60 },
+    ...CORE_DAILY,
+    { id:'climb_easy',    name:'Easy traversing + downclimbing V0–V2', tier:'c', sets:1, reps:1, kg:0, dur:'30–40 min', rest:0 },
   ]},
-  rest: { name:'Rest', restDay:true, exercises:[] },
+  sat: { name:'Sat', focus:'Climb · Projecting Day', type:'Climb', exercises:[
+    { id:'climb_warm',    name:'Easy boulders + mobility',         tier:'w', sets:1, reps:1, kg:0, dur:'15 min', rest:0 },
+    { id:'climb_project', name:'Project attempts — limit boulders', tier:'c', sets:1, reps:1, kg:0, dur:'90 min', rest:0 },
+    ...CORE_DAILY,
+  ]},
+  sun: { name:'Sun', focus:'Rest', restDay:true, exercises:[] },
 };
-const ORDER = ['push','pull','legs','upper','lower','rest'];
+const ORDER = ['mon','tue','wed','thu','fri','sat','sun'];
 
 /* form reference + swap library (cues for the ⓘ button + swap options) */
 const LIB = {
@@ -482,14 +495,23 @@ const LIB = {
   seated_leg_curl:{ equipment:'Machine', primary:['Hamstrings'], secondary:[], gist:'Seated leg curl to hit the hamstrings at length.', steps:['Pad above the heels, lap pad tight','Curl down and back fully','Return slow to a full stretch'], cues:['Squeeze at the bottom','No lifting off the seat'] },
   seated_calf:{ equipment:'Machine', primary:['Calves'], secondary:[], gist:'Seated calf raise for the soleus.', steps:['Balls of the feet on the platform, pad on the knees','Rise to a full contraction','Lower to a deep stretch'], cues:['Pause at the top and bottom','Full range every rep'] },
   cable_crunch:{ equipment:'Cable', primary:['Abs'], secondary:[], gist:'Kneeling cable crunch to load the abs.', steps:['Kneel below the rope, hands by your head','Crunch your ribs toward your hips','Return slow, keep tension'], cues:['Spine flexes, hips stay still','Crunch down, not pull down'] },
+  smith_bench:{ equipment:'Smith machine', primary:['Chest'], secondary:['Front delts','Triceps'], gist:'Smith bench press, your push-day anchor on a fixed bar path.', steps:['Bar over mid-chest, shoulder blades pinned','Lower under control to the base of your sternum','Drive up and squeeze the chest'], cues:['Lower slower than you press','Feet planted, no bouncing'] },
+  incline_smith:{ equipment:'Smith machine', primary:['Upper chest'], secondary:['Front delts'], gist:'Incline Smith press for the upper chest.', steps:['Bench at about 30 degrees under the bar','Lower to your upper chest','Press up and slightly back'], cues:['Shoulder blades stay pinned','Full stretch at the bottom'] },
+  leg_raises:{ equipment:'Bodyweight', primary:['Abs'], secondary:['Hip flexors'], gist:'Leg raises for the lower abs.', steps:['Lie flat or hang, legs together','Raise your legs without swinging','Lower slow, stay controlled'], cues:['Curl the pelvis up at the top','No momentum'] },
+  pallof:{ equipment:'Cable', primary:['Core'], secondary:['Obliques'], gist:'Anti-rotation press — the core resists the cable twisting you.', steps:['Cable at chest height, stand side-on','Press the handle straight out','Hold, resist the pull, return slow'], cues:['Hips and shoulders stay square','Brace like a punch is coming'] },
+  db_row:{ equipment:'Dumbbell', primary:['Lats'], secondary:['Upper back','Biceps'], gist:'Single-arm row for lats and a strong pulling side.', steps:['Hand and knee on the bench, flat back','Row the dumbbell to your hip','Lower slow to a full stretch'], cues:['Lead with the elbow','No torso twist'] },
+  db_curl:{ equipment:'Dumbbell', primary:['Biceps'], secondary:['Forearms'], gist:'Dumbbell curl for biceps size.', steps:['Palms up, elbows pinned to your sides','Curl up without swinging','Lower slow to a full stretch'], cues:['Elbows stay still','Control the negative'] },
+  smith_squat:{ equipment:'Smith machine', primary:['Quads'], secondary:['Glutes','Core'], gist:'Smith squat, your leg-day anchor on a fixed bar path.', steps:['Bar on your upper back, feet slightly forward','Sit down until thighs hit parallel','Drive up through the whole foot'], cues:['Knees track over your toes','Brace hard before every rep'] },
+  db_rdl:{ equipment:'Dumbbell', primary:['Hamstrings'], secondary:['Glutes','Back'], gist:'Dumbbell Romanian deadlift for hamstrings and glutes.', steps:['Soft knees, dumbbells on your thighs','Push your hips back, weights close','Stand tall, squeeze the glutes'], cues:['Feel the hamstring stretch','Flat back throughout'] },
+  leg_curl:{ equipment:'Machine', primary:['Hamstrings'], secondary:[], gist:'Lying leg curl to isolate the hamstrings.', steps:['Pad just above the heels','Curl up fully, squeeze','Lower slow, full stretch'], cues:['Hips stay down','Slow on the way down'] },
 };
 const SWAPS = {
-  push:[ {id:'incl_bb_bench',name:'Incline barbell bench',tier:2},{id:'machine_chest',name:'Machine chest press',tier:2},{id:'dips_weighted',name:'Weighted dips',tier:2},{id:'db_shoulder_press',name:'DB shoulder press',tier:2,perHand:true},{id:'pec_deck',name:'Pec deck',tier:3} ],
-  pull:[ {id:'tbar_row',name:'T-bar row',tier:1},{id:'chinup',name:'Chin-ups',tier:1},{id:'seated_row',name:'Seated cable row',tier:2},{id:'db_curl',name:'Incline DB curl',tier:3,perHand:true},{id:'rear_delt_fly',name:'Rear delt fly',tier:3} ],
-  legs:[ {id:'hack_squat',name:'Hack squat',tier:1},{id:'front_squat',name:'Front squat',tier:1},{id:'bulgarian',name:'Bulgarian split squat',tier:2,perHand:true},{id:'good_morning',name:'Good morning',tier:2},{id:'seated_calf',name:'Seated calf raise',tier:3} ],
-  upper:[ {id:'machine_chest',name:'Machine chest press',tier:2},{id:'chinup',name:'Chin-ups',tier:1},{id:'cable_fly',name:'Cable chest fly',tier:3},{id:'face_pull',name:'Cable face pull',tier:3},{id:'hammer_curl',name:'Hammer curl',tier:3,perHand:true} ],
-  lower:[ {id:'hack_squat',name:'Hack squat',tier:1},{id:'leg_press',name:'Leg press',tier:2},{id:'good_morning',name:'Good morning',tier:2},{id:'leg_ext',name:'Leg extension',tier:3},{id:'walking_lunge',name:'Walking lunge',tier:2,perHand:true} ],
-  rest:[],
+  mon:[ {id:'db_bench',name:'Dumbbell Bench Press',tier:1,perHand:true},{id:'machine_chest',name:'Machine Chest Press',tier:1},{id:'pec_deck',name:'Pec Deck',tier:1},{id:'arnold_press',name:'Arnold Press',tier:1,perHand:true} ],
+  tue:[],
+  wed:[ {id:'chinup',name:'Chin-Ups',tier:1},{id:'straight_arm_pd',name:'Straight-Arm Pulldown',tier:1},{id:'chest_row',name:'Chest-Supported Row',tier:1},{id:'rear_delt_fly',name:'Rear Delt Fly',tier:1} ],
+  thu:[],
+  fri:[ {id:'hack_squat',name:'Hack Squat',tier:1},{id:'walking_lunge',name:'Walking Lunge',tier:1,perHand:true},{id:'leg_ext',name:'Leg Extension',tier:1},{id:'seated_calf',name:'Seated Calf Raise',tier:1} ],
+  sat:[], sun:[],
 };
 
 /* Ships clean. The program (PROGRAM) fills each day with lifts ready to log;
@@ -505,16 +527,16 @@ function buildState(){
   const days = {};
   ORDER.forEach(key=>{
     const p = PROGRAM[key];
-    days[key] = { name:p.name, type:p.type||'', restDay:!!p.restDay, off:false, ex:(p.exercises||[]).map(e=>{
+    days[key] = { name:p.name, focus:p.focus||'', type:p.type||'', restDay:!!p.restDay, off:false, ex:(p.exercises||[]).map(e=>{
       const seedLog = (SEED&&SEED.log&&SEED.log[e.id]) || null;
       const lk = lastRealKg(e.id);
-      return { id:e.id, name:e.name, tier:e.tier, sets:e.sets, reps:e.reps, kg:e.kg, perHand:!!e.perHand, rest:e.rest||120,
+      return { id:e.id, name:e.name, tier:e.tier, sets:e.sets, reps:e.reps, kg:e.kg, dur:e.dur||null, perHand:!!e.perHand, rest:e.rest||120,
         lastKg: (lk==null? null : lk), pinned:false, collapsed:false, deload:false, note:'',
         log: seedLog ? seedLog.map(s=>s?{kg:s.kg,reps:s.reps,fail:!!s.fail}:null) : Array(e.sets).fill(null),
         hist: (SEED&&SEED.hist&&SEED.hist[e.id]) ? JSON.parse(JSON.stringify(SEED.hist[e.id])) : [] };
     })};
   });
-  return { active:(SEED&&SEED.active)||'push', unit:'lb', submitted:false, days };
+  return { active:(SEED&&SEED.active)||'mon', unit:'lb', submitted:false, days };
 }
 /* STATE is filled by the async boot below once the dashboard bridge resolves. */
 let STATE = null;
@@ -568,7 +590,7 @@ function renderDots(){
 }
 function renderHead(){
   const d=curDay();
-  $('#daytitle').textContent = d.name;
+  $('#daytitle').textContent = d.focus || d.name;
   const pill=$('#daypill');
   if(d.restDay){ pill.style.display='none'; } else { pill.style.display=''; pill.textContent=d.type||'Session'; pill.className='daypill'+(/vol/i.test(d.type)?' vol':''); }
   const moon=$('#moonbtn');
@@ -612,7 +634,7 @@ function renderCard(e, day){
   const rx=prescription(e);
   const card=document.createElement('div'); card.className='ex'+(e.collapsed?' collapsed':''); card.dataset.id=e.id;
   const tier = TIER_LABEL[e.tier]||('tier '+e.tier);
-  const metaBits = [tier, rx.sets+' × '+rx.reps];
+  const metaBits = [tier, e.dur ? e.dur : rx.sets+' × '+rx.reps];
   if(e.lastKg!=null) metaBits.push('last '+e.lastKg+' '+STATE.unit);
   const meta = metaBits.map(b=>'<span>'+b+'</span>').join('<span class="metaSep">·</span>') + (e.deload?'<span class="deloadTag">deload</span>':'');
   card.innerHTML =
@@ -992,7 +1014,9 @@ function migrateToLb(d){
 (async()=>{
   let d=null;
   try{ d = await window.Vitality.load(); }catch(e){ d=null; }
-  STATE = (d && typeof d==='object' && !Array.isArray(d) && d.days) ? migrateToLb(d) : buildState();
+  /* d.days.mon check: saved state from the old PPL/UL split doesn't fit the
+     weekly plan's days, so those installs rebuild onto the new program. */
+  STATE = (d && typeof d==='object' && !Array.isArray(d) && d.days && d.days.mon) ? migrateToLb(d) : buildState();
   render(); wireFresh();
   spawnParticles(document.querySelector('#vt-backdrop .wb-particles'));
 })();
