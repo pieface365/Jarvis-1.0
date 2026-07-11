@@ -395,51 +395,52 @@ const TIER_LABEL = { 1:'tier 1', 2:'tier 2', 3:'tier 3', ab:'abs' };
 
 /* ---- the program: 5-day Push / Pull / Legs / Upper / Lower split ---- */
 /* Three heavy days (PPL) then two volume days (Upper / Lower), plus rest.
-   The kg are a realistic starting prescription; retune them to yours.    */
+   Weights are in POUNDS (the `kg` field name is historical — every number
+   here and in saved state is lb). Realistic starting prescriptions; retune. */
 const PROGRAM = {
   push: { name:'Push', type:'Heavy', exercises:[
-    { id:'bench_bb',        name:'Barbell bench',        tier:1, sets:4, reps:6,  kg:85,   rest:180 },
-    { id:'standing_ohp',    name:'Standing barbell OHP', tier:1, sets:3, reps:8,  kg:50,   rest:150 },
-    { id:'incl_db_press',   name:'Incline DB press',     tier:2, sets:3, reps:10, kg:32.5, perHand:true, rest:120 },
-    { id:'cable_fly',       name:'Cable chest fly',      tier:3, sets:3, reps:12, kg:18,   rest:75  },
-    { id:'cable_lat_raise', name:'Cable lateral raise',  tier:3, sets:4, reps:12, kg:9,    rest:60  },
-    { id:'tri_pushdown',    name:'Tricep rope pushdown', tier:3, sets:3, reps:12, kg:27.5, rest:75  },
-    { id:'oh_tri_ext',      name:'Overhead cable tri ext', tier:3, sets:3, reps:12, kg:22.5, rest:75 },
+    { id:'bench_bb',        name:'Barbell bench',        tier:1, sets:4, reps:6,  kg:185, rest:180 },
+    { id:'standing_ohp',    name:'Standing barbell OHP', tier:1, sets:3, reps:8,  kg:110, rest:150 },
+    { id:'incl_db_press',   name:'Incline DB press',     tier:2, sets:3, reps:10, kg:70,  perHand:true, rest:120 },
+    { id:'cable_fly',       name:'Cable chest fly',      tier:3, sets:3, reps:12, kg:40,  rest:75  },
+    { id:'cable_lat_raise', name:'Cable lateral raise',  tier:3, sets:4, reps:12, kg:20,  rest:60  },
+    { id:'tri_pushdown',    name:'Tricep rope pushdown', tier:3, sets:3, reps:12, kg:60,  rest:75  },
+    { id:'oh_tri_ext',      name:'Overhead cable tri ext', tier:3, sets:3, reps:12, kg:50, rest:75 },
   ]},
   pull: { name:'Pull', type:'Heavy', exercises:[
-    { id:'conv_dl',         name:'Conventional deadlift', tier:1, sets:3, reps:5,  kg:140, rest:210 },
-    { id:'pullup_weighted', name:'Weighted pull-ups',     tier:1, sets:4, reps:8,  kg:15,  rest:150 },
-    { id:'bb_row',          name:'Barbell row',           tier:1, sets:3, reps:8,  kg:80,  rest:150 },
-    { id:'lat_pulldown',    name:'Lat pulldown',          tier:2, sets:3, reps:10, kg:64,  rest:120 },
-    { id:'face_pull',       name:'Cable face pull',       tier:3, sets:3, reps:15, kg:22.5, rest:60 },
-    { id:'bb_curl',         name:'Barbell curl',          tier:2, sets:3, reps:10, kg:35,  rest:75  },
-    { id:'hammer_curl',     name:'Hammer curl',           tier:3, sets:3, reps:12, kg:16,  perHand:true, rest:60 },
+    { id:'conv_dl',         name:'Conventional deadlift', tier:1, sets:3, reps:5,  kg:315, rest:210 },
+    { id:'pullup_weighted', name:'Weighted pull-ups',     tier:1, sets:4, reps:8,  kg:35,  rest:150 },
+    { id:'bb_row',          name:'Barbell row',           tier:1, sets:3, reps:8,  kg:175, rest:150 },
+    { id:'lat_pulldown',    name:'Lat pulldown',          tier:2, sets:3, reps:10, kg:140, rest:120 },
+    { id:'face_pull',       name:'Cable face pull',       tier:3, sets:3, reps:15, kg:50,  rest:60 },
+    { id:'bb_curl',         name:'Barbell curl',          tier:2, sets:3, reps:10, kg:75,  rest:75  },
+    { id:'hammer_curl',     name:'Hammer curl',           tier:3, sets:3, reps:12, kg:35,  perHand:true, rest:60 },
   ]},
   legs: { name:'Legs', type:'Heavy', exercises:[
-    { id:'back_squat',      name:'Barbell back squat',    tier:1, sets:4, reps:6,  kg:120, rest:210 },
-    { id:'rdl',             name:'Romanian deadlift',     tier:1, sets:3, reps:8,  kg:100, rest:150 },
-    { id:'leg_press',       name:'Leg press',             tier:2, sets:3, reps:10, kg:200, rest:120 },
-    { id:'lying_leg_curl',  name:'Lying leg curl',        tier:3, sets:3, reps:12, kg:50,  rest:75  },
-    { id:'leg_ext',         name:'Leg extension',         tier:3, sets:3, reps:12, kg:60,  rest:75  },
-    { id:'calf_raise',      name:'Calf raise',            tier:3, sets:4, reps:12, kg:90,  rest:60  },
+    { id:'back_squat',      name:'Barbell back squat',    tier:1, sets:4, reps:6,  kg:265, rest:210 },
+    { id:'rdl',             name:'Romanian deadlift',     tier:1, sets:3, reps:8,  kg:225, rest:150 },
+    { id:'leg_press',       name:'Leg press',             tier:2, sets:3, reps:10, kg:440, rest:120 },
+    { id:'lying_leg_curl',  name:'Lying leg curl',        tier:3, sets:3, reps:12, kg:110, rest:75  },
+    { id:'leg_ext',         name:'Leg extension',         tier:3, sets:3, reps:12, kg:130, rest:75  },
+    { id:'calf_raise',      name:'Calf raise',            tier:3, sets:4, reps:12, kg:200, rest:60  },
     { id:'hang_leg_raise',  name:'Hanging leg raise',     tier:'ab', sets:3, reps:12, kg:0, rest:60 },
   ]},
   upper: { name:'Upper', type:'Volume', exercises:[
-    { id:'incl_bb_bench',    name:'Incline barbell bench', tier:1, sets:4, reps:8,  kg:65,   rest:150 },
-    { id:'seated_row',       name:'Seated cable row',      tier:1, sets:3, reps:10, kg:60,   rest:120 },
-    { id:'db_shoulder_press',name:'DB shoulder press',     tier:2, sets:3, reps:10, kg:22.5, perHand:true, rest:120 },
-    { id:'pec_deck',         name:'Pec deck',              tier:3, sets:3, reps:12, kg:55,   rest:75  },
-    { id:'db_lat_raise',     name:'DB lateral raise',      tier:3, sets:3, reps:15, kg:10,   perHand:true, rest:60 },
-    { id:'incl_db_curl',     name:'Incline DB curl',       tier:3, sets:3, reps:12, kg:12,   perHand:true, rest:60 },
-    { id:'skullcrusher',     name:'EZ-bar skullcrusher',   tier:3, sets:3, reps:12, kg:30,   rest:75  },
+    { id:'incl_bb_bench',    name:'Incline barbell bench', tier:1, sets:4, reps:8,  kg:145, rest:150 },
+    { id:'seated_row',       name:'Seated cable row',      tier:1, sets:3, reps:10, kg:130, rest:120 },
+    { id:'db_shoulder_press',name:'DB shoulder press',     tier:2, sets:3, reps:10, kg:50,  perHand:true, rest:120 },
+    { id:'pec_deck',         name:'Pec deck',              tier:3, sets:3, reps:12, kg:120, rest:75  },
+    { id:'db_lat_raise',     name:'DB lateral raise',      tier:3, sets:3, reps:15, kg:20,  perHand:true, rest:60 },
+    { id:'incl_db_curl',     name:'Incline DB curl',       tier:3, sets:3, reps:12, kg:25,  perHand:true, rest:60 },
+    { id:'skullcrusher',     name:'EZ-bar skullcrusher',   tier:3, sets:3, reps:12, kg:65,  rest:75  },
   ]},
   lower: { name:'Lower', type:'Volume', exercises:[
-    { id:'front_squat',      name:'Front squat',           tier:1, sets:3, reps:8,  kg:80,  rest:180 },
-    { id:'hip_thrust',       name:'Barbell hip thrust',    tier:1, sets:3, reps:10, kg:120, rest:150 },
-    { id:'bulgarian',        name:'Bulgarian split squat', tier:2, sets:3, reps:10, kg:20,  perHand:true, rest:120 },
-    { id:'seated_leg_curl',  name:'Seated leg curl',       tier:3, sets:3, reps:12, kg:45,  rest:75  },
-    { id:'seated_calf',      name:'Seated calf raise',     tier:3, sets:4, reps:15, kg:50,  rest:60  },
-    { id:'cable_crunch',     name:'Cable crunch',          tier:'ab', sets:3, reps:15, kg:40, rest:60 },
+    { id:'front_squat',      name:'Front squat',           tier:1, sets:3, reps:8,  kg:175, rest:180 },
+    { id:'hip_thrust',       name:'Barbell hip thrust',    tier:1, sets:3, reps:10, kg:265, rest:150 },
+    { id:'bulgarian',        name:'Bulgarian split squat', tier:2, sets:3, reps:10, kg:45,  perHand:true, rest:120 },
+    { id:'seated_leg_curl',  name:'Seated leg curl',       tier:3, sets:3, reps:12, kg:100, rest:75  },
+    { id:'seated_calf',      name:'Seated calf raise',     tier:3, sets:4, reps:15, kg:110, rest:60  },
+    { id:'cable_crunch',     name:'Cable crunch',          tier:'ab', sets:3, reps:15, kg:90, rest:60 },
   ]},
   rest: { name:'Rest', restDay:true, exercises:[] },
 };
@@ -513,7 +514,7 @@ function buildState(){
         hist: (SEED&&SEED.hist&&SEED.hist[e.id]) ? JSON.parse(JSON.stringify(SEED.hist[e.id])) : [] };
     })};
   });
-  return { active:(SEED&&SEED.active)||'push', unit:'kg', submitted:false, days };
+  return { active:(SEED&&SEED.active)||'push', unit:'lb', submitted:false, days };
 }
 /* STATE is filled by the async boot below once the dashboard bridge resolves. */
 let STATE = null;
@@ -669,6 +670,9 @@ function renderPill(e, rx, idx){
         : '<button class="pillHit" aria-label="Log set">hit it →</button><button class="pillMiss" aria-label="Mark missed">miss</button>')
     + '</div>';
   const wIn=row.querySelector('.w'), rIn=row.querySelector('.r');
+  // lb weights run to 3 digits + decimals (185, 142.5) — the kg-era fixed 2.6ch clips them
+  const fitW=()=>{ wIn.style.width=Math.max(2.6, String(wIn.value||'').length+0.8)+'ch'; };
+  fitW(); wIn.addEventListener('input', fitW);
   const commit=()=>{ const kg=parseFloat(wIn.value); const reps=Math.round(parseFloat(rIn.value)); if(!Number.isFinite(kg)||kg<0||!Number.isFinite(reps)||reps<0) return; if(reps===0){ doLog(e, idx, kg, 0, true); } else { doLog(e, idx, kg, reps, false); } };
   const stop=ev=>ev.stopPropagation();
   [wIn,rIn].forEach(inp=>{ inp.addEventListener('click',stop); inp.addEventListener('keydown',ev=>{ if(ev.key==='Enter'){ ev.preventDefault(); commit(); inp.blur(); } }); });
@@ -858,7 +862,7 @@ function openSwap(e){
     scrim=>{
       scrim.querySelectorAll('.swapItem').forEach(b=> b.onclick=()=>{
         const o=opts.find(x=>x.id===b.dataset.id); if(!o) return;
-        const def={ id:o.id, name:o.name, tier:o.tier, sets:(e?e.sets:3), reps:(e?e.reps:10), kg:(e?e.kg:20), perHand:!!o.perHand, rest:(e?e.rest:120), lastKg:null, pinned:false, collapsed:false, deload:false, note:'', log:Array(e?e.sets:3).fill(null), hist:[] };
+        const def={ id:o.id, name:o.name, tier:o.tier, sets:(e?e.sets:3), reps:(e?e.reps:10), kg:(e?e.kg:45), perHand:!!o.perHand, rest:(e?e.rest:120), lastKg:null, pinned:false, collapsed:false, deload:false, note:'', log:Array(e?e.sets:3).fill(null), hist:[] };
         if(adding){ day.ex.push(def); }
         else { const i=day.ex.findIndex(x=>x.id===e.id); if(i>=0) day.ex[i]=def; stopRest(e.id); }
         closePop(); render();
@@ -941,7 +945,7 @@ function confirmRemove(e, day){
 
 /* ---- celebrate ---------------------------------------------------- */
 function celebrate(e, kg, reps){
-  const heavier=r1(kg+2.5);
+  const heavier=r1(kg+5); // pounds: 5 lb is the standard smallest jump
   $('#ch2').innerHTML='You beat your best on '+e.name+'. Next time, chase <span class="goal">'+heavier+' '+STATE.unit+'</span> or <span class="goal">'+kg+' '+STATE.unit+' × '+(reps+1)+'</span>.';
   const c=$('#celebrate'); c.classList.add('on'); c.onclick=()=>c.classList.remove('on');
 }
@@ -971,10 +975,24 @@ function spawnParticles(root){
 /* ---- boot: load state from the dashboard bridge, THEN render -------
    window.Vitality is injected by the dashboard — we never define it. load()
    returns [] when empty, or the saved STATE object; render only after it resolves. */
+/* One-time migration: earlier installs of this tile saved weights in kg.
+   Convert every stored weight to pounds (rounded to the nearest 2.5) so
+   logged history survives the unit switch. New saves carry unit:'lb'. */
+function toLb(k){ return (typeof k==='number' && k>0) ? Math.round(k*2.20462/2.5)*2.5 : k; }
+function migrateToLb(d){
+  if(d.unit==='lb') return d;
+  Object.values(d.days||{}).forEach(day=>(day.ex||[]).forEach(e=>{
+    e.kg=toLb(e.kg); if(e.lastKg!=null) e.lastKg=toLb(e.lastKg);
+    (e.log||[]).forEach(s=>{ if(s) s.kg=toLb(s.kg); });
+    (e.hist||[]).forEach(h=>{ h.kg=toLb(h.kg); });
+  }));
+  d.unit='lb';
+  return d;
+}
 (async()=>{
   let d=null;
   try{ d = await window.Vitality.load(); }catch(e){ d=null; }
-  STATE = (d && typeof d==='object' && !Array.isArray(d) && d.days) ? d : buildState();
+  STATE = (d && typeof d==='object' && !Array.isArray(d) && d.days) ? migrateToLb(d) : buildState();
   render(); wireFresh();
   spawnParticles(document.querySelector('#vt-backdrop .wb-particles'));
 })();
