@@ -36,7 +36,15 @@
   body { margin:0; min-height:100dvh; padding: max(16px, env(safe-area-inset-top)) 14px calc(40px + env(safe-area-inset-bottom)); display:flex; background:transparent; color:var(--text); font-family:var(--sans); -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
   /* flex parent + margin:auto centers the sheet both ways when there's room,
      and still scrolls from the top (title never clipped) when it doesn't. */
-  .shell { width: 100%; max-width: 640px; margin: auto; }
+  /* two columns: the standalone consistency tile on the left, the logger
+     sheet on the right; stacks when the viewport can't fit both. */
+  .shell { width: 100%; max-width: 880px; margin: auto; display: flex; gap: 18px; align-items: flex-start; }
+  .sideCol { flex: none; width: 216px; position: sticky; top: 16px; }
+  .sheet { flex: 1; min-width: 0; }
+  @media (max-width: 780px) {
+    .shell { display: block; max-width: 640px; }
+    .sideCol { width: 100%; position: static; margin-bottom: 14px; }
+  }
 
   /* ── inlined Vitality backdrop — mountains / glass atmosphere / particles,
         fully self-contained so it renders with NO external file ── */
@@ -70,20 +78,28 @@
   .daytab .tnum { font-variant-numeric: tabular-nums; opacity:.6; font-size:10px; margin-left:5px; }
   .daytab.on .tnum { opacity:.55; }
 
-  /* consistency ring — the left-aligned mini tile above the weekday tabs.
-     Fills as days hit 7/7; a perfect week goes solid mint with a check. */
-  .weekCard { display:flex; align-items:center; gap:14px; margin-top:14px; padding:13px 15px; border:1px solid var(--line); border-radius:13px; background:var(--row); width:fit-content; max-width:100%; transition: border-color .4s var(--ease), box-shadow .6s var(--ease); }
-  .weekCard.full { border-color: var(--mint); box-shadow: 0 0 26px rgba(110,231,183,.22); background: rgba(110,231,183,.05); }
-  .weekRing { flex:none; width:56px; height:56px; }
+  /* consistency ring — its own tile in the left column, twin styling to the
+     logger sheet. Fills as days hit 7/7; a perfect week goes solid mint. */
+  .weekCard { display:flex; flex-direction:column; align-items:center; text-align:center; gap:4px; padding:22px 16px 20px; border:1px solid var(--line); border-radius:var(--radius-lg); background:var(--card); backdrop-filter: blur(20px) saturate(1.2); -webkit-backdrop-filter: blur(20px) saturate(1.2); opacity:0; transform: translateY(14px); animation: rise .6s var(--spring) forwards; transition: border-color .4s var(--ease), box-shadow .6s var(--ease); }
+  .weekCard.full { border-color: var(--mint); box-shadow: 0 0 30px rgba(110,231,183,.24); background: rgba(110,231,183,.05); }
+  .weekRing { flex:none; width:84px; height:84px; margin-bottom:8px; }
   .weekRing svg { width:100%; height:100%; display:block; }
   .weekRingNum { font-family: var(--vt-mono); font-size:12.5px; font-weight:600; fill: var(--text); }
-  .weekTitle { font-family: var(--serif); font-style:italic; font-size:17px; line-height:1.2; }
+  .weekText { display:flex; flex-direction:column; align-items:center; }
+  .weekTitle { font-family: var(--serif); font-style:italic; font-size:19px; line-height:1.2; }
   .weekCard.full .weekTitle { color: var(--mint); }
-  .weekSub { font-size:11.5px; color: var(--muted); margin-top:2px; max-width:340px; }
-  .weekDays { display:flex; gap:5px; margin-top:7px; }
-  .weekDays .wd { width:18px; height:18px; border-radius:50%; border:1px solid var(--hair); display:grid; place-items:center; font-family: var(--vt-mono); font-size:9px; color: var(--muted); }
+  .weekSub { font-size:11.5px; line-height:1.45; color: var(--muted); margin-top:4px; }
+  .weekDays { display:flex; gap:5px; margin-top:11px; justify-content:center; }
+  .weekDays .wd { width:19px; height:19px; border-radius:50%; border:1px solid var(--hair); display:grid; place-items:center; font-family: var(--vt-mono); font-size:9px; color: var(--muted); }
   .weekDays .wd.on { background: var(--mint); border-color: var(--mint); color: var(--ink); font-weight:700; }
   .weekDays .wd.today:not(.on) { border-color: var(--mint); color: var(--mint); }
+  /* stacked (narrow) layout: lie the tile down as a compact row */
+  @media (max-width: 780px) {
+    .weekCard { flex-direction:row; text-align:left; padding:14px 16px; gap:14px; }
+    .weekRing { width:56px; height:56px; margin-bottom:0; }
+    .weekText { align-items:flex-start; }
+    .weekDays { justify-content:flex-start; margin-top:7px; }
+  }
 
   /* the plan's motto, under the weekday tabs */
   .motto { font-family: var(--serif); font-style:italic; font-size:13.5px; line-height:1.5; color: var(--muted); margin:14px 0 0; padding-left:11px; border-left:2px solid var(--mint); }
@@ -365,9 +381,11 @@
 </div>
 
 <div class="shell">
+  <aside class="sideCol">
+    <div class="weekCard" id="weekCard"></div>
+  </aside>
   <div class="sheet" id="sheet">
     <div class="eyebrow">Weekly training plan</div>
-    <div class="weekCard" id="weekCard"></div>
     <div class="daytabs" id="daytabs"></div>
     <p class="motto" id="motto"></p>
     <div class="daydots" id="daydots"></div>
