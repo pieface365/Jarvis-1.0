@@ -64,7 +64,7 @@ export async function GET(req: Request) {
   }
 
   const results = await Promise.allSettled([
-    listDataPoints('sleep', token).then((points) =>
+    listDataPoints('sleep').then((points) =>
       points.forEach((p: any) => {
         const s = payload(p, 'sleep')
         if (!s) return
@@ -77,7 +77,7 @@ export async function GET(req: Request) {
         }
       }),
     ),
-    listDataPoints('heart-rate-variability', token).then((points) => {
+    listDataPoints('heart-rate-variability').then((points) => {
       // possibly several samples per day (nightly readings) — average them
       const byDate: Record<string, number[]> = {}
       points.forEach((p: any) => {
@@ -91,7 +91,7 @@ export async function GET(req: Request) {
         set(date, 'hrv', Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10),
       )
     }),
-    listDataPoints('daily-resting-heart-rate', token).then((points) =>
+    listDataPoints('daily-resting-heart-rate').then((points) =>
       points.forEach((p: any) => {
         const r = payload(p, 'dailyRestingHeartRate')
         if (!r) return

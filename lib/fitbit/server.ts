@@ -53,39 +53,67 @@ export async function writeTokens(t: FitbitTokens): Promise<void> {
   }
 }
 
-/** Valid access token, refreshing through Google when expired. Null = not connected. */
-export async function getAccessToken(): Promise<string | null> {
+/* Single-flight refresh: three data types load in parallel, and concurrent
+   refreshes with the same refresh_token are wasteful at best. */
+let refreshing: Promise<string | null> | null = null
+
+/**
+ * Valid access token, refreshing through Google when expired — or when
+ * `force` is set, because Google sometimes invalidates access tokens ahead
+ * of their stated expiry (observed in the wild: 401 with 60min "left").
+ * Null = not connected.
+ */
+export async function getAccessToken(force = false): Promise<string | null> {
   const env = fitbitEnv()
   const t = await readTokens()
   if (!env || !t) return null
-  if (Date.now() < t.expires_at - 60_000) return t.access_token
-  const res = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: env.clientId,
-      client_secret: env.clientSecret,
-      grant_type: 'refresh_token',
-      refresh_token: t.refresh_token,
-    }),
-  })
-  if (!res.ok) return null
-  const j = await res.json()
-  const next: FitbitTokens = {
-    access_token: j.access_token,
-    // Google usually omits refresh_token on refresh; keep the one we have
-    refresh_token: j.refresh_token || t.refresh_token,
-    expires_at: Date.now() + (j.expires_in ?? 3600) * 1000,
+  if (!force && Date.now() < t.expires_at - 60_000) return t.access_token
+  if (!refreshing) {
+    refreshing = (async () => {
+      try {
+        const res = await fetch('https://oauth2.googleapis.com/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            client_id: env.clientId,
+            client_secret: env.clientSecret,
+            grant_type: 'refresh_token',
+            refresh_token: t.refresh_token,
+          }),
+        })
+        if (!res.ok) return null
+        const j = await res.json()
+        const next: FitbitTokens = {
+          access_token: j.access_token,
+          // Google usually omits refresh_token on refresh; keep the one we have
+          refresh_token: j.refresh_token || t.refresh_token,
+          expires_at: Date.now() + (j.expires_in ?? 3600) * 1000,
+        }
+        await writeTokens(next)
+        return next.access_token
+      } finally {
+        refreshing = null
+      }
+    })()
   }
-  await writeTokens(next)
-  return next.access_token
+  return refreshing
 }
 
-/** GET against the Google Health API (the Fitbit Web API's replacement). */
-export async function healthGet(pathAndQuery: string, token: string): Promise<any> {
-  const res = await fetch('https://health.googleapis.com/v4' + pathAndQuery, {
-    headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' },
-  })
+/** GET against the Google Health API (the Fitbit Web API's replacement).
+ *  Fetches its own token; a 401 forces one refresh and one retry. */
+export async function healthGet(pathAndQuery: string): Promise<any> {
+  const attempt = async (token: string) =>
+    fetch('https://health.googleapis.com/v4' + pathAndQuery, {
+      headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' },
+    })
+  let token = await getAccessToken()
+  if (!token) throw Object.assign(new Error('not connected'), { status: 401 })
+  let res = await attempt(token)
+  if (res.status === 401) {
+    token = await getAccessToken(true)
+    if (!token) throw Object.assign(new Error('token refresh failed'), { status: 401 })
+    res = await attempt(token)
+  }
   if (!res.ok) {
     const body = (await res.text()).slice(0, 300)
     const err = new Error(`health api ${res.status} on ${pathAndQuery}: ${body}`) as Error & { status?: number }
@@ -102,14 +130,13 @@ export async function healthGet(pathAndQuery: string, token: string): Promise<an
  * nextPageToken, so emptiness never stops the walk — only a missing token or
  * the caps do.
  */
-export async function listDataPoints(dataType: string, token: string): Promise<any[]> {
+export async function listDataPoints(dataType: string): Promise<any[]> {
   const base = `/users/me/dataTypes/${dataType}/dataPoints`
   const all: any[] = []
   let pageToken = ''
   for (let page = 0; page < 8 && all.length < 400; page++) {
     const j = await healthGet(
       `${base}?pageSize=200${pageToken ? '&pageToken=' + encodeURIComponent(pageToken) : ''}`,
-      token,
     )
     all.push(...(j.dataPoints || []))
     pageToken = j.nextPageToken
