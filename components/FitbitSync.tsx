@@ -19,7 +19,10 @@ export default function FitbitSync({ userId }: { userId: string }) {
     ;(async () => {
       try {
         const res = await fetch('/api/fitbit/vitals?days=14')
-        if (!res.ok) return
+        if (!res.ok) {
+          console.info('[fitbit] vitals sync skipped — API said', res.status)
+          return
+        }
         const { days } = await res.json()
         if (cancelled || !days || typeof days !== 'object') return
 
@@ -83,6 +86,7 @@ export default function FitbitSync({ userId }: { userId: string }) {
             // adopts .readiness off the raw load even when it rebuilds state
             await tileStore.saveData(userId, 'train', { readiness })
           }
+          console.info('[fitbit] readiness synced for', readiness.date, '— recovery', readiness.recovery + '%')
         }
       } catch {
         /* offline or dev server hiccup — the tile still works manually */

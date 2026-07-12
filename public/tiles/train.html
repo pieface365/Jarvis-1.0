@@ -112,6 +112,8 @@
   .ready.amber .rdot { background: var(--gold); box-shadow:0 0 10px rgba(245,158,11,.5); }
   .ready.red { border-color: rgba(224,106,108,.5); background: rgba(224,106,108,.06); }
   .ready.red .rdot { background: var(--fail); box-shadow:0 0 10px rgba(224,106,108,.5); }
+  .ready.off .rdot { background: var(--hair); }
+  .ready.off .rmeta { text-transform:none; letter-spacing:0; font-family:var(--sans); font-size:12px; }
   .ready .rmain { flex:1; min-width:200px; }
   .ready .rline { font-family: var(--serif); font-style:italic; font-size:14.5px; line-height:1.35; }
   .ready.green .rline b { color: var(--mint); } .ready.amber .rline b { color: var(--gold); } .ready.red .rline b { color: var(--fail); }
@@ -725,7 +727,14 @@ function deloadApplied(day){ const m=mainLifts(day); return m.length>0 && m.ever
 function renderReadiness(){
   const el = $('#readiness'); if(!el) return;
   const r = STATE.readiness;
-  if(!r || r.date !== today || typeof r.recovery !== 'number'){ el.innerHTML=''; return; }
+  if(!r || r.date !== today || typeof r.recovery !== 'number'){
+    /* visible empty state — says WHY there's no banner instead of vanishing */
+    const why = !r ? 'No readiness data reached this tile yet — load the dashboard first (it syncs Fitbit on open), then reopen Train.'
+      : r.date !== today ? 'Readiness data is from '+r.date+', not today — reload the dashboard to sync, then reopen Train.'
+      : 'Fitbit data for today is incomplete — wear the band tonight and it fills in.';
+    el.innerHTML = '<div class="ready off"><span class="rdot"></span><div class="rmain"><div class="rmeta">'+why+'</div></div></div>';
+    return;
+  }
   const tier = readinessTier(r);
   const d = curDay();
   const line = tier==='green' ? '<b>Recovered — full send.</b> Chase the PRs today.'
