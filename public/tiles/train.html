@@ -943,9 +943,12 @@ function renderPill(e, rx, idx){
         : '<button class="pillHit" aria-label="Log set">hit it →</button><button class="pillMiss" aria-label="Mark missed">miss</button>')
     + '</div>';
   const wIn=row.querySelector('.w'), rIn=row.querySelector('.r');
-  // lb weights run to 3 digits + decimals (185, 142.5) — the kg-era fixed 2.6ch clips them
-  const fitW=()=>{ wIn.style.width=Math.max(2.6, String(wIn.value||'').length+0.8)+'ch'; };
-  fitW(); wIn.addEventListener('input', fitW);
+  // lb weights run to 3 digits + decimals (185, 142.5) and reps to 2 digits (15) —
+  // the fixed kg-era widths clip them, so both inputs fit to their content
+  const fit=(inp,min)=>{ inp.style.width=Math.max(min, String(inp.value||'').length+0.9)+'ch'; };
+  const fitW=()=>fit(wIn,2.6), fitR=()=>fit(rIn,1.9);
+  fitW(); fitR();
+  wIn.addEventListener('input', fitW); rIn.addEventListener('input', fitR);
   const commit=()=>{ const kg=parseFloat(wIn.value); const reps=Math.round(parseFloat(rIn.value)); if(!Number.isFinite(kg)||kg<0||!Number.isFinite(reps)||reps<0) return; if(reps===0){ doLog(e, idx, kg, 0, true); } else { doLog(e, idx, kg, reps, false); } };
   const stop=ev=>ev.stopPropagation();
   [wIn,rIn].forEach(inp=>{ inp.addEventListener('click',stop); inp.addEventListener('keydown',ev=>{ if(ev.key==='Enter'){ ev.preventDefault(); commit(); inp.blur(); } }); });
