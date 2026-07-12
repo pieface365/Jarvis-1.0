@@ -5,6 +5,7 @@ import styles from './dashboard.module.css'
 import DashboardHeader from './DashboardHeader'
 import WelcomeBackdrop from '@/components/WelcomeBackdrop'
 import FitbitSync from '@/components/FitbitSync'
+import CustomizePanel from '@/components/CustomizePanel'
 import DashboardHeaderGem from './DashboardHeaderGem'
 import DashboardGrid from './DashboardGrid'
 import '@/components/veeTiles.css'
@@ -180,6 +181,8 @@ export default function Dashboard({ firstName, userId }: DashboardProps) {
   const avatarInitial = (firstName?.trim()?.[0] || 'V').toUpperCase()
   const [chrome, setChrome] = useState<DashboardChrome | undefined>(undefined)
   const [scratchOpen, setScratchOpen] = useState(false)
+  const [customizeOpen, setCustomizeOpen] = useState(false)
+  const [arranging, setArranging] = useState(false)
 
   useEffect(() => {
     setChrome(dashboardChrome.get(userId))
@@ -217,8 +220,49 @@ export default function Dashboard({ firstName, userId }: DashboardProps) {
           </div>
         </div>
 
-        <DashboardGrid userId={userId} chrome={chrome ?? DEFAULT_CHROME} />
+        <DashboardGrid userId={userId} chrome={chrome ?? DEFAULT_CHROME} arranging={arranging} />
       </div>
+
+      {/* Customize (pencil): every dashboard value becomes editable */}
+      <button
+        type="button"
+        onClick={() => setCustomizeOpen(true)}
+        aria-label="Customize dashboard"
+        title="Customize"
+        style={{
+          position: 'fixed', left: 24, bottom: 72, zIndex: 50,
+          background: 'transparent', color: 'var(--muted)', border: '1px solid var(--border)',
+          borderRadius: 999, padding: '10px 16px', fontWeight: 500, fontSize: 13, cursor: 'pointer',
+        }}
+      >
+        ✎ Customize
+      </button>
+
+      {customizeOpen && chrome && (
+        <CustomizePanel
+          userId={userId}
+          chrome={chrome}
+          onChange={setChrome}
+          onClose={() => setCustomizeOpen(false)}
+          arranging={arranging}
+          onToggleArrange={() => { setArranging((a) => !a); setCustomizeOpen(false) }}
+        />
+      )}
+
+      {arranging && (
+        <button
+          type="button"
+          onClick={() => setArranging(false)}
+          style={{
+            position: 'fixed', left: '50%', transform: 'translateX(-50%)', bottom: 24, zIndex: 60,
+            background: '#6EE7B7', color: '#04140d', border: 'none', borderRadius: 999,
+            padding: '12px 22px', fontWeight: 600, fontSize: 14, cursor: 'pointer',
+            boxShadow: '0 6px 24px rgba(0,0,0,.45)',
+          }}
+        >
+          Done arranging
+        </button>
+      )}
 
       {scratchOpen && <ScratchPanel userId={userId} onClose={() => setScratchOpen(false)} />}
     </main>

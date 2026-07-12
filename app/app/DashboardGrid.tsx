@@ -9,6 +9,8 @@ import { useTileHost } from '@/lib/tiles/useTileHost'
 import { withBridge } from '@/lib/tiles/tileBridge'
 import { syncEnabled, syncLoadTiles, syncSaveTile } from '@/lib/sync'
 import type { DashboardChrome } from '@/lib/tiles/dashboardChrome'
+import { homeLayout, resolveOrder } from '@/lib/tiles/homeLayout'
+import { nextSize, SIZE_LABELS } from '@/lib/tiles/tileSkin'
 
 /**
  * The base dashboard grid. Every tile is an inert SLOT: the beautiful poster is
@@ -67,13 +69,25 @@ function TileFace({
   isVee,
   core,
   pos,
+  size,
   onOpen,
+  arranging,
+  onMove,
+  onResize,
+  canMoveBack,
+  canMoveFwd,
 }: {
   id: string
   isVee: boolean
   core: CoreTile | null
   pos: { x: number; y: number; w: number; h: number } | undefined
+  size: TileSize
   onOpen: () => void
+  arranging?: boolean
+  onMove?: (dir: -1 | 1) => void
+  onResize?: () => void
+  canMoveBack?: boolean
+  canMoveFwd?: boolean
 }) {
   const label = isVee ? VEE_TILE.label : core!.label
   const index = isVee ? VEE_TILE.index : core!.index
@@ -84,10 +98,16 @@ function TileFace({
     ['--y' as string]: pos?.y ?? 0,
     ['--w' as string]: pos?.w ?? 1,
     ['--h' as string]: pos?.h ?? 1,
+    ...(arranging ? { outline: '1.5px dashed rgba(110,231,183,.55)', outlineOffset: -6 } : {}),
+  }
+  const ctlBtn: CSSProperties = {
+    background: 'rgba(6,10,9,.85)', color: '#6EE7B7', border: '1px solid rgba(110,231,183,.5)',
+    borderRadius: 999, padding: '5px 11px', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+    backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
   }
   return (
     <div
-      data-size={isVee ? coreDefaultSize('vee') : coreDefaultSize(id as Parameters<typeof coreDefaultSize>[0])}
+      data-size={size}
       data-orb={orb?.mode}
       data-roam={orb?.roam}
       data-pt={orb?.pt}
@@ -112,7 +132,22 @@ function TileFace({
       <span className="arrow">→</span>
 
       {/* Inert: clicking opens the slot (filled tile or connector), never navigates. */}
-      <button type="button" className="hit" aria-label={`Open ${label}`} onClick={onOpen} />
+      {!arranging && <button type="button" className="hit" aria-label={`Open ${label}`} onClick={onOpen} />}
+
+      {/* Arrange mode: move + resize controls float over the tile. */}
+      {arranging && (
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 6, display: 'flex', alignItems: 'center',
+          justifyContent: 'center', gap: 8, flexWrap: 'wrap', padding: 10,
+        }}>
+          <button type="button" style={{ ...ctlBtn, opacity: canMoveBack ? 1 : 0.35 }} disabled={!canMoveBack}
+            aria-label={`Move ${label} earlier`} onClick={() => onMove?.(-1)}>◀</button>
+          <button type="button" style={ctlBtn} aria-label={`Resize ${label}`} onClick={onResize}
+            title="Cycle size">{SIZE_LABELS[size]} ⤢</button>
+          <button type="button" style={{ ...ctlBtn, opacity: canMoveFwd ? 1 : 0.35 }} disabled={!canMoveFwd}
+            aria-label={`Move ${label} later`} onClick={() => onMove?.(1)}>▶</button>
+        </div>
+      )}
     </div>
   )
 }
@@ -479,9 +514,10 @@ function VisionEmptyState({ onNewTile }: { onNewTile: () => void }) {
 interface DashboardGridProps {
   userId: string
   chrome?: DashboardChrome
+  arranging?: boolean
 }
 
-export default function DashboardGrid({ userId }: DashboardGridProps) {
+export default function DashboardGrid({ userId, arranging = false }: DashboardGridProps) {
   const ref = useRef<HTMLDivElement>(null)
   const [mounted, setMounted] = useState(false)
   const [cols, setCols] = useState(4)
@@ -495,6 +531,10 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
 
   const { register, unregister } = useTileHost(userId, undefined, () => {})
 
+  // The user's arrangement (order + per-tile sizes), persisted per user.
+  const [order, setOrder] = useState<string[]>(SLOT_ORDER)
+  const [sizes, setSizes] = useState<Record<string, TileSize>>({})
+
   useEffect(() => {
     setMounted(true)
     try {
@@ -502,7 +542,42 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
     } catch {
       /* ignore */
     }
-  }, [])
+    const saved = homeLayout.get(userId)
+    setOrder(resolveOrder(saved.order, SLOT_ORDER))
+    setSizes(saved.sizes || {})
+  }, [userId])
+
+  const sizeFor = (id: string): TileSize =>
+    sizes[id] ?? ((id === 'vee' ? coreDefaultSize('vee') : coreDefaultSize(id as Parameters<typeof coreDefaultSize>[0])) as TileSize)
+
+  const persistLayout = (nextOrder: string[], nextSizes: Record<string, TileSize>) => {
+    homeLayout.set(userId, { order: nextOrder, sizes: nextSizes })
+  }
+
+  /** Swap a tile with its filled neighbour (arrange mode ◀ ▶). */
+  const moveTile = (id: string, dir: -1 | 1) => {
+    setOrder((cur) => {
+      const filledIds = cur.filter((x) => filled[x])
+      const i = filledIds.indexOf(id)
+      const j = i + dir
+      if (i < 0 || j < 0 || j >= filledIds.length) return cur
+      const a = cur.indexOf(filledIds[i])
+      const b = cur.indexOf(filledIds[j])
+      const next = [...cur]
+      ;[next[a], next[b]] = [next[b], next[a]]
+      persistLayout(next, sizes)
+      return next
+    })
+  }
+
+  /** Cycle a tile through the size vocabulary (arrange mode chip). */
+  const resizeTile = (id: string) => {
+    setSizes((cur) => {
+      const next = { ...cur, [id]: nextSize(sizeFor(id)) }
+      persistLayout(order, next)
+      return next
+    })
+  }
 
   // Column bucket, matching the CSS: 4 desktop / 2 phone.
   useEffect(() => {
@@ -551,25 +626,23 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
     }
   }, [])
 
-  // The board shows ONLY tiles that actually exist. A fresh scaffold has none, so
-  // it boots to the blank "see the vision" canvas; tiles appear as they're built
-  // (/tile) or installed (/vitality writes the full set into public/tiles).
-  const filledOrder = useMemo(() => SLOT_ORDER.filter((id) => filled[id]), [filled])
+  // The board shows ONLY tiles that actually exist, in the USER'S order. A fresh
+  // scaffold has none, so it boots to the blank "see the vision" canvas; tiles
+  // appear as they're built (/tile) or installed.
+  const filledOrder = useMemo(() => order.filter((id) => filled[id]), [order, filled])
 
-  // Layout: pure function of (which tiles exist, sizes, cols).
+  // Layout: pure function of (which tiles exist, the user's sizes, cols).
   const { positions, rows } = useMemo(() => {
-    const feet = filledOrder.map((id) => {
-      const size = (id === 'vee' ? coreDefaultSize('vee') : coreDefaultSize(id as Parameters<typeof coreDefaultSize>[0])) as TileSize
-      return footprintFor(id, size, cols)
-    })
+    const feet = filledOrder.map((id) => footprintFor(id, sizeFor(id), cols))
     return packTiles(feet, cols)
-  }, [filledOrder, cols])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filledOrder, cols, sizes])
 
   // (Re)bind the living orbs whenever the packed layout changes.
   useEffect(() => {
     if (!ref.current || !mounted) return
     return initVeeTiles(ref.current, { score: null, showNumber: false })
-  }, [mounted, cols, filledOrder])
+  }, [mounted, cols, filledOrder, sizes, arranging])
 
   // Esc closes any overlay.
   useEffect(() => {
@@ -603,7 +676,7 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
         scratched ? null : <VisionEmptyState onNewTile={() => setNewOpen(true)} />
       ) : (
         <div className="grid" style={{ ['--rows' as string]: rows }}>
-          {filledOrder.map((id) => {
+          {filledOrder.map((id, i) => {
             const isVee = id === 'vee'
             return (
               <TileFace
@@ -612,7 +685,13 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
                 isVee={isVee}
                 core={isVee ? null : CORE_TILES[id as keyof typeof CORE_TILES]}
                 pos={positions.get(id)}
+                size={sizeFor(id)}
                 onOpen={() => openSlot(id)}
+                arranging={arranging}
+                onMove={(dir) => moveTile(id, dir)}
+                onResize={() => resizeTile(id)}
+                canMoveBack={i > 0}
+                canMoveFwd={i < filledOrder.length - 1}
               />
             )
           })}
@@ -686,6 +765,24 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
           }}
         >
           See the vision
+        </button>
+      )}
+
+      {arranging && (
+        <button
+          type="button"
+          onClick={() => {
+            homeLayout.reset(userId)
+            setOrder(SLOT_ORDER)
+            setSizes({})
+          }}
+          style={{
+            position: 'fixed', left: '50%', transform: 'translateX(calc(-50% + 120px))', bottom: 24, zIndex: 60,
+            background: 'transparent', color: 'var(--muted)', border: '1px solid var(--border)',
+            borderRadius: 999, padding: '11px 16px', fontWeight: 500, fontSize: 13, cursor: 'pointer',
+          }}
+        >
+          Reset layout
         </button>
       )}
 
