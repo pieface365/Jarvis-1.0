@@ -77,6 +77,15 @@
   .legDot{width:12px;height:3px;border-radius:2px}
   .noteLine{font-size:12px;color:var(--muted);font-style:italic;margin-top:6px;line-height:1.5}
 
+  /* feel check-in buttons */
+  .feelRow{display:flex;gap:8px}
+  .feelBtn{flex:1;padding:12px 6px;border-radius:12px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:border-color .15s,color .15s,background .15s,transform .15s}
+  .feelBtn:hover{transform:translateY(-1px)}
+  .feelBtn:nth-child(1).on{border-color:#e06a6c;color:#e06a6c;background:rgba(224,106,108,.09)}
+  .feelBtn:nth-child(2).on{border-color:#f59e0b;color:#f59e0b;background:rgba(245,158,11,.09)}
+  .feelBtn:nth-child(3).on{border-color:#6EE7B7;color:#6EE7B7;background:rgba(110,231,183,.09)}
+  .feelBtn:nth-child(4).on{border-color:#a7f3d0;color:#a7f3d0;background:rgba(167,243,208,.12);box-shadow:0 0 14px rgba(167,243,208,.25)}
+
   /* tips */
   .tip{display:flex;gap:12px;padding:13px 14px;border-radius:var(--radius-md);background:var(--bg);border:1px solid var(--border);margin-bottom:10px}
   .tip:last-child{margin-bottom:0}
@@ -95,7 +104,7 @@
    browser storage. In the suite the source read a shared health record; the
    sealed tile takes a manual daily entry (HRV / RHR / sleep) and feeds the
    same recovery-estimate math, rings, trend chart and readiness tips. */
-let store={};     /* keyed by YYYY-MM-DD -> {hrv,rhr,sleepHours,sleepPerf} */
+let store={};     /* keyed by YYYY-MM-DD -> {hrv,rhr,sleepHours,sleepPerf,feel:1-4} */
 let range=14;
 const $=id=>document.getElementById(id);
 const round=n=>Math.round(n);
@@ -105,14 +114,29 @@ function todayKey(){const d=new Date();return d.getFullYear()+'-'+String(d.getMo
 function num(v){const n=Number(v);return (v===''||v==null||!isFinite(n))?null:n;}
 function todaysEntry(){return store[todayKey()]||{};}
 
-/* recovery estimate — same weighting as the source dashboard */
+/* subjective "how do you feel" rating (1 bad … 4 excellent). It nudges
+   today's sleep score and joins the recovery blend as its own component —
+   the body knows things the band doesn't. */
+const FEELS=['','Bad','Okay','Good','Excellent'];
+const FEEL_COLOR=['','#e06a6c','#f59e0b','#6EE7B7','#a7f3d0'];
+const FEEL_REC={1:20,2:50,3:75,4:95};       /* recovery-component value */
+const FEEL_SLEEP_ADJ={1:-10,2:0,3:4,4:8};   /* sleep-score nudge */
+function adjSleepPerf(h){
+  const p=num(h&&h.sleepPerf); if(p==null) return null;
+  const a=(h&&typeof h.feel==='number')?(FEEL_SLEEP_ADJ[h.feel]||0):0;
+  return Math.max(1,Math.min(100,Math.round(p+a)));
+}
+
+/* recovery estimate — same weighting as the source dashboard, plus feel */
 function estRecovery(h){
   if(!h) return null;
   const parts=[],w=[];
   if(typeof h.hrv==='number'){ parts.push(clamp01((h.hrv-20)/(90-20))*100); w.push(0.5); }
   if(typeof h.rhr==='number'){ parts.push(clamp01((80-h.rhr)/(80-42))*100); w.push(0.25); }
-  if(typeof h.sleepPerf==='number'){ parts.push(Math.min(100,h.sleepPerf)); w.push(0.25); }
+  const sp=adjSleepPerf(h);
+  if(sp!=null){ parts.push(sp); w.push(0.25); }
   else if(typeof h.sleepHours==='number'){ parts.push(clamp01(h.sleepHours/8)*100); w.push(0.25); }
+  if(typeof h.feel==='number'){ parts.push(FEEL_REC[h.feel]??50); w.push(0.3); }
   if(!parts.length) return null;
   const sw=w.reduce((a,b)=>a+b,0); let s=0; for(let i=0;i<parts.length;i++)s+=parts[i]*w[i];
   return Math.max(1,Math.min(99,Math.round(s/sw)));
@@ -125,7 +149,7 @@ function fmtHM(h){ if(h==null)return '—'; const hh=Math.floor(h),mm=Math.round
 function entries(){
   return Object.keys(store).filter(k=>/^\d{4}-\d{2}-\d{2}$/.test(k)).sort().map(k=>{
     const e=store[k]||{};
-    return {dateKey:k,hrv:num(e.hrv),rhr:num(e.rhr),sleepHours:num(e.sleepHours),sleepPerf:num(e.sleepPerf),recovery:estRecovery(e)};
+    return {dateKey:k,hrv:num(e.hrv),rhr:num(e.rhr),sleepHours:num(e.sleepHours),sleepPerf:num(e.sleepPerf),feel:(typeof e.feel==='number'?e.feel:null),recovery:estRecovery(e)};
   });
 }
 
@@ -159,6 +183,36 @@ function chartSvg(){
     + (pts.length>1?'<path d="'+line+'" fill="none" stroke="#6EE7B7" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="filter:drop-shadow(0 0 5px rgba(110,231,183,.6))"/>':'')
     + dots + '</svg>'
     + '<div class="legend"><span class="legItem"><span class="legDot" style="background:#6EE7B7"></span>Recovery %</span><span class="legItem"><span class="legDot" style="background:#84848c"></span>Sleep hours</span></div>';
+}
+
+/* ---------- feel check-in + its history chart ---------- */
+function feelHtml(){
+  const f=todaysEntry().feel;
+  return '<section class="card"><span class="cardName">How do you feel?</span>'
+    + '<div class="feelRow">'+[1,2,3,4].map(v=>'<button class="feelBtn'+(f===v?' on':'')+'" data-feel="'+v+'">'+FEELS[v]+'</button>').join('')+'</div>'
+    + '<div class="hint">One honest tap a day — it nudges today\'s sleep score and readiness'+(f?' (feeling <b style="color:'+FEEL_COLOR[f]+'">'+FEELS[f].toLowerCase()+'</b> today)':'')+'.</div></section>';
+}
+function feelChartHtml(){
+  const hist=entries().slice(-range).filter(d=>d.feel!=null);
+  const all=entries().slice(-range);
+  let body;
+  if(hist.length<2){
+    body='<p class="noteLine">Tap a feeling above for 2+ days and your check-ins chart here.</p>';
+  } else {
+    const W=320,H=96,padY=12,padX=8;
+    const xOf=i=>all.length===1?W/2:padX+(i/(all.length-1))*(W-padX*2);
+    const yOf=v=>H-padY-((v-1)/3)*(H-padY*2);
+    /* faint guide rows for the four levels */
+    let grid=''; for(let v=1;v<=4;v++){ const y=yOf(v); grid+='<line x1="0" y1="'+y.toFixed(1)+'" x2="'+W+'" y2="'+y.toFixed(1)+'" stroke="rgba(255,255,255,.06)" stroke-width="1"/>'; }
+    const pts=[]; all.forEach((d,i)=>{ if(d.feel!=null) pts.push([xOf(i),yOf(d.feel),d.feel]); });
+    const line=pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
+    const dots=pts.map(p=>'<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="3.4" fill="'+FEEL_COLOR[p[2]]+'"/>').join('');
+    body='<svg class="chart" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" aria-hidden="true">'+grid
+      + (pts.length>1?'<path d="'+line+'" fill="none" stroke="rgba(255,255,255,.25)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>':'')
+      + dots+'</svg>'
+      + '<div class="legend">'+[1,2,3,4].map(v=>'<span class="legItem"><span class="legDot" style="background:'+FEEL_COLOR[v]+'"></span>'+FEELS[v]+'</span>').join('')+'</div>';
+  }
+  return '<section class="card"><span class="cardName">How you\'ve felt</span>'+body+'</section>';
 }
 
 /* ---------- tips ---------- */
@@ -199,8 +253,9 @@ function outputHtml(){
     : 'Your body needs rest — keep it light.';
   const recRing=ringWrap(rec,t,'Recovery','');
   const hasSleep=(typeof h.sleepPerf==='number'||typeof h.sleepHours==='number');
+  const sp=adjSleepPerf(h);
   const sleepRing=hasSleep
-    ? ringWrap(typeof h.sleepPerf==='number'?h.sleepPerf:null,sleepTone(num(h.sleepPerf)),'Sleep',typeof h.sleepHours==='number'?fmtHM(h.sleepHours):'')
+    ? ringWrap(sp,sleepTone(sp),'Sleep',typeof h.sleepHours==='number'?fmtHM(h.sleepHours):'')
     : ringWrap(null,'muted','Sleep','');
   const hero='<section class="card"><span class="cardName">Today</span>'
     +'<div class="hero">'+recRing+sleepRing+'</div>'
@@ -216,7 +271,7 @@ function outputHtml(){
   const guide='<section class="card"><span class="cardName">Today\'s guidance</span>'
     + tips(rec,h).map(x=>'<div class="tip"><span class="tipIcon">'+x[0]+'</span><span class="tipText">'+x[1]+'</span></div>').join('')
     +'</section>';
-  return hero+trends+guide;
+  return feelHtml()+hero+trends+feelChartHtml()+guide;
 }
 function renderOutput(){$('out').innerHTML=outputHtml();}
 function render(){
@@ -228,8 +283,10 @@ function render(){
 /* entry inputs stay mounted (never re-rendered) so focus is preserved */
 document.addEventListener('input',e=>{
   if(e.target && e.target.id && e.target.id.indexOf('in-')===0){
-    const e2={};
-    ['hrv','rhr','sleepHours','sleepPerf'].forEach(k=>{const v=num($('in-'+k).value); if(v!=null)e2[k]=v;});
+    /* start from the existing entry so keys the inputs don't own (feel,
+       synced values) survive an edit */
+    const e2={...(store[todayKey()]||{})};
+    ['hrv','rhr','sleepHours','sleepPerf'].forEach(k=>{const v=num($('in-'+k).value); if(v!=null)e2[k]=v; else delete e2[k];});
     store[todayKey()]=e2;
     persist();
     renderOutput();
@@ -237,7 +294,16 @@ document.addEventListener('input',e=>{
 });
 document.addEventListener('click',e=>{
   const b=e.target.closest('[data-range]');
-  if(b){ range=parseInt(b.getAttribute('data-range'),10)||14; renderOutput(); }
+  if(b){ range=parseInt(b.getAttribute('data-range'),10)||14; renderOutput(); return; }
+  const fb=e.target.closest('[data-feel]');
+  if(fb){
+    const v=parseInt(fb.getAttribute('data-feel'),10);
+    const entry={...(store[todayKey()]||{})};
+    if(entry.feel===v) delete entry.feel; else entry.feel=v; /* tap again to clear */
+    store[todayKey()]=entry;
+    persist();
+    renderOutput();
+  }
 });
 
 (async()=>{const d=await window.Vitality.load();store=(d&&typeof d==='object'&&!Array.isArray(d))?d:{};render();})();

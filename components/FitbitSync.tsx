@@ -58,8 +58,12 @@ export default function FitbitSync({ userId }: { userId: string }) {
           const w: number[] = []
           if (typeof h.hrv === 'number') { parts.push(clamp01((h.hrv - 20) / 70) * 100); w.push(0.5) }
           if (typeof h.rhr === 'number') { parts.push(clamp01((80 - h.rhr) / 38) * 100); w.push(0.25) }
-          if (typeof h.sleepPerf === 'number') { parts.push(Math.min(100, h.sleepPerf)); w.push(0.25) }
+          // the Vitals tile's "how do you feel" tap nudges sleep and joins the
+          // blend, mirroring its estRecovery so both tiles agree on the number
+          const feelAdj = typeof h.feel === 'number' ? ({ 1: -10, 2: 0, 3: 4, 4: 8 }[h.feel] ?? 0) : 0
+          if (typeof h.sleepPerf === 'number') { parts.push(Math.max(1, Math.min(100, h.sleepPerf + feelAdj))); w.push(0.25) }
           else if (typeof h.sleepHours === 'number') { parts.push(clamp01(h.sleepHours / 8) * 100); w.push(0.25) }
+          if (typeof h.feel === 'number') { parts.push({ 1: 20, 2: 50, 3: 75, 4: 95 }[h.feel] ?? 50); w.push(0.3) }
           if (!parts.length) return null
           const sw = w.reduce((a, b) => a + b, 0)
           return Math.max(1, Math.min(99, Math.round(parts.reduce((s, p, i) => s + p * w[i], 0) / sw)))
