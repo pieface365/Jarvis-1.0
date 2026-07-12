@@ -183,6 +183,12 @@
   .exNote { padding-left:29px; margin-top:9px; font-size:13px; color: var(--muted-strong); font-style:italic; display:flex; gap:7px; align-items:baseline; }
   .exNote .ndot { color: var(--mint); }
   .deloadTag { color: var(--muted-strong); border:1px solid var(--hair); border-radius:4px; padding:1px 6px; font-size:9px; letter-spacing:.12em; }
+  /* readiness advice tags: amber caps main lifts, red eases climbs */
+  .capTag { color: var(--gold); border:1px solid rgba(245,158,11,.5); border-radius:4px; padding:1px 6px; font-size:9px; letter-spacing:.12em; margin-left:8px; }
+  .capTag.red { color: var(--fail); border-color: rgba(224,106,108,.55); }
+  /* auto-adjust switch inside the readiness meta line */
+  .rauto { background:none; border:none; padding:0; cursor:pointer; color: inherit; font: inherit; letter-spacing: inherit; text-transform: inherit; text-decoration: underline; text-underline-offset: 2px; }
+  .rauto:hover { color: var(--text); }
 
   .exActions { display:flex; align-items:center; flex-wrap:wrap; gap:7px; padding-left:29px; margin-top:14px; }
   .actionPill { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; font-size:12px; color: var(--mint); background: rgba(110,231,183,.04); border:1px solid rgba(110,231,183,.25); border-radius: var(--radius-pill); cursor:pointer; white-space:nowrap; box-shadow: 0 0 16px rgba(110,231,183,.10); transition: color .15s, border-color .15s, background .15s, box-shadow .48s var(--ease), transform .15s var(--spring); }
@@ -634,7 +640,7 @@ function buildState(){
   /* v bumps when the program's day structure changes, so stale saves rebuild */
   /* weekLog: 'YYYY-MM-DD' -> true for each date every exercise got fully
      logged — feeds the consistency ring (7/7 fills the circle). */
-  return { v:2, active:(SEED&&SEED.active)||'mon', unit:'lb', submitted:false, weekLog:{}, days };
+  return { v:2, active:(SEED&&SEED.active)||'mon', unit:'lb', submitted:false, weekLog:{}, autoAdjust:true, autoAdjustDate:null, days };
 }
 /* STATE is filled by the async boot below once the dashboard bridge resolves. */
 let STATE = null;
@@ -724,6 +730,19 @@ function readinessTier(r){
 }
 function mainLifts(day){ return day.ex.filter(e=>e.tier===1 && !e.dur); }
 function deloadApplied(day){ const m=mainLifts(day); return m.length>0 && m.every(e=>e.deload); }
+/* the day key whose session is actually TODAY (Mon-start week) */
+function todayDayKey(){ return ORDER[(new Date().getDay()+6)%7]; }
+function todayTier(){ const r=STATE.readiness; if(!r || r.date!==today || typeof r.recovery!=='number') return null; return readinessTier(r); }
+/* Auto-adjust: on a red day, deload today's main lifts without being asked.
+   Runs once per date (autoAdjustDate) so undoing it sticks; the banner's
+   auto-adjust switch turns the whole behavior off. */
+function applyAutoAdjust(){
+  if(STATE.autoAdjust===false) return;
+  if(todayTier()!=='red' || STATE.autoAdjustDate===today) return;
+  const d=STATE.days[todayDayKey()];
+  if(d && !d.restDay) mainLifts(d).forEach(e=>{ e.deload=true; });
+  STATE.autoAdjustDate=today;
+}
 function renderReadiness(){
   const el = $('#readiness'); if(!el) return;
   const r = STATE.readiness;
@@ -747,17 +766,24 @@ function renderReadiness(){
   if(typeof r.rhr==='number') meta.push('RHR '+Math.round(r.rhr));
   const showBtn = tier==='red' && !d.restDay && !d.off && mainLifts(d).length>0;
   const applied = showBtn && deloadApplied(d);
+  const auto = STATE.autoAdjust!==false;
   el.innerHTML = '<div class="ready '+tier+'"><span class="rdot"></span><div class="rmain">'
     + '<div class="rline">'+line+'</div>'
-    + '<div class="rmeta">'+meta.join(' · ')+'</div></div>'
+    + '<div class="rmeta">'+meta.join(' · ')+' · <button class="rauto" id="rauto" title="On red days, today\'s main lifts deload automatically">auto-adjust '+(auto?'on':'off')+'</button></div></div>'
     + (showBtn ? '<button class="rbtn'+(applied?' on':'')+'" id="rdeload">'+(applied?'deload on · undo':'deload today −10%')+'</button>' : '')
     + '</div>';
   const btn = $('#rdeload');
   if(btn) btn.onclick = () => { const on = !deloadApplied(curDay()); mainLifts(curDay()).forEach(e=>{ e.deload = on; }); render(); };
+  const autoBtn = $('#rauto');
+  if(autoBtn) autoBtn.onclick = () => {
+    STATE.autoAdjust = !(STATE.autoAdjust!==false);
+    if(STATE.autoAdjust){ STATE.autoAdjustDate=null; applyAutoAdjust(); }
+    render();
+  };
 }
 
 function render(){
-  markConsistency();
+  markConsistency(); applyAutoAdjust();
   renderWeek(); renderReadiness(); renderTabs(); renderDots(); renderHead(); renderProgress(); renderBody(); saveState();
 }
 function renderTabs(){
@@ -820,7 +846,11 @@ function renderCard(e, day){
   const tier = TIER_LABEL[e.tier]||('tier '+e.tier);
   const metaBits = [tier, e.dur ? e.dur : rx.sets+' × '+rx.reps];
   if(e.lastKg!=null) metaBits.push('last '+e.lastKg+' '+STATE.unit);
-  const meta = metaBits.map(b=>'<span>'+b+'</span>').join('<span class="metaSep">·</span>') + (e.deload?'<span class="deloadTag">deload</span>':'');
+  /* readiness tags — only on the day whose session is actually today */
+  const rTier = (day===STATE.days[todayDayKey()]) ? todayTier() : null;
+  const capTag = (rTier==='amber' && e.tier===1) ? '<span class="capTag">cap top set</span>' : '';
+  const easyTag = (rTier==='red' && (e.tier==='pj'||e.tier==='c'||e.tier==='ce')) ? '<span class="capTag red">go easy</span>' : '';
+  const meta = metaBits.map(b=>'<span>'+b+'</span>').join('<span class="metaSep">·</span>') + (e.deload?'<span class="deloadTag">deload</span>':'') + capTag + easyTag;
   card.innerHTML =
     '<div class="exHead">'
     + '<button class="grip" aria-label="Drag to reorder" title="Drag to reorder">'+gripIcon()+'</button>'
@@ -1200,6 +1230,8 @@ function migrateToLb(d){
 function patchProgramEdits(d){
   /* 2026-07-11: consistency ring — older v:2 saves predate weekLog */
   if(!d.weekLog) d.weekLog = {};
+  /* 2026-07-12: readiness auto-adjust — default on for older saves */
+  if(d.autoAdjust===undefined){ d.autoAdjust=true; d.autoAdjustDate=null; }
   const mon = d.days && d.days.mon;
   if(mon && mon.ex){
     /* 2026-07-11: Mon's Smith bench became incline DB press */
