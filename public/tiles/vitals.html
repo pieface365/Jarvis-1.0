@@ -77,6 +77,12 @@
   .legDot{width:12px;height:3px;border-radius:2px}
   .noteLine{font-size:12px;color:var(--muted);font-style:italic;margin-top:6px;line-height:1.5}
 
+  /* trends chart tabs — click through the metric graphs */
+  .chartTabs{display:flex;gap:5px;margin:4px 0 12px;flex-wrap:wrap}
+  .ctab{appearance:none;background:var(--bg);border:1px solid var(--border);color:var(--muted);border-radius:var(--radius-pill);padding:6px 12px;font-size:11.5px;font-weight:600;cursor:pointer;transition:color .15s,border-color .15s,background .15s}
+  .ctab:hover{color:var(--fg)}
+  .ctab.on{background:rgba(110,231,183,.1);border-color:#6EE7B7;color:#6EE7B7}
+
   /* feel check-in buttons */
   .feelRow{display:flex;gap:8px}
   .feelBtn{flex:1;padding:12px 6px;border-radius:12px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:border-color .15s,color .15s,background .15s,transform .15s}
@@ -106,6 +112,7 @@
    same recovery-estimate math, rings, trend chart and readiness tips. */
 let store={};     /* keyed by YYYY-MM-DD -> {hrv,rhr,sleepHours,sleepPerf,feel:1-4} */
 let range=14;
+let chartTab='trend'; /* which trends tab is showing: trend|hrv|rhr|sleep|corr */
 const $=id=>document.getElementById(id);
 const round=n=>Math.round(n);
 const clamp01=x=>Math.max(0,Math.min(1,x));
@@ -183,6 +190,90 @@ function chartSvg(){
     + (pts.length>1?'<path d="'+line+'" fill="none" stroke="#6EE7B7" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="filter:drop-shadow(0 0 5px rgba(110,231,183,.6))"/>':'')
     + dots + '</svg>'
     + '<div class="legend"><span class="legItem"><span class="legDot" style="background:#6EE7B7"></span>Recovery %</span><span class="legItem"><span class="legDot" style="background:#84848c"></span>Sleep hours</span></div>';
+}
+
+/* ---------- metric charts + the correlation finder ---------- */
+const CHART_TABS=[['trend','Overview'],['hrv','HRV'],['rhr','Resting HR'],['sleep','Sleep'],['corr','Correlation']];
+
+/* one metric over the range: line + dots + latest/range caption */
+function metricChart(key,color,unit,fmt){
+  const hist=entries().slice(-range);
+  const f=fmt||(v=>Math.round(v*10)/10);
+  const pts=hist.map((d,i)=>({i,v:typeof d[key]==='number'?d[key]:null})).filter(p=>p.v!=null);
+  if(pts.length<2) return '<p class="noteLine">Not enough '+unit+' data in this window yet — it charts once 2+ days have values.</p>';
+  const W=320,H=120,padY=14,padX=6;
+  const vals=pts.map(p=>p.v);
+  let lo=Math.min(...vals), hi=Math.max(...vals);
+  if(hi-lo<1e-9){ hi+=1; lo-=1; }
+  const span=hi-lo; lo-=span*0.12; hi+=span*0.12;
+  const xOf=i=>hist.length===1?W/2:padX+(i/(hist.length-1))*(W-padX*2);
+  const yOf=v=>H-padY-((v-lo)/(hi-lo))*(H-padY*2);
+  const line=pts.map((p,k)=>(k?'L':'M')+xOf(p.i).toFixed(1)+' '+yOf(p.v).toFixed(1)).join(' ');
+  const dots=pts.map(p=>'<circle cx="'+xOf(p.i).toFixed(1)+'" cy="'+yOf(p.v).toFixed(1)+'" r="2.8" fill="'+color+'"/>').join('');
+  const latest=pts[pts.length-1].v;
+  return '<svg class="chart" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" aria-hidden="true">'
+    + '<path d="'+line+'" fill="none" stroke="'+color+'" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="filter:drop-shadow(0 0 5px '+color+'88)"/>'
+    + dots + '</svg>'
+    + '<div class="legend"><span class="legItem"><span class="legDot" style="background:'+color+'"></span>Latest '+f(latest)+' '+unit+'</span>'
+    + '<span class="legItem" style="color:var(--muted)">range '+f(Math.min(...vals))+'–'+f(Math.max(...vals))+' '+unit+'</span></div>';
+}
+
+/* Pearson r over paired days */
+function pearson(pairs){
+  const n=pairs.length;
+  const mx=pairs.reduce((s,p)=>s+p[0],0)/n, my=pairs.reduce((s,p)=>s+p[1],0)/n;
+  let sxy=0,sx=0,sy=0;
+  pairs.forEach(([x,y])=>{ sxy+=(x-mx)*(y-my); sx+=(x-mx)**2; sy+=(y-my)**2; });
+  if(sx===0||sy===0) return null;
+  return { r:sxy/Math.sqrt(sx*sy), mx, my, slope:sxy/sx };
+}
+
+/* the pairs worth testing (derived metrics like recovery excluded — they'd
+   trivially correlate with their own inputs) */
+const CORR_PAIRS=[
+  ['sleepHours','hrv','Sleep (h)','HRV (ms)'],
+  ['sleepHours','rhr','Sleep (h)','Resting HR'],
+  ['sleepPerf','hrv','Sleep score','HRV (ms)'],
+  ['hrv','rhr','HRV (ms)','Resting HR'],
+  ['feel','hrv','Feel (1–4)','HRV (ms)'],
+  ['feel','sleepHours','Feel (1–4)','Sleep (h)'],
+];
+function corrChart(){
+  const hist=entries().slice(-Math.max(range,30)); /* correlations need bodies of data */
+  let best=null;
+  CORR_PAIRS.forEach(([a,b,la,lb])=>{
+    const pairs=hist.filter(d=>typeof d[a]==='number'&&typeof d[b]==='number').map(d=>[d[a],d[b]]);
+    if(pairs.length<5) return;
+    const p=pearson(pairs);
+    if(p && (!best || Math.abs(p.r)>Math.abs(best.r))) best={...p, a, b, la, lb, pairs};
+  });
+  if(!best) return '<p class="noteLine">Correlations unlock at 5+ days where two metrics both have values — keep checking in.</p>';
+  const W=320,H=140,pad=16;
+  const xs=best.pairs.map(p=>p[0]), ys=best.pairs.map(p=>p[1]);
+  let x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);
+  if(x1-x0<1e-9){x1+=1;x0-=1;} if(y1-y0<1e-9){y1+=1;y0-=1;}
+  const X=v=>pad+((v-x0)/(x1-x0))*(W-pad*2);
+  const Y=v=>H-pad-((v-y0)/(y1-y0))*(H-pad*2);
+  const dots=best.pairs.map(p=>'<circle cx="'+X(p[0]).toFixed(1)+'" cy="'+Y(p[1]).toFixed(1)+'" r="3.2" fill="#6EE7B7" opacity=".85"/>').join('');
+  /* least-squares line through the cloud */
+  const yAt=x=>best.my+best.slope*(x-best.mx);
+  const fit='<line x1="'+X(x0).toFixed(1)+'" y1="'+Y(yAt(x0)).toFixed(1)+'" x2="'+X(x1).toFixed(1)+'" y2="'+Y(yAt(x1)).toFixed(1)+'" stroke="rgba(255,255,255,.4)" stroke-width="1.6" stroke-dasharray="5 4"/>';
+  const s=Math.abs(best.r);
+  const strength=s>=0.6?'strong':s>=0.3?'moderate':'weak';
+  const dir=best.r>=0?'higher':'lower';
+  const caption='<b>'+best.la+' × '+best.lb+'</b> — r = '+(Math.round(best.r*100)/100)
+    +' ('+strength+'). More '+best.la.toLowerCase().replace(/\s*\(.*\)/,'')+' &rarr; '+dir+' '+best.lb.toLowerCase().replace(/\s*\(.*\)/,'')
+    +', across '+best.pairs.length+' days.';
+  return '<svg class="chart" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" aria-hidden="true">'+fit+dots+'</svg>'
+    + '<p class="noteLine" style="font-style:normal">'+caption+'</p>';
+}
+
+function chartBody(){
+  if(chartTab==='hrv') return metricChart('hrv','#6EE7B7','ms');
+  if(chartTab==='rhr') return metricChart('rhr','#e06a6c','bpm',v=>Math.round(v));
+  if(chartTab==='sleep') return metricChart('sleepHours','#B794F6','h');
+  if(chartTab==='corr') return corrChart();
+  return chartSvg();
 }
 
 /* ---------- feel check-in + its history chart ---------- */
@@ -267,7 +358,8 @@ function outputHtml(){
     +'</div></section>';
   const trends='<section class="card"><div class="chartHead"><span class="cardName" style="margin:0">Trends</span>'
     +'<div class="seg">'+[7,14,30].map(n=>'<button class="segBtn '+(range===n?'on':'')+'" data-range="'+n+'">'+n+'d</button>').join('')+'</div></div>'
-    + chartSvg() + '</section>';
+    +'<div class="chartTabs">'+CHART_TABS.map(([k,l])=>'<button class="ctab'+(chartTab===k?' on':'')+'" data-charttab="'+k+'">'+l+'</button>').join('')+'</div>'
+    + chartBody() + '</section>';
   const guide='<section class="card"><span class="cardName">Today\'s guidance</span>'
     + tips(rec,h).map(x=>'<div class="tip"><span class="tipIcon">'+x[0]+'</span><span class="tipText">'+x[1]+'</span></div>').join('')
     +'</section>';
@@ -295,6 +387,8 @@ document.addEventListener('input',e=>{
 document.addEventListener('click',e=>{
   const b=e.target.closest('[data-range]');
   if(b){ range=parseInt(b.getAttribute('data-range'),10)||14; renderOutput(); return; }
+  const ct=e.target.closest('[data-charttab]');
+  if(ct){ chartTab=ct.getAttribute('data-charttab'); renderOutput(); return; }
   const fb=e.target.closest('[data-feel]');
   if(fb){
     const v=parseInt(fb.getAttribute('data-feel'),10);
