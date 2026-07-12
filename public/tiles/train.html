@@ -477,81 +477,80 @@ const CLIMB_WARMUP = [
   { id:'no_moneys',         name:'No Moneys',         tier:'w', sets:2, reps:15, kg:0, rest:0 },
   { id:'recruitment_pulls', name:'Recruitment Pulls', tier:'w', sets:3, reps:5,  kg:0, dur:'3 × 5 sec per grip', rest:0 },
 ];
+/* v3 week — four climb days (M/W/F/S, each with its own job), two lift days
+   (Tue upper + antagonist, Thu legs), Sunday rest with optional easy mileage.
+   Grades reflect the current level: V4 base (flashing some), V5–V6 projects. */
 const PROGRAM = {
-  mon: { name:'Mon', focus:'Push + Easy Climb', type:'Lift + climb',
-    motto:'Progressive overload is non-negotiable — log every set and beat it next week. One more rep or 5 more lbs. Core every day.',
-    exercises:[
-    { id:'band_pullaparts', name:'Band Pull-Aparts + Arm Circles', tier:'w', sets:2, reps:15, kg:0, rest:30 },
-    { id:'incl_db_press', name:'Incline Dumbbell Press',           tier:1, sets:4, reps:6,  kg:70,  perHand:true, rest:180 },
-    { id:'incline_smith', name:'Incline Smith Press',              tier:1, sets:4, reps:8,  kg:95,  rest:150 },
-    { id:'seated_chest_press', name:'Seated Flat Chest Press',     tier:1, sets:3, reps:10, kg:130, rest:120 },
-    { id:'db_lat_raise',  name:'Dumbbell Lateral Raises',          tier:1, sets:4, reps:15, kg:15,  perHand:true, rest:60 },
-    { id:'cable_fly',     name:'Cable Chest Fly',                  tier:1, sets:3, reps:12, kg:40,  rest:75 },
-    { id:'oh_tri_ext',    name:'Overhead Tricep Extension (cable)',tier:1, sets:3, reps:12, kg:50,  rest:75 },
-    { id:'tri_pushdown',  name:'Tricep Pushdown',                  tier:1, sets:3, reps:15, kg:50,  rest:75 },
-    ...CORE_DAILY,
-    { id:'climb_easy',    name:'Easy traversing + downclimbing V0–V2', tier:'ce', sets:1, reps:1, kg:0, dur:'30–40 min', rest:0 },
-  ]},
-  tue: { name:'Tue', focus:'Climb · Gravity Vault', type:'Climb',
-    motto:'Tendon warm-up mandatory. Technique focus — your grade regression is mostly form not fitness. Film your footwork.',
+  mon: { name:'Mon', focus:'Climb · Technique + Volume', type:'Climb',
+    motto:'Technique day — V4 is your floor now, so make it look easy. Quiet feet, straight arms, read every problem before you pull on.',
     exercises:[
     ...CLIMB_WARMUP,
-    { id:'easy_jugs',        name:'Easy jugs traversing',          tier:'w',  sets:1, reps:1, kg:0, dur:'10 min', rest:0 },
-    { id:'silent_feet',      name:'Silent feet drills V1–V3',      tier:'tb', sets:1, reps:1, kg:0, dur:'20 min', rest:0 },
-    { id:'body_positioning', name:'Body positioning on overhangs', tier:'tb', sets:1, reps:1, kg:0, dur:'15 min', rest:0 },
-    { id:'proj_attempts',    name:'V4–V5 attempts',                tier:'pj', sets:1, reps:1, kg:0, dur:'45 min', rest:0 },
-    { id:'hb_repeaters',     name:'Repeaters — open hand',         tier:'hb', sets:1, reps:1, kg:0, dur:'10 min', rest:0 },
+    { id:'easy_jugs',        name:'Easy jugs traversing',            tier:'w',  sets:1, reps:1, kg:0, dur:'10 min', rest:0 },
+    { id:'silent_feet',      name:'Silent feet drills V2–V4',        tier:'tb', sets:1, reps:1, kg:0, dur:'20 min', rest:0 },
+    { id:'body_positioning', name:'Body positioning on overhangs',   tier:'tb', sets:1, reps:1, kg:0, dur:'15 min', rest:0 },
+    { id:'volume_moderate',  name:'V3–V4 mileage — perfect form only', tier:'vc', sets:1, reps:1, kg:0, dur:'40 min', rest:0 },
     ...CORE_DAILY, AB_ROLLER,
   ]},
-  wed: { name:'Wed', focus:'Pull + Slab (opt)', type:'Lift + climb',
-    motto:'Pull strength directly carries over to climbing. Face pulls protect the rotator cuff — do not skip them.',
+  tue: { name:'Tue', focus:'Upper Body + Antagonist', type:'Lift',
+    motto:'Pull strength carries onto the wall; pressing keeps your shoulders honest. Face pulls are non-negotiable.',
     exercises:[
-    { id:'weighted_pullups', name:'Weighted Pull-ups',             tier:1, sets:5, reps:5,  kg:25,  rest:180 },
-    { id:'smith_row',     name:'Heavy Smith Barbell Rows',         tier:1, sets:3, reps:10, kg:135, rest:150 },
-    { id:'lat_pulldown',  name:'Lat Pulldown',                     tier:1, sets:4, reps:8,  kg:140, rest:150 },
-    { id:'seated_row',    name:'Seated Cable Row',                 tier:1, sets:4, reps:10, kg:130, rest:120 },
-    { id:'face_pull',     name:'Face Pulls',                       tier:1, sets:4, reps:15, kg:50,  rest:60 },
-    { id:'hammer_curl',   name:'Hammer Curls',                     tier:1, sets:4, reps:10, kg:30,  perHand:true, rest:60 },
-    { id:'incl_db_curl',  name:'Incline DB Curl',                  tier:1, sets:3, reps:12, kg:25,  perHand:true, rest:60 },
+    { id:'band_pullaparts', name:'Band Pull-Aparts + Arm Circles',  tier:'w', sets:2, reps:15, kg:0, rest:30 },
+    { id:'weighted_pullups', name:'Weighted Pull-ups',              tier:1, sets:5, reps:5,  kg:25,  rest:180 },
+    { id:'smith_bench',   name:'Smith Machine Bench Press',         tier:1, sets:4, reps:6,  kg:135, rest:180 },
+    { id:'seated_row',    name:'Seated Cable Row',                  tier:1, sets:4, reps:10, kg:130, rest:120 },
+    { id:'incl_db_press', name:'Incline Dumbbell Press',            tier:1, sets:3, reps:10, kg:65,  perHand:true, rest:120 },
+    { id:'face_pull',     name:'Face Pulls',                        tier:1, sets:4, reps:15, kg:50,  rest:60 },
+    { id:'db_lat_raise',  name:'Dumbbell Lateral Raises',           tier:1, sets:3, reps:15, kg:15,  perHand:true, rest:60 },
+    { id:'tri_pushdown',  name:'Tricep Pushdown',                   tier:1, sets:3, reps:12, kg:50,  rest:75 },
+    { id:'hammer_curl',   name:'Hammer Curls',                      tier:1, sets:3, reps:10, kg:30,  perHand:true, rest:60 },
     ...CORE_DAILY,
-    { id:'slab_easy',     name:'Slab-only V0–V2',                  tier:'ce', sets:1, reps:1, kg:0, dur:'20 min max', rest:0 },
   ]},
-  thu: { name:'Thu', focus:'Climb · Gravity Vault', type:'Climb',
-    motto:'Volume day — build climbing endurance and route reading. No max attempts today.',
+  wed: { name:'Wed', focus:'Climb · Power + Limit', type:'Climb',
+    motto:'Limit day — pick V5–V6 problems that scare you a little. Full rest between attempts; quality over volume.',
     exercises:[
     ...CLIMB_WARMUP,
-    { id:'easy_jugs',      name:'Easy jugs',                       tier:'w',  sets:1, reps:1, kg:0, dur:'10 min', rest:0 },
-    { id:'volume_laps',    name:'V3–V4 laps × 5 routes × 3 rounds',tier:'vc', sets:1, reps:1, kg:0, dur:'60 min', rest:0 },
-    { id:'slab_balance',   name:'Slab balance work V1–V3',         tier:'vc', sets:1, reps:1, kg:0, dur:'20 min', rest:0 },
-    { id:'route_reading',  name:'Read 3 routes before attempting', tier:'rr', sets:1, reps:1, kg:0, dur:'—', rest:0 },
+    { id:'easy_jugs',      name:'Easy jugs traversing',             tier:'w',  sets:1, reps:1, kg:0, dur:'10 min', rest:0 },
+    { id:'limit_boulders', name:'Limit boulders V5–V6',             tier:'pj', sets:1, reps:1, kg:0, dur:'45 min', rest:0 },
+    { id:'hb_repeaters',   name:'Repeaters — open hand',            tier:'hb', sets:1, reps:1, kg:0, dur:'10 min', rest:0 },
     ...CORE_DAILY, AB_ROLLER,
   ]},
-  fri: { name:'Fri', focus:'Legs + Easy Climb', type:'Lift + climb',
-    motto:'Heaviest compound day of the week. Full depth on squats — no ego loading. This builds the foundation.',
+  thu: { name:'Thu', focus:'Legs + Core', type:'Lift',
+    motto:'Heaviest compound day. Full depth on squats — climbing power starts in the hips.',
     exercises:[
-    { id:'leg_ext',       name:'Leg Extension',                    tier:1, sets:3, reps:12, kg:110, rest:75 },
-    { id:'leg_curl',      name:'Leg Curl',                         tier:1, sets:3, reps:12, kg:90,  rest:75 },
-    { id:'smith_squat',   name:'Smith Machine Squat',              tier:1, sets:5, reps:5,  kg:185, rest:180 },
-    { id:'rdl',           name:'Romanian Deadlift',                tier:1, sets:4, reps:8,  kg:135, rest:150 },
-    { id:'calf_raise',    name:'Calf Raises',                      tier:1, sets:4, reps:20, kg:90,  rest:60 },
-    { id:'leg_press',     name:'Leg Press',                        tier:1, sets:3, reps:10, kg:270, rest:120 },
+    { id:'leg_swings',    name:'Leg Swings + Bodyweight Squats',    tier:'w', sets:2, reps:15, kg:0, rest:30 },
+    { id:'smith_squat',   name:'Smith Machine Squat',               tier:1, sets:5, reps:5,  kg:185, rest:180 },
+    { id:'rdl',           name:'Romanian Deadlift',                 tier:1, sets:4, reps:8,  kg:135, rest:150 },
+    { id:'leg_press',     name:'Leg Press',                         tier:1, sets:3, reps:10, kg:270, rest:120 },
+    { id:'leg_curl',      name:'Leg Curl',                          tier:1, sets:3, reps:12, kg:90,  rest:75 },
+    { id:'calf_raise',    name:'Calf Raises',                       tier:1, sets:4, reps:20, kg:90,  rest:60 },
     ...CORE_DAILY,
-    { id:'climb_easy',    name:'Juggy vertical V0–V2',             tier:'ce', sets:1, reps:1, kg:0, dur:'30–40 min', rest:0 },
+  ]},
+  fri: { name:'Fri', focus:'Climb · Volume + Endurance', type:'Climb',
+    motto:'Volume day — endurance and route reading. Stay two grades under your limit and keep moving.',
+    exercises:[
+    ...CLIMB_WARMUP,
+    { id:'easy_jugs',      name:'Easy jugs traversing',             tier:'w',  sets:1, reps:1, kg:0, dur:'10 min', rest:0 },
+    { id:'volume_laps',    name:'V3–V4 laps × 5 routes × 3 rounds', tier:'vc', sets:1, reps:1, kg:0, dur:'60 min', rest:0 },
+    { id:'slab_balance',   name:'Slab balance work V2–V4',          tier:'vc', sets:1, reps:1, kg:0, dur:'20 min', rest:0 },
+    { id:'route_reading',  name:'Read 3 routes before attempting',  tier:'rr', sets:1, reps:1, kg:0, dur:'—', rest:0 },
+    ...CORE_DAILY, AB_ROLLER,
   ]},
   sat: { name:'Sat', focus:'Climb · Projecting Day', type:'Climb',
-    motto:'Hardest training day of the week. Longest warm-up. Film every attempt and watch beta between tries.',
+    motto:'Hardest day of the week. Longest warm-up. Film every V5–V6 attempt and watch beta between tries.',
     exercises:[
     ...CLIMB_WARMUP,
-    { id:'easy_warm',      name:'V1–V3 easy',                      tier:'w',  sets:1, reps:1, kg:0, dur:'20 min', rest:0 },
-    { id:'projects',       name:'V4–V5 projects',                  tier:'pj', sets:1, reps:1, kg:0, dur:'90 min', rest:0 },
+    { id:'easy_warm',      name:'V2–V4 easy',                       tier:'w',  sets:1, reps:1, kg:0, dur:'20 min', rest:0 },
+    { id:'projects',       name:'V5–V6 projects',                   tier:'pj', sets:1, reps:1, kg:0, dur:'90 min', rest:0 },
+    { id:'flash_attempts', name:'Flash attempts on fresh V4s',      tier:'pj', sets:1, reps:1, kg:0, dur:'20 min', rest:0 },
     ...CORE_DAILY, AB_ROLLER,
   ]},
-  sun: { name:'Sun', focus:'Rest', type:'Recovery',
-    motto:"Full rest — OFF the wall. Six days of finger loading only works because of this seventh day. If you truly can't stay away: 20 min of V0 traversing max, and any finger soreness is a hard stop.",
+  sun: { name:'Sun', focus:'Rest (climb if fresh)', type:'Recovery',
+    motto:"General rest day. Feeling genuinely good? An easy session is fine — V2–V4 mileage, nothing at your limit, and any finger tweak is a hard stop.",
     exercises:[
     { id:'rest_walk',     name:'30 min walk', tier:'rec', sets:1, reps:1, kg:0, dur:'—', rest:0 },
     { id:'rest_stretch',  name:'Stretching',  tier:'rec', sets:1, reps:1, kg:0, dur:'20 min', rest:0 },
     { id:'rest_mealprep', name:'Meal prep',   tier:'rec', sets:1, reps:1, kg:0, dur:'—', rest:0 },
+    { id:'optional_climb', name:'Optional: easy mileage V2–V4 (only if feeling good)', tier:'c', sets:1, reps:1, kg:0, dur:'30–40 min', rest:0 },
   ]},
 };
 const ORDER = ['mon','tue','wed','thu','fri','sat','sun'];
@@ -607,12 +606,11 @@ const LIB = {
   ab_roller:{ equipment:'Ab wheel', primary:['Abs'], secondary:['Lats','Hip flexors'], gist:'Ab roller for hard anti-extension core strength — climb-day bonus.', steps:['Kneel, wheel under your shoulders','Roll out as far as you can hold a flat back','Pull back with the abs, not the hips'], cues:['Ribs down, no sagging','Shorten the range before form breaks'] },
 };
 const SWAPS = {
-  mon:[ {id:'db_bench',name:'Dumbbell Bench Press',tier:1,perHand:true},{id:'machine_chest',name:'Machine Chest Press',tier:1},{id:'pec_deck',name:'Pec Deck',tier:1},{id:'arnold_press',name:'Arnold Press',tier:1,perHand:true} ],
-  tue:[],
-  wed:[ {id:'chinup',name:'Chin-Ups',tier:1},{id:'straight_arm_pd',name:'Straight-Arm Pulldown',tier:1},{id:'chest_row',name:'Chest-Supported Row',tier:1},{id:'rear_delt_fly',name:'Rear Delt Fly',tier:1} ],
-  thu:[],
-  fri:[ {id:'hack_squat',name:'Hack Squat',tier:1},{id:'walking_lunge',name:'Walking Lunge',tier:1,perHand:true},{id:'leg_ext',name:'Leg Extension',tier:1},{id:'seated_calf',name:'Seated Calf Raise',tier:1} ],
-  sat:[], sun:[],
+  mon:[],
+  tue:[ {id:'chinup',name:'Chin-Ups',tier:1},{id:'lat_pulldown',name:'Lat Pulldown',tier:1},{id:'machine_chest',name:'Machine Chest Press',tier:1},{id:'db_bench',name:'Dumbbell Bench Press',tier:1,perHand:true},{id:'rear_delt_fly',name:'Rear Delt Fly',tier:1} ],
+  wed:[],
+  thu:[ {id:'hack_squat',name:'Hack Squat',tier:1},{id:'walking_lunge',name:'Walking Lunge',tier:1,perHand:true},{id:'leg_ext',name:'Leg Extension',tier:1},{id:'seated_calf',name:'Seated Calf Raise',tier:1} ],
+  fri:[], sat:[], sun:[],
 };
 
 /* Ships clean. The program (PROGRAM) fills each day with lifts ready to log;
@@ -640,7 +638,7 @@ function buildState(){
   /* v bumps when the program's day structure changes, so stale saves rebuild */
   /* weekLog: 'YYYY-MM-DD' -> true for each date every exercise got fully
      logged — feeds the consistency ring (7/7 fills the circle). */
-  return { v:2, active:(SEED&&SEED.active)||'mon', unit:'lb', submitted:false, weekLog:{}, autoAdjust:true, autoAdjustDate:null, days };
+  return { v:3, active:(SEED&&SEED.active)||'mon', unit:'lb', submitted:false, weekLog:{}, autoAdjust:true, autoAdjustDate:null, days };
 }
 /* STATE is filled by the async boot below once the dashboard bridge resolves. */
 let STATE = null;
@@ -1228,34 +1226,25 @@ function migrateToLb(d){
 /* Small program edits patch saved v:2 state in place (a full rebuild via a
    v bump would wipe logged history for a one-lift change). */
 function patchProgramEdits(d){
-  /* 2026-07-11: consistency ring — older v:2 saves predate weekLog */
+  /* guards for fields newer than a given v:3 save */
   if(!d.weekLog) d.weekLog = {};
-  /* 2026-07-12: readiness auto-adjust — default on for older saves */
   if(d.autoAdjust===undefined){ d.autoAdjust=true; d.autoAdjustDate=null; }
-  const mon = d.days && d.days.mon;
-  if(mon && mon.ex){
-    /* 2026-07-11: Mon's Smith bench became incline DB press */
-    const i = mon.ex.findIndex(e=>e.id==='smith_bench');
-    if(i>=0) mon.ex[i] = { id:'incl_db_press', name:'Incline Dumbbell Press', tier:1, sets:4, reps:6, kg:70, dur:null, perHand:true, rest:180,
-      lastKg:null, pinned:false, collapsed:false, deload:false, note:'', log:Array(4).fill(null), hist:[] };
-    /* 2026-07-11: seated flat chest press added to push day, after incline smith */
-    if(!mon.ex.some(e=>e.id==='seated_chest_press')){
-      const j = mon.ex.findIndex(e=>e.id==='incline_smith');
-      mon.ex.splice(j>=0?j+1:mon.ex.length, 0, { id:'seated_chest_press', name:'Seated Flat Chest Press', tier:1, sets:3, reps:10, kg:130, dur:null, perHand:false, rest:120,
-        lastKg:null, pinned:false, collapsed:false, deload:false, note:'', log:Array(3).fill(null), hist:[] });
-    }
-  }
   return d;
 }
 (async()=>{
   let d=null;
   try{ d = await window.Vitality.load(); }catch(e){ d=null; }
-  /* v check: saved state from older program layouts (PPL/UL split, or the
-     v-less first weekly cut) doesn't fit this plan, so those rebuild. */
-  STATE = (d && typeof d==='object' && !Array.isArray(d) && d.days && d.v===2) ? patchProgramEdits(migrateToLb(d)) : buildState();
-  /* readiness rides on the raw save even when the program state rebuilds
-     (the dashboard's Fitbit sync may write it before the tile ever opens) */
-  if(d && typeof d==='object' && !Array.isArray(d) && d.readiness && !STATE.readiness) STATE.readiness = d.readiness;
+  /* v check: saved state from older program layouts rebuilds onto the
+     current plan (v3 = four climb days M/W/F/S, lifts Tue/Thu). */
+  STATE = (d && typeof d==='object' && !Array.isArray(d) && d.days && d.v===3) ? patchProgramEdits(migrateToLb(d)) : buildState();
+  /* carry the cross-program fields through a rebuild: readiness (the
+     dashboard's Fitbit sync may write it before the tile ever opens),
+     the consistency streak, and the auto-adjust preference. */
+  if(d && typeof d==='object' && !Array.isArray(d)){
+    if(d.readiness && !STATE.readiness) STATE.readiness = d.readiness;
+    if(d.weekLog && Object.keys(STATE.weekLog||{}).length===0) STATE.weekLog = d.weekLog;
+    if(d.autoAdjust!==undefined && STATE.days!==d.days){ STATE.autoAdjust = d.autoAdjust; STATE.autoAdjustDate = d.autoAdjustDate||null; }
+  }
   render(); wireFresh();
   spawnParticles(document.querySelector('#vt-backdrop .wb-particles'));
 })();
