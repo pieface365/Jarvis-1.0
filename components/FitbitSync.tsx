@@ -2,6 +2,24 @@
 
 import { useEffect } from 'react'
 import { tileStore } from '@/lib/tiles/tileStore'
+import { syncEnabled, syncLoad, syncSave } from '@/lib/sync'
+
+/* Read/write EXACTLY like the tile host does (useTileHost): local store first,
+   but the cloud row (bare tileId) wins when sync is on. Writing only through
+   tileStore put readiness in a row (`me:train`) the host then discarded in
+   favor of the cloud row (`train`) — data has to land where the host looks. */
+async function loadTileData(userId: string, id: string): Promise<unknown> {
+  let data: unknown = await tileStore.loadData(userId, id)
+  if (syncEnabled()) {
+    const remote = await syncLoad(id)
+    if (remote != null) data = remote
+  }
+  return data
+}
+async function saveTileData(userId: string, id: string, data: unknown): Promise<void> {
+  await tileStore.saveData(userId, id, data as never)
+  if (syncEnabled()) await syncSave(id, data, new Date().toISOString())
+}
 
 /**
  * Pulls the last two weeks of Fitbit vitals on dashboard load and merges them
@@ -26,7 +44,7 @@ export default function FitbitSync({ userId }: { userId: string }) {
         const { days } = await res.json()
         if (cancelled || !days || typeof days !== 'object') return
 
-        const cur = await tileStore.loadData(userId, 'vitals')
+        const cur = await loadTileData(userId, 'vitals')
         const store: Record<string, Record<string, number>> =
           cur && typeof cur === 'object' && !Array.isArray(cur)
             ? { ...(cur as Record<string, Record<string, number>>) }
@@ -42,7 +60,7 @@ export default function FitbitSync({ userId }: { userId: string }) {
           }
           store[date] = entry
         }
-        if (changed) await tileStore.saveData(userId, 'vitals', store)
+        if (changed) await saveTileData(userId, 'vitals', store)
 
         /* Hand today's readiness to the Train tile so it can adapt the day
            (banner + one-tap deload). Same recovery formula as the Vitals
@@ -80,15 +98,15 @@ export default function FitbitSync({ userId }: { userId: string }) {
             date: todayKey, recovery,
             hrv: h.hrv ?? null, rhr: h.rhr ?? null, sleepHours: h.sleepHours ?? null, hrvBase,
           }
-          const train = await tileStore.loadData(userId, 'train')
+          const train = await loadTileData(userId, 'train')
           if (train && typeof train === 'object' && !Array.isArray(train)) {
             // existing state (any version — the tile's boot migrates): ride along
             ;(train as any).readiness = readiness
-            await tileStore.saveData(userId, 'train', train)
+            await saveTileData(userId, 'train', train)
           } else {
             // tile never opened in this browser: seed a bare object; the tile
             // adopts .readiness off the raw load even when it rebuilds state
-            await tileStore.saveData(userId, 'train', { readiness })
+            await saveTileData(userId, 'train', { readiness })
           }
           console.info('[fitbit] readiness synced for', readiness.date, '— recovery', readiness.recovery + '%')
         }
