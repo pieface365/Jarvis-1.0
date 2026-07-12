@@ -77,6 +77,13 @@
   .legDot{width:12px;height:3px;border-radius:2px}
   .noteLine{font-size:12px;color:var(--muted);font-style:italic;margin-top:6px;line-height:1.5}
 
+  /* entry date navigator — makes every day's vitals editable */
+  .dateNav{display:flex;align-items:center;gap:6px}
+  .dnBtn{appearance:none;background:var(--bg);border:1px solid var(--border);color:var(--muted);border-radius:8px;width:28px;height:28px;font-size:16px;line-height:1;cursor:pointer}
+  .dnBtn:hover:not(:disabled){color:var(--fg);border-color:var(--muted)}
+  .dnBtn:disabled{opacity:.35;cursor:default}
+  .dnDate{background:var(--bg);border:1px solid var(--border);color:var(--fg);border-radius:8px;padding:4px 8px;font:inherit;font-size:12px;color-scheme:dark}
+
   /* trends chart tabs — click through the metric graphs */
   .chartTabs{display:flex;gap:5px;margin:4px 0 12px;flex-wrap:wrap}
   .ctab{appearance:none;background:var(--bg);border:1px solid var(--border);color:var(--muted);border-radius:var(--radius-pill);padding:6px 12px;font-size:11.5px;font-weight:600;cursor:pointer;transition:color .15s,border-color .15s,background .15s}
@@ -113,6 +120,7 @@
 let store={};     /* keyed by YYYY-MM-DD -> {hrv,rhr,sleepHours,sleepPerf,feel:1-4} */
 let range=14;
 let chartTab='trend'; /* which trends tab is showing: trend|hrv|rhr|sleep|corr */
+let editDate=null;    /* which day the entry card edits (null until boot = today) */
 const $=id=>document.getElementById(id);
 const round=n=>Math.round(n);
 const clamp01=x=>Math.max(0,Math.min(1,x));
@@ -120,6 +128,20 @@ function persist(){window.Vitality.save(store);}
 function todayKey(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function num(v){const n=Number(v);return (v===''||v==null||!isFinite(n))?null:n;}
 function todaysEntry(){return store[todayKey()]||{};}
+function editedEntry(){return store[editDate||todayKey()]||{};}
+function shiftEditDate(days){
+  const [y,m,d]=(editDate||todayKey()).split('-').map(Number);
+  const dt=new Date(y,m-1,d); dt.setDate(dt.getDate()+days);
+  const k=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
+  if(k>todayKey()) return; /* the future isn't editable */
+  editDate=k;
+}
+function fmtEditDate(){
+  const k=editDate||todayKey();
+  if(k===todayKey()) return 'Today';
+  const [y,m,d]=k.split('-').map(Number);
+  return new Date(y,m-1,d).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+}
 
 /* subjective "how do you feel" rating (1 bad … 4 excellent). It nudges
    today's sleep score and joins the recovery blend as its own component —
@@ -278,10 +300,11 @@ function chartBody(){
 
 /* ---------- feel check-in + its history chart ---------- */
 function feelHtml(){
-  const f=todaysEntry().feel;
-  return '<section class="card"><span class="cardName">How do you feel?</span>'
+  const isToday=(editDate||todayKey())===todayKey();
+  const f=editedEntry().feel;
+  return '<section class="card"><span class="cardName">'+(isToday?'How do you feel?':'How did you feel — '+fmtEditDate()+'?')+'</span>'
     + '<div class="feelRow">'+[1,2,3,4].map(v=>'<button class="feelBtn'+(f===v?' on':'')+'" data-feel="'+v+'">'+FEELS[v]+'</button>').join('')+'</div>'
-    + '<div class="hint">One honest tap a day — it nudges today\'s sleep score and readiness'+(f?' (feeling <b style="color:'+FEEL_COLOR[f]+'">'+FEELS[f].toLowerCase()+'</b> today)':'')+'.</div></section>';
+    + '<div class="hint">One honest tap a day — it nudges the sleep score and readiness'+(f?' (<b style="color:'+FEEL_COLOR[f]+'">'+FEELS[f].toLowerCase()+'</b>'+(isToday?' today':'')+')':'')+'.</div></section>';
 }
 function feelChartHtml(){
   const hist=entries().slice(-range).filter(d=>d.feel!=null);
@@ -323,15 +346,23 @@ function tips(rec,h){
 
 /* ---------- render ---------- */
 function entryHtml(){
-  const e=todaysEntry();
+  const e=editedEntry();
+  const isToday=(editDate||todayKey())===todayKey();
   const val=k=>e[k]!=null?e[k]:'';
   const f=(id,label,ph,step)=>'<label class="field"><span class="fLabel">'+label+'</span><input class="fieldInput" id="'+id+'" type="number" min="0" step="'+step+'" inputmode="decimal" placeholder="'+ph+'" value="'+val(id.replace('in-',''))+'" /></label>';
-  return '<section class="card"><span class="cardName">Today\'s vitals</span><div class="entryGrid">'
+  return '<section class="card"><div class="chartHead" style="margin-bottom:12px"><span class="cardName" style="margin:0">'+(isToday?'Today\'s vitals':'Editing · '+fmtEditDate())+'</span>'
+    + '<div class="dateNav">'
+    +   '<button class="dnBtn" data-datenav="-1" aria-label="Previous day">&#8249;</button>'
+    +   '<input class="dnDate" id="dn-date" type="date" value="'+(editDate||todayKey())+'" max="'+todayKey()+'">'
+    +   '<button class="dnBtn" data-datenav="1" aria-label="Next day"'+(isToday?' disabled':'')+'>&#8250;</button>'
+    + '</div></div><div class="entryGrid">'
     + f('in-hrv','HRV · ms','—','1')
     + f('in-rhr','Resting HR · bpm','—','1')
     + f('in-sleepHours','Sleep · hours','—','0.1')
     + f('in-sleepPerf','Sleep score · %','—','1')
-    + '</div><div class="hint" id="hint">Fill in what your band or app shows — recovery is estimated from HRV, resting HR and sleep.</div></section>';
+    + '</div><div class="hint" id="hint">'+(isToday
+      ? 'Fill in what your band or app shows — recovery is estimated from HRV, resting HR and sleep.'
+      : 'Editing a past day — every value (and the feel tap below) writes to '+fmtEditDate()+'. Charts update live.')+'</div></section>';
 }
 function outputHtml(){
   const h=todaysEntry();
@@ -376,12 +407,17 @@ function render(){
 document.addEventListener('input',e=>{
   if(e.target && e.target.id && e.target.id.indexOf('in-')===0){
     /* start from the existing entry so keys the inputs don't own (feel,
-       synced values) survive an edit */
-    const e2={...(store[todayKey()]||{})};
+       synced values) survive an edit; writes go to the SELECTED day */
+    const k0=editDate||todayKey();
+    const e2={...(store[k0]||{})};
     ['hrv','rhr','sleepHours','sleepPerf'].forEach(k=>{const v=num($('in-'+k).value); if(v!=null)e2[k]=v; else delete e2[k];});
-    store[todayKey()]=e2;
+    store[k0]=e2;
     persist();
     renderOutput();
+  }
+  if(e.target && e.target.id==='dn-date'){
+    const v=e.target.value;
+    if(/^\d{4}-\d{2}-\d{2}$/.test(v) && v<=todayKey()){ editDate=v; render(); }
   }
 });
 document.addEventListener('click',e=>{
@@ -389,12 +425,15 @@ document.addEventListener('click',e=>{
   if(b){ range=parseInt(b.getAttribute('data-range'),10)||14; renderOutput(); return; }
   const ct=e.target.closest('[data-charttab]');
   if(ct){ chartTab=ct.getAttribute('data-charttab'); renderOutput(); return; }
+  const dn=e.target.closest('[data-datenav]');
+  if(dn){ shiftEditDate(parseInt(dn.getAttribute('data-datenav'),10)); render(); return; }
   const fb=e.target.closest('[data-feel]');
   if(fb){
     const v=parseInt(fb.getAttribute('data-feel'),10);
-    const entry={...(store[todayKey()]||{})};
+    const k0=editDate||todayKey();
+    const entry={...(store[k0]||{})};
     if(entry.feel===v) delete entry.feel; else entry.feel=v; /* tap again to clear */
-    store[todayKey()]=entry;
+    store[k0]=entry;
     persist();
     renderOutput();
   }
