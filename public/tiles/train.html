@@ -93,12 +93,22 @@
   .weekDays .wd { width:19px; height:19px; border-radius:50%; border:1px solid var(--hair); display:grid; place-items:center; font-family: var(--vt-mono); font-size:9px; color: var(--muted); }
   .weekDays .wd.on { background: var(--mint); border-color: var(--mint); color: var(--ink); font-weight:700; }
   .weekDays .wd.today:not(.on) { border-color: var(--mint); color: var(--mint); }
+  /* goal countdown — the two clocks under the consistency ring */
+  .goalCard { margin-top:14px; padding:16px; border:1px solid var(--line); border-radius:var(--radius-lg); background:var(--card); backdrop-filter: blur(20px) saturate(1.2); -webkit-backdrop-filter: blur(20px) saturate(1.2); opacity:0; transform: translateY(14px); animation: rise .6s var(--spring) forwards; animation-delay:.08s; }
+  .goalCard .gTitle { font-family: var(--vt-mono); text-transform:uppercase; letter-spacing:.18em; font-size:10px; font-weight:600; color: var(--muted); margin-bottom:11px; }
+  .goalRow { display:flex; align-items:baseline; justify-content:space-between; gap:8px; padding:7px 0; border-top:1px solid var(--line); }
+  .goalRow:first-of-type { border-top:none; padding-top:0; }
+  .goalName { font-family: var(--serif); font-style:italic; font-size:15px; }
+  .goalLeft { font-family: var(--vt-mono); font-size:11px; color: var(--mint); white-space:nowrap; }
+  .goalLeft.soon { color: var(--gold); }
+
   /* stacked (narrow) layout: lie the tile down as a compact row */
   @media (max-width: 780px) {
     .weekCard { flex-direction:row; text-align:left; padding:14px 16px; gap:14px; }
     .weekRing { width:56px; height:56px; margin-bottom:0; }
     .weekText { align-items:flex-start; }
     .weekDays { justify-content:flex-start; margin-top:7px; }
+    .goalCard { margin-top:12px; }
   }
 
   /* readiness banner — today's recovery (synced from Fitbit via the Vitals
@@ -410,6 +420,7 @@
 <div class="shell">
   <aside class="sideCol">
     <div class="weekCard" id="weekCard"></div>
+    <div class="goalCard" id="goalCard"></div>
   </aside>
   <div class="sheet" id="sheet">
     <div class="eyebrow">Weekly training plan</div>
@@ -459,7 +470,7 @@ const ROMAN = ['i','ii','iii','iv','v','vi','vii','viii','ix','x'];
 function mmss(s){ return Math.floor(s/60)+':'+pad(s%60); }
 const TIER_LABEL = { 1:'main', 2:'main', 3:'main', ab:'core — daily', cb:'core — climb day bonus', w:'warm-up',
   c:'climb', ce:'climb — easy (after lift)', tb:'technique block', pj:'projects', hb:'hangboard',
-  vc:'volume circuits', rr:'route reading', rec:'recovery' };
+  vc:'volume circuits', rr:'route reading', rec:'recovery', bp:'beach pump' };
 
 /* ---- the program: weekly lift + climb plan (Mon–Sun) ----------------- */
 /* Lifting (Smith/cable/DB) three days, climbing at Gravity Vault around it,
@@ -477,12 +488,13 @@ const CLIMB_WARMUP = [
   { id:'no_moneys',         name:'No Moneys',         tier:'w', sets:2, reps:15, kg:0, rest:0 },
   { id:'recruitment_pulls', name:'Recruitment Pulls', tier:'w', sets:3, reps:5,  kg:0, dur:'3 × 5 sec per grip', rest:0 },
 ];
-/* v3 week — four climb days (M/W/F/S, each with its own job), two lift days
-   (Tue upper + antagonist, Thu legs), Sunday rest with optional easy mileage.
-   Grades reflect the current level: V4 base (flashing some), V5–V6 projects. */
+/* v4 week — aesthetics layered onto the climb structure. Four climb days
+   (M/W/F/S) with light "beach pump" finishers, Tue chest/delts/arms priority,
+   Thu legs + rear delts. Two clocks: Cancun 2026-08-05 (lean out), graduation
+   2028 (the build). Climbing targets: flash V5, project V6–V7. */
 const PROGRAM = {
   mon: { name:'Mon', focus:'Climb · Technique + Volume', type:'Climb',
-    motto:'Technique day — V4 is your floor now, so make it look easy. Quiet feet, straight arms, read every problem before you pull on.',
+    motto:'Technique day — V4 is your floor, make it look easy. Quiet feet, straight arms. Finish with the pump: grades AND the beach.',
     exercises:[
     ...CLIMB_WARMUP,
     { id:'easy_jugs',        name:'Easy jugs traversing',            tier:'w',  sets:1, reps:1, kg:0, dur:'10 min', rest:0 },
@@ -490,32 +502,35 @@ const PROGRAM = {
     { id:'body_positioning', name:'Body positioning on overhangs',   tier:'tb', sets:1, reps:1, kg:0, dur:'15 min', rest:0 },
     { id:'volume_moderate',  name:'V3–V4 mileage — perfect form only', tier:'vc', sets:1, reps:1, kg:0, dur:'40 min', rest:0 },
     ...CORE_DAILY, AB_ROLLER,
+    { id:'pump_delts',    name:'Lateral Raise Pump',                 tier:'bp', sets:3, reps:15, kg:15, perHand:true, rest:45 },
+    { id:'pump_tris',     name:'Rope Pushdown Pump',                 tier:'bp', sets:3, reps:12, kg:45, rest:45 },
   ]},
-  tue: { name:'Tue', focus:'Upper Body + Antagonist', type:'Lift',
-    motto:'Pull strength carries onto the wall; pressing keeps your shoulders honest. Face pulls are non-negotiable.',
+  tue: { name:'Tue', focus:'Upper · Chest, Delts + Arms', type:'Lift',
+    motto:'Aesthetic priority day — chest, capped delts and arms carry the look. Cancun Aug 5, then the long build to 2028. Earn the pump; protein after.',
     exercises:[
     { id:'band_pullaparts', name:'Band Pull-Aparts + Arm Circles',  tier:'w', sets:2, reps:15, kg:0, rest:30 },
-    { id:'weighted_pullups', name:'Weighted Pull-ups',              tier:1, sets:5, reps:5,  kg:25,  rest:180 },
     { id:'smith_bench',   name:'Smith Machine Bench Press',         tier:1, sets:4, reps:6,  kg:135, rest:180 },
-    { id:'seated_row',    name:'Seated Cable Row',                  tier:1, sets:4, reps:10, kg:130, rest:120 },
-    { id:'incl_db_press', name:'Incline Dumbbell Press',            tier:1, sets:3, reps:10, kg:65,  perHand:true, rest:120 },
+    { id:'incl_db_press', name:'Incline Dumbbell Press',            tier:1, sets:4, reps:8,  kg:65,  perHand:true, rest:150 },
+    { id:'weighted_pullups', name:'Weighted Pull-ups',              tier:1, sets:5, reps:5,  kg:25,  rest:180 },
+    { id:'cable_fly',     name:'Cable Chest Fly',                   tier:1, sets:3, reps:12, kg:40,  rest:75 },
+    { id:'db_lat_raise',  name:'Dumbbell Lateral Raises',           tier:1, sets:4, reps:15, kg:15,  perHand:true, rest:60 },
     { id:'face_pull',     name:'Face Pulls',                        tier:1, sets:4, reps:15, kg:50,  rest:60 },
-    { id:'db_lat_raise',  name:'Dumbbell Lateral Raises',           tier:1, sets:3, reps:15, kg:15,  perHand:true, rest:60 },
     { id:'tri_pushdown',  name:'Tricep Pushdown',                   tier:1, sets:3, reps:12, kg:50,  rest:75 },
+    { id:'incl_db_curl',  name:'Incline DB Curl',                   tier:1, sets:3, reps:12, kg:25,  perHand:true, rest:60 },
     { id:'hammer_curl',   name:'Hammer Curls',                      tier:1, sets:3, reps:10, kg:30,  perHand:true, rest:60 },
     ...CORE_DAILY,
   ]},
   wed: { name:'Wed', focus:'Climb · Power + Limit', type:'Climb',
-    motto:'Limit day — pick V5–V6 problems that scare you a little. Full rest between attempts; quality over volume.',
+    motto:'Limit day — V5–V6 problems that scare you a little, pushing toward V7. Full rest between attempts; quality over volume.',
     exercises:[
     ...CLIMB_WARMUP,
     { id:'easy_jugs',      name:'Easy jugs traversing',             tier:'w',  sets:1, reps:1, kg:0, dur:'10 min', rest:0 },
-    { id:'limit_boulders', name:'Limit boulders V5–V6',             tier:'pj', sets:1, reps:1, kg:0, dur:'45 min', rest:0 },
+    { id:'limit_boulders', name:'Limit boulders V5–V6+',            tier:'pj', sets:1, reps:1, kg:0, dur:'45 min', rest:0 },
     { id:'hb_repeaters',   name:'Repeaters — open hand',            tier:'hb', sets:1, reps:1, kg:0, dur:'10 min', rest:0 },
     ...CORE_DAILY, AB_ROLLER,
   ]},
-  thu: { name:'Thu', focus:'Legs + Core', type:'Lift',
-    motto:'Heaviest compound day. Full depth on squats — climbing power starts in the hips.',
+  thu: { name:'Thu', focus:'Legs + Rear Delts', type:'Lift',
+    motto:'Legs keep the physique balanced and the hips powerful. Full depth — no chicken legs on the beach.',
     exercises:[
     { id:'leg_swings',    name:'Leg Swings + Bodyweight Squats',    tier:'w', sets:2, reps:15, kg:0, rest:30 },
     { id:'smith_squat',   name:'Smith Machine Squat',               tier:1, sets:5, reps:5,  kg:185, rest:180 },
@@ -523,10 +538,11 @@ const PROGRAM = {
     { id:'leg_press',     name:'Leg Press',                         tier:1, sets:3, reps:10, kg:270, rest:120 },
     { id:'leg_curl',      name:'Leg Curl',                          tier:1, sets:3, reps:12, kg:90,  rest:75 },
     { id:'calf_raise',    name:'Calf Raises',                       tier:1, sets:4, reps:20, kg:90,  rest:60 },
+    { id:'rear_delt_fly', name:'Rear Delt Fly',                     tier:1, sets:3, reps:15, kg:30,  rest:60 },
     ...CORE_DAILY,
   ]},
   fri: { name:'Fri', focus:'Climb · Volume + Endurance', type:'Climb',
-    motto:'Volume day — endurance and route reading. Stay two grades under your limit and keep moving.',
+    motto:'Volume day — endurance and route reading. Two grades under your limit, keep moving. Pump finisher after: the deficit does the rest.',
     exercises:[
     ...CLIMB_WARMUP,
     { id:'easy_jugs',      name:'Easy jugs traversing',             tier:'w',  sets:1, reps:1, kg:0, dur:'10 min', rest:0 },
@@ -534,18 +550,20 @@ const PROGRAM = {
     { id:'slab_balance',   name:'Slab balance work V2–V4',          tier:'vc', sets:1, reps:1, kg:0, dur:'20 min', rest:0 },
     { id:'route_reading',  name:'Read 3 routes before attempting',  tier:'rr', sets:1, reps:1, kg:0, dur:'—', rest:0 },
     ...CORE_DAILY, AB_ROLLER,
+    { id:'pump_chest',    name:'Cable Fly Pump',                    tier:'bp', sets:3, reps:15, kg:35, rest:45 },
+    { id:'pump_bis',      name:'Cable Curl Pump',                   tier:'bp', sets:3, reps:12, kg:40, rest:45 },
   ]},
   sat: { name:'Sat', focus:'Climb · Projecting Day', type:'Climb',
-    motto:'Hardest day of the week. Longest warm-up. Film every V5–V6 attempt and watch beta between tries.',
+    motto:'Projecting day — the road to V6–V7 runs through V5–V6 at your limit. Longest warm-up. Film every attempt.',
     exercises:[
     ...CLIMB_WARMUP,
     { id:'easy_warm',      name:'V2–V4 easy',                       tier:'w',  sets:1, reps:1, kg:0, dur:'20 min', rest:0 },
-    { id:'projects',       name:'V5–V6 projects',                   tier:'pj', sets:1, reps:1, kg:0, dur:'90 min', rest:0 },
-    { id:'flash_attempts', name:'Flash attempts on fresh V4s',      tier:'pj', sets:1, reps:1, kg:0, dur:'20 min', rest:0 },
+    { id:'projects',       name:'V5–V6 projects — building to V6–V7', tier:'pj', sets:1, reps:1, kg:0, dur:'90 min', rest:0 },
+    { id:'flash_attempts', name:'Flash attempts V4–V5',             tier:'pj', sets:1, reps:1, kg:0, dur:'20 min', rest:0 },
     ...CORE_DAILY, AB_ROLLER,
   ]},
   sun: { name:'Sun', focus:'Rest (climb if fresh)', type:'Recovery',
-    motto:"General rest day. Feeling genuinely good? An easy session is fine — V2–V4 mileage, nothing at your limit, and any finger tweak is a hard stop.",
+    motto:"General rest day — abs are made here and in the kitchen. Feeling genuinely good? Easy V2–V4 mileage is fine; any finger tweak is a hard stop.",
     exercises:[
     { id:'rest_walk',     name:'30 min walk', tier:'rec', sets:1, reps:1, kg:0, dur:'—', rest:0 },
     { id:'rest_stretch',  name:'Stretching',  tier:'rec', sets:1, reps:1, kg:0, dur:'20 min', rest:0 },
@@ -554,6 +572,12 @@ const PROGRAM = {
   ]},
 };
 const ORDER = ['mon','tue','wed','thu','fri','sat','sun'];
+
+/* the two clocks this program trains against (goal countdown card) */
+const GOALS = [
+  { date:'2026-08-05', label:'Cancun' },
+  { date:'2028-05-15', label:'Graduation ’28' },
+];
 
 /* form reference + swap library (cues for the ⓘ button + swap options) */
 const LIB = {
@@ -603,6 +627,7 @@ const LIB = {
   weighted_pullups:{ equipment:'Bodyweight', primary:['Lats'], secondary:['Biceps','Upper back'], gist:'Weighted pull-ups — pull strength that carries straight onto the wall.', steps:['Belt the plate, dead hang start','Pull your chest to the bar','Lower under full control'], cues:['Drive elbows down and back','Full stretch at the bottom'] },
   smith_row:{ equipment:'Smith machine', primary:['Upper back'], secondary:['Lats','Biceps'], gist:'Heavy Smith row for a thick, strong back.', steps:['Hinge to about 45 degrees, flat back','Row the bar to your lower ribs','Lower slow, no jerking'], cues:['Lead with the elbows','Squeeze the back at the top'] },
   seated_chest_press:{ equipment:'Machine', primary:['Chest'], secondary:['Front delts','Triceps'], gist:'Seated machine press to finish the chest with a stable, flat pressing line.', steps:['Handles at mid-chest height','Press out to full lockout','Return slow to a deep stretch'], cues:['Shoulder blades pinned to the pad','Squeeze the chest at lockout'] },
+  rear_delt_fly:{ equipment:'Machine', primary:['Rear delts'], secondary:['Upper back'], gist:'Reverse fly — the delt head mirrors forget, and the one that rounds out the shoulder.', steps:['Chest on the pad, arms out front','Sweep your arms back and wide','Return slow, keep tension'], cues:['Lead with the pinkies','No shrugging'] },
   ab_roller:{ equipment:'Ab wheel', primary:['Abs'], secondary:['Lats','Hip flexors'], gist:'Ab roller for hard anti-extension core strength — climb-day bonus.', steps:['Kneel, wheel under your shoulders','Roll out as far as you can hold a flat back','Pull back with the abs, not the hips'], cues:['Ribs down, no sagging','Shorten the range before form breaks'] },
 };
 const SWAPS = {
@@ -638,7 +663,7 @@ function buildState(){
   /* v bumps when the program's day structure changes, so stale saves rebuild */
   /* weekLog: 'YYYY-MM-DD' -> true for each date every exercise got fully
      logged — feeds the consistency ring (7/7 fills the circle). */
-  return { v:3, active:(SEED&&SEED.active)||'mon', unit:'lb', submitted:false, weekLog:{}, autoAdjust:true, autoAdjustDate:null, days };
+  return { v:4, active:(SEED&&SEED.active)||'mon', unit:'lb', submitted:false, weekLog:{}, autoAdjust:true, autoAdjustDate:null, days };
 }
 /* STATE is filled by the async boot below once the dashboard bridge resolves. */
 let STATE = null;
@@ -780,9 +805,23 @@ function renderReadiness(){
   };
 }
 
+function renderGoals(){
+  const el = $('#goalCard'); if(!el) return;
+  const rows = GOALS.map(g=>{
+    const [y,m,dd]=g.date.split('-').map(Number);
+    const t=new Date(); t.setHours(0,0,0,0);
+    const days=Math.round((new Date(y,m-1,dd)-t)/DAY);
+    if(days<0) return '';
+    const left = days===0 ? 'today' : days<=60 ? days+' days' : Math.round(days/7)+' weeks';
+    return '<div class="goalRow"><span class="goalName">'+g.label+'</span><span class="goalLeft'+(days<=30?' soon':'')+'">'+left+'</span></div>';
+  }).join('');
+  el.innerHTML = rows ? '<div class="gTitle">Countdown</div>'+rows : '';
+  el.style.display = rows ? '' : 'none';
+}
+
 function render(){
   markConsistency(); applyAutoAdjust();
-  renderWeek(); renderReadiness(); renderTabs(); renderDots(); renderHead(); renderProgress(); renderBody(); saveState();
+  renderWeek(); renderGoals(); renderReadiness(); renderTabs(); renderDots(); renderHead(); renderProgress(); renderBody(); saveState();
 }
 function renderTabs(){
   const el = $('#daytabs');
@@ -1236,7 +1275,7 @@ function patchProgramEdits(d){
   try{ d = await window.Vitality.load(); }catch(e){ d=null; }
   /* v check: saved state from older program layouts rebuilds onto the
      current plan (v3 = four climb days M/W/F/S, lifts Tue/Thu). */
-  STATE = (d && typeof d==='object' && !Array.isArray(d) && d.days && d.v===3) ? patchProgramEdits(migrateToLb(d)) : buildState();
+  STATE = (d && typeof d==='object' && !Array.isArray(d) && d.days && d.v===4) ? patchProgramEdits(migrateToLb(d)) : buildState();
   /* carry the cross-program fields through a rebuild: readiness (the
      dashboard's Fitbit sync may write it before the tile ever opens),
      the consistency streak, and the auto-adjust preference. */
