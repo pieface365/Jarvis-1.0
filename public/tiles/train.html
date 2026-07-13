@@ -132,6 +132,14 @@
   .ready .rbtn:hover { background: rgba(224,106,108,.12); }
   .ready .rbtn.on { background: var(--fail); color:#fff; }
 
+  /* draggable block wrappers — reorder the side cards and the sheet's top
+     blocks (tabs / motto / readiness) by their grips */
+  .blockWrap { position:relative; }
+  .blockGrip { position:absolute; top:-2px; left:50%; transform:translateX(-50%); z-index:8; background:none; border:none; color:var(--muted); opacity:.45; font-size:13px; letter-spacing:2px; line-height:1; padding:5px 18px; cursor:grab; touch-action:none; transition:opacity .15s, color .15s; }
+  .blockGrip:hover { opacity:1; color:var(--text); }
+  .blockGrip:active { cursor:grabbing; }
+  .blockWrap.block-dragging { opacity:.3; }
+
   /* the plan's motto, under the weekday tabs */
   .motto { font-family: var(--serif); font-style:italic; font-size:13.5px; line-height:1.5; color: var(--muted); margin:14px 0 0; padding-left:11px; border-left:2px solid var(--mint); }
 
@@ -418,15 +426,15 @@
 </div>
 
 <div class="shell">
-  <aside class="sideCol">
-    <div class="weekCard" id="weekCard"></div>
-    <div class="goalCard" id="goalCard"></div>
+  <aside class="sideCol" id="sideCol">
+    <div class="blockWrap" data-block="week"><button class="blockGrip" data-bgrip="week" aria-label="Drag to reorder" title="Drag to reorder">&#10495;</button><div class="weekCard" id="weekCard"></div></div>
+    <div class="blockWrap" data-block="goal"><button class="blockGrip" data-bgrip="goal" aria-label="Drag to reorder" title="Drag to reorder">&#10495;</button><div class="goalCard" id="goalCard"></div></div>
   </aside>
   <div class="sheet" id="sheet">
     <div class="eyebrow">Weekly training plan</div>
-    <div class="daytabs" id="daytabs"></div>
-    <p class="motto" id="motto"></p>
-    <div id="readiness"></div>
+    <div class="blockWrap" data-block="tabs"><button class="blockGrip" data-bgrip="tabs" aria-label="Drag to reorder" title="Drag to reorder">&#10495;</button><div class="daytabs" id="daytabs"></div></div>
+    <div class="blockWrap" data-block="motto"><button class="blockGrip" data-bgrip="motto" aria-label="Drag to reorder" title="Drag to reorder">&#10495;</button><p class="motto" id="motto"></p></div>
+    <div class="blockWrap" data-block="ready"><button class="blockGrip" data-bgrip="ready" aria-label="Drag to reorder" title="Drag to reorder">&#10495;</button><div id="readiness"></div></div>
     <div class="daydots" id="daydots"></div>
     <div class="dayhead">
       <h1 class="daytitle" id="daytitle">Push</h1>
@@ -818,6 +826,67 @@ function renderGoals(){
   el.innerHTML = rows ? '<div class="gTitle">Countdown</div>'+rows : '';
   el.style.display = rows ? '' : 'none';
 }
+
+/* ---- draggable blocks: side cards + the sheet's top blocks ----------
+   Renderers target ids INSIDE the wrappers, so reordering is pure DOM
+   surgery — move the wrapper nodes, everything keeps re-rendering. Order
+   persists in STATE.uiOrder = { side:[...], top:[...] }. */
+const BLOCK_GROUPS = { side:['week','goal'], top:['tabs','motto','ready'] };
+function groupOf(k){ return BLOCK_GROUPS.side.includes(k) ? 'side' : 'top'; }
+function blockOrder(group){
+  const saved = (STATE && STATE.uiOrder && Array.isArray(STATE.uiOrder[group])) ? STATE.uiOrder[group] : [];
+  const out=[], seen={};
+  saved.forEach(k=>{ if(BLOCK_GROUPS[group].includes(k) && !seen[k]){ out.push(k); seen[k]=1; } });
+  BLOCK_GROUPS[group].forEach(k=>{ if(!seen[k]) out.push(k); });
+  return out;
+}
+function applyBlockOrder(){
+  const side=$('#sideCol');
+  blockOrder('side').forEach(k=>{ const w=document.querySelector('[data-block="'+k+'"]'); if(w && side) side.appendChild(w); });
+  const dots=$('#daydots'); /* top blocks sit between the eyebrow and the dots */
+  blockOrder('top').forEach(k=>{ const w=document.querySelector('[data-block="'+k+'"]'); if(w && dots) dots.parentElement.insertBefore(w, dots); });
+}
+
+let blockDrag=null;
+document.addEventListener('pointerdown',e=>{
+  const g=e.target.closest('[data-bgrip]');
+  if(!g || blockDrag) return;
+  e.preventDefault();
+  const k=g.getAttribute('data-bgrip');
+  const wrap=document.querySelector('[data-block="'+k+'"]');
+  const r=wrap.getBoundingClientRect();
+  const ghost=wrap.cloneNode(true);
+  ghost.style.cssText='position:fixed;left:'+r.left+'px;top:'+r.top+'px;width:'+r.width+'px;margin:0;z-index:95;pointer-events:none;opacity:.92;box-shadow:0 18px 50px rgba(0,0,0,.6);';
+  document.body.appendChild(ghost);
+  wrap.classList.add('block-dragging');
+  blockDrag={ k, group:groupOf(k), ghost, sx:e.clientX, sy:e.clientY, last:null };
+});
+document.addEventListener('pointermove',e=>{
+  const d=blockDrag; if(!d) return;
+  d.ghost.style.transform='translate('+(e.clientX-d.sx)+'px,'+(e.clientY-d.sy)+'px)';
+  const under=document.elementsFromPoint(e.clientX,e.clientY)
+    .find(n=>n.getAttribute && n.getAttribute('data-block') && n.getAttribute('data-block')!==d.k && groupOf(n.getAttribute('data-block'))===d.group);
+  const t=under ? under.getAttribute('data-block') : null;
+  if(t && t!==d.last){
+    d.last=t;
+    const cur=blockOrder(d.group);
+    cur.splice(cur.indexOf(d.k),1);
+    cur.splice(cur.indexOf(t),0,d.k);
+    if(!STATE.uiOrder) STATE.uiOrder={};
+    STATE.uiOrder[d.group]=cur;
+    applyBlockOrder(); saveState();
+  }
+  if(!t) d.last=null;
+});
+function endBlockDrag(){
+  const d=blockDrag; if(!d) return;
+  d.ghost.remove();
+  const w=document.querySelector('[data-block="'+d.k+'"]');
+  if(w) w.classList.remove('block-dragging');
+  blockDrag=null;
+}
+document.addEventListener('pointerup',endBlockDrag);
+document.addEventListener('pointercancel',endBlockDrag);
 
 function render(){
   markConsistency(); applyAutoAdjust();
@@ -1286,8 +1355,9 @@ function patchProgramEdits(d){
     if(d.readiness && !STATE.readiness) STATE.readiness = d.readiness;
     if(d.weekLog && Object.keys(STATE.weekLog||{}).length===0) STATE.weekLog = d.weekLog;
     if(d.autoAdjust!==undefined && STATE.days!==d.days){ STATE.autoAdjust = d.autoAdjust; STATE.autoAdjustDate = d.autoAdjustDate||null; }
+    if(d.uiOrder && !STATE.uiOrder) STATE.uiOrder = d.uiOrder;
   }
-  render(); wireFresh();
+  render(); applyBlockOrder(); wireFresh();
   spawnParticles(document.querySelector('#vt-backdrop .wb-particles'));
 })();
 </script>
