@@ -521,6 +521,66 @@ function VisionEmptyState({ onNewTile }: { onNewTile: () => void }) {
   )
 }
 
+/* ── bottom dock: hop between sections from anywhere (stays above an open
+   tile, so Train → Fuel is one tap without passing through the dashboard) ── */
+function Dock({ activeId, onSelect }: { activeId: string; onSelect: (id: string) => void }) {
+  const items: { id: string; label: string; icon: React.ReactNode }[] = [
+    {
+      id: 'home', label: 'Home',
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 11.5 12 4l9 7.5M5.5 9.8V20h13V9.8" />
+        </svg>
+      ),
+    },
+    ...SLOT_ORDER.map((id) => ({
+      id,
+      label: id === 'vee' ? VEE_TILE.label : CORE_TILES[id as keyof typeof CORE_TILES].label,
+      icon: id === 'vee'
+        ? <span style={{ fontFamily: 'Georgia, serif', fontStyle: 'italic', fontSize: 15, lineHeight: 1 }}>V</span>
+        : CORE_TILES[id as keyof typeof CORE_TILES].glyph,
+    })),
+  ]
+  return (
+    <nav
+      aria-label="Sections"
+      style={{
+        position: 'fixed', left: '50%', transform: 'translateX(-50%)',
+        bottom: 'max(10px, env(safe-area-inset-bottom))', zIndex: 85,
+        display: 'flex', gap: 2, alignItems: 'stretch',
+        background: 'rgba(10,12,11,.82)', backdropFilter: 'blur(18px) saturate(1.2)', WebkitBackdropFilter: 'blur(18px) saturate(1.2)',
+        border: '1px solid rgba(255,255,255,.09)', borderRadius: 18, padding: '7px 8px',
+        boxShadow: '0 14px 40px rgba(0,0,0,.5)', maxWidth: '96vw', overflowX: 'auto',
+      }}
+    >
+      {items.map((it) => {
+        const on = activeId === it.id
+        return (
+          <button
+            key={it.id}
+            type="button"
+            onClick={() => onSelect(it.id)}
+            aria-current={on ? 'page' : undefined}
+            style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+              minWidth: 58, padding: '7px 8px 5px', cursor: 'pointer', border: 'none', borderRadius: 12,
+              background: on ? 'rgba(255,255,255,.08)' : 'transparent',
+              color: on ? 'var(--mint, #6EE7B7)' : 'rgba(255,255,255,.45)',
+              transition: 'color .15s, background .15s',
+            }}
+          >
+            <span style={{ width: 18, height: 18, display: 'grid', placeItems: 'center' }}>{it.icon}</span>
+            <span style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 9, letterSpacing: '.08em', textTransform: 'uppercase' }}>
+              {it.label}
+            </span>
+            <span style={{ width: 16, height: 2, borderRadius: 2, background: on ? 'var(--mint, #6EE7B7)' : 'transparent' }} />
+          </button>
+        )
+      })}
+    </nav>
+  )
+}
+
 interface DashboardGridProps {
   userId: string
   chrome?: DashboardChrome
@@ -786,7 +846,7 @@ export default function DashboardGrid({ userId, arranging = false }: DashboardGr
           style={{
             position: 'fixed',
             right: 24,
-            bottom: 24,
+            bottom: 92,
             zIndex: 50,
             background: 'var(--mint)',
             color: 'var(--mint-ink, #042a1c)',
@@ -818,7 +878,7 @@ export default function DashboardGrid({ userId, arranging = false }: DashboardGr
           style={{
             position: 'fixed',
             left: 24,
-            bottom: 24,
+            bottom: 92,
             zIndex: 50,
             background: 'transparent',
             color: 'var(--muted)',
@@ -843,7 +903,7 @@ export default function DashboardGrid({ userId, arranging = false }: DashboardGr
             setSizes({})
           }}
           style={{
-            position: 'fixed', left: '50%', transform: 'translateX(calc(-50% + 120px))', bottom: 24, zIndex: 60,
+            position: 'fixed', left: '50%', transform: 'translateX(calc(-50% + 120px))', bottom: 92, zIndex: 60,
             background: 'transparent', color: 'var(--muted)', border: '1px solid var(--border)',
             borderRadius: 999, padding: '11px 16px', fontWeight: 500, fontSize: 13, cursor: 'pointer',
           }}
@@ -853,6 +913,16 @@ export default function DashboardGrid({ userId, arranging = false }: DashboardGr
       )}
 
       {showWelcome && <EmptyCanvas onBack={() => setShowWelcome(false)} />}
+
+      <Dock
+        activeId={openId ?? 'home'}
+        onSelect={(id) => {
+          if (id === 'home') { setOpenId(null); setConnectId(null); return }
+          setConnectId(null)
+          if (filled[id]) setOpenId(id)
+          else { setOpenId(null); setConnectId(id) }
+        }}
+      />
     </div>
   )
 }
