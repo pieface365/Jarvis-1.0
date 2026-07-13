@@ -141,23 +141,23 @@ const FOODS=[
 const PLAN_TARGET = { cal:2400, p:150 };
 const WEEK=['mon','tue','wed','thu','fri','sat','sun'];
 const DAY_LABEL={mon:'Mon',tue:'Tue',wed:'Wed',thu:'Thu',fri:'Fri',sat:'Sat',sun:'Sun'};
-const DAY_TYPE={mon:'lift',tue:'climb',wed:'lift',thu:'climb',fri:'lift',sat:'climb',sun:'rest'};
+const DAY_TYPE={mon:'climb',tue:'lift',wed:'climb',thu:'lift',fri:'climb',sat:'lift',sun:'rest'};
 const DAY_FOCUS={lift:'Lift day — training fuel',climb:'Climb day — carbs up for the wall',rest:'Rest day — lightest, protein stays'};
 /* Lunch + dinner rotate through the week (new combo every 2-3 days, two
    veg per plate); breakfasts and snacks stay stable for easy prep. */
 const DAY_LD={
-  mon:{ lunch:{ name:'Lunch — @main rice bowl, broccoli + carrots', items:[['@main',150],['White rice',250],['Broccoli',100],['Carrots',100],['Olive oil',8]] },
-        dinner:{ name:'Dinner — @main, sweet potato + green beans', items:[['@main',150],['Sweet potato',300],['Green beans',150],['Olive oil',8]] } },
-  tue:{ lunch:{ name:'Lunch — @main pasta, spinach + zucchini', items:[['@main',150],['Pasta (cooked)',250],['Spinach',100],['Zucchini',150],['Olive oil',8]] },
+  mon:{ lunch:{ name:'Lunch — @main pasta, spinach + zucchini', items:[['@main',150],['Pasta (cooked)',250],['Spinach',100],['Zucchini',150],['Olive oil',8]] },
         dinner:{ name:'Post-climb — @main, potatoes, peppers + mushrooms', items:[['@main',150],['Potato',350],['Bell pepper',100],['Mushrooms',100],['Olive oil',8]] } },
-  wed:{ lunch:{ name:'Lunch — @main fajita bowl (peppers + avocado)', items:[['@main',150],['White rice',250],['Bell pepper',150],['Avocado',50],['Olive oil',5]] },
-        dinner:{ name:'Dinner — @main pasta, mushrooms + spinach', items:[['@main',150],['Pasta (cooked)',200],['Mushrooms',100],['Spinach',100],['Olive oil',8]] } },
-  thu:{ lunch:{ name:'Lunch — @main rice bowl, edamame + cucumber', items:[['@main',150],['White rice',230],['Edamame',75],['Cucumber',100],['Olive oil',8]] },
+  tue:{ lunch:{ name:'Lunch — @main rice bowl, broccoli + carrots', items:[['@main',150],['White rice',250],['Broccoli',100],['Carrots',100],['Olive oil',8]] },
+        dinner:{ name:'Dinner — @main, sweet potato + green beans', items:[['@main',150],['Sweet potato',300],['Green beans',150],['Olive oil',8]] } },
+  wed:{ lunch:{ name:'Lunch — @main rice bowl, edamame + cucumber', items:[['@main',150],['White rice',230],['Edamame',75],['Cucumber',100],['Olive oil',8]] },
         dinner:{ name:'Post-climb — @main pasta, zucchini + mushrooms', items:[['@main',150],['Pasta (cooked)',210],['Zucchini',150],['Mushrooms',100],['Olive oil',8]] } },
-  fri:{ lunch:{ name:'Lunch — @main stir-fry rice, green beans + mushrooms', items:[['@main',150],['White rice',250],['Green beans',100],['Mushrooms',100],['Olive oil',8]] },
-        dinner:{ name:'Dinner — @main, sweet potato + asparagus', items:[['@main',150],['Sweet potato',300],['Asparagus',150],['Olive oil',8]] } },
-  sat:{ lunch:{ name:'Lunch — @main pasta, peppers + spinach', items:[['@main',150],['Pasta (cooked)',250],['Bell pepper',100],['Spinach',100],['Olive oil',8]] },
+  thu:{ lunch:{ name:'Lunch — @main fajita bowl (peppers + avocado)', items:[['@main',150],['White rice',250],['Bell pepper',150],['Avocado',50],['Olive oil',5]] },
+        dinner:{ name:'Dinner — @main pasta, mushrooms + spinach', items:[['@main',150],['Pasta (cooked)',200],['Mushrooms',100],['Spinach',100],['Olive oil',8]] } },
+  fri:{ lunch:{ name:'Lunch — @main pasta, peppers + spinach', items:[['@main',150],['Pasta (cooked)',250],['Bell pepper',100],['Spinach',100],['Olive oil',8]] },
         dinner:{ name:'Post-climb — @main, potatoes, carrots + green beans', items:[['@main',150],['Potato',350],['Carrots',100],['Green beans',100],['Olive oil',8]] } },
+  sat:{ lunch:{ name:'Lunch — @main stir-fry rice, green beans + mushrooms', items:[['@main',150],['White rice',250],['Green beans',100],['Mushrooms',100],['Olive oil',8]] },
+        dinner:{ name:'Dinner — @main, sweet potato + asparagus', items:[['@main',150],['Sweet potato',300],['Asparagus',150],['Olive oil',8]] } },
   sun:{ lunch:{ name:'Lunch — @main big salad (greens, cucumber, peppers, avocado)', items:[['@main',150],['Salad greens',100],['Cucumber',100],['Bell pepper',100],['Avocado',70],['Olive oil',8]] },
         dinner:{ name:'Dinner — @main, sweet potato + asparagus', items:[['@main',150],['Sweet potato',250],['Asparagus',150],['Olive oil',8]] } },
 };
@@ -185,7 +185,7 @@ function planDayMeals(k){
     evening,
   ];
 }
-const PLAN_V=2;
+const PLAN_V=3;
 function ensurePlan(){
   if(store.plan && store.plan.v===PLAN_V) return;
   const days={};
