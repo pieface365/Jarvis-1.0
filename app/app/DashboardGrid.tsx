@@ -7,7 +7,7 @@ import type { TileSize } from '@/lib/tiles/tileSkin'
 import { initVeeTiles } from '@/components/veeTilesAnim'
 import { useTileHost } from '@/lib/tiles/useTileHost'
 import { withBridge } from '@/lib/tiles/tileBridge'
-import { syncEnabled, syncLoadTiles, syncSaveTile } from '@/lib/sync'
+import { syncEnabled, syncLoadTiles, syncSaveTile, syncSave, syncLoad } from '@/lib/sync'
 import type { DashboardChrome } from '@/lib/tiles/dashboardChrome'
 import { homeLayout, resolveOrder } from '@/lib/tiles/homeLayout'
 import { nextSize, SIZE_LABELS } from '@/lib/tiles/tileSkin'
@@ -614,6 +614,18 @@ export default function DashboardGrid({ userId, arranging = false }: DashboardGr
     const saved = homeLayout.get(userId)
     setOrder(resolveOrder(saved.order, SLOT_ORDER))
     setSizes(saved.sizes || {})
+    // Cloud copy wins when sync is on, so an arrangement made in one browser
+    // (or before a redeploy) shows up in every other one.
+    if (syncEnabled()) {
+      ;(async () => {
+        const remote = (await syncLoad('_homeLayout')) as { order?: string[]; sizes?: Record<string, TileSize> } | null
+        if (remote && Array.isArray(remote.order)) {
+          homeLayout.set(userId, { order: remote.order, sizes: remote.sizes || {} })
+          setOrder(resolveOrder(remote.order, SLOT_ORDER))
+          setSizes(remote.sizes || {})
+        }
+      })()
+    }
   }, [userId])
 
   const sizeFor = (id: string): TileSize =>
@@ -621,6 +633,7 @@ export default function DashboardGrid({ userId, arranging = false }: DashboardGr
 
   const persistLayout = (nextOrder: string[], nextSizes: Record<string, TileSize>) => {
     homeLayout.set(userId, { order: nextOrder, sizes: nextSizes })
+    if (syncEnabled()) void syncSave('_homeLayout', { order: nextOrder, sizes: nextSizes }, new Date().toISOString())
   }
 
   /* ── drag & drop (arrange mode): a fixed-position ghost follows the pointer,
@@ -900,6 +913,7 @@ export default function DashboardGrid({ userId, arranging = false }: DashboardGr
             homeLayout.reset(userId)
             setOrder(SLOT_ORDER)
             setSizes({})
+            if (syncEnabled()) void syncSave('_homeLayout', { order: [], sizes: {} }, new Date().toISOString())
           }}
           style={{
             position: 'fixed', left: '50%', transform: 'translateX(calc(-50% + 120px))', bottom: 92, zIndex: 60,

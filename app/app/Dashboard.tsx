@@ -10,7 +10,7 @@ import DashboardHeaderGem from './DashboardHeaderGem'
 import DashboardGrid from './DashboardGrid'
 import '@/components/veeTiles.css'
 import { dashboardChrome, backgroundAccent, DEFAULT_CHROME, type DashboardChrome } from '@/lib/tiles/dashboardChrome'
-import { syncWipe } from '@/lib/sync'
+import { syncWipe, syncEnabled, syncSave, syncLoad } from '@/lib/sync'
 
 interface DashboardProps {
   firstName: string | null
@@ -186,6 +186,15 @@ export default function Dashboard({ firstName, userId }: DashboardProps) {
 
   useEffect(() => {
     setChrome(dashboardChrome.get(userId))
+    // Cloud copy of the chrome (greeting/wallpaper) wins when sync is on.
+    if (syncEnabled()) {
+      ;(async () => {
+        const remote = (await syncLoad('_chrome')) as Partial<DashboardChrome> | null
+        if (remote && typeof remote === 'object' && (remote.greeting || remote.background)) {
+          setChrome(dashboardChrome.update(userId, remote))
+        }
+      })()
+    }
   }, [userId])
 
   const wallAccent = chrome ? backgroundAccent(chrome.background) : '#6EE7B7'
@@ -242,7 +251,10 @@ export default function Dashboard({ firstName, userId }: DashboardProps) {
         <CustomizePanel
           userId={userId}
           chrome={chrome}
-          onChange={setChrome}
+          onChange={(c) => {
+            setChrome(c)
+            if (syncEnabled()) void syncSave('_chrome', c, new Date().toISOString())
+          }}
           onClose={() => setCustomizeOpen(false)}
           arranging={arranging}
           onToggleArrange={() => { setArranging((a) => !a); setCustomizeOpen(false) }}
