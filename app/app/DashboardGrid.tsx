@@ -72,10 +72,9 @@ function TileFace({
   size,
   onOpen,
   arranging,
-  onMove,
+  dragging,
+  onDragStart,
   onResize,
-  canMoveBack,
-  canMoveFwd,
 }: {
   id: string
   isVee: boolean
@@ -84,10 +83,9 @@ function TileFace({
   size: TileSize
   onOpen: () => void
   arranging?: boolean
-  onMove?: (dir: -1 | 1) => void
+  dragging?: boolean
+  onDragStart?: (e: React.PointerEvent) => void
   onResize?: () => void
-  canMoveBack?: boolean
-  canMoveFwd?: boolean
 }) {
   const label = isVee ? VEE_TILE.label : core!.label
   const index = isVee ? VEE_TILE.index : core!.index
@@ -98,21 +96,28 @@ function TileFace({
     ['--y' as string]: pos?.y ?? 0,
     ['--w' as string]: pos?.w ?? 1,
     ['--h' as string]: pos?.h ?? 1,
-    ...(arranging ? { outline: '1.5px dashed rgba(110,231,183,.55)', outlineOffset: -6 } : {}),
-  }
-  const ctlBtn: CSSProperties = {
-    background: 'rgba(6,10,9,.85)', color: '#6EE7B7', border: '1px solid rgba(110,231,183,.5)',
-    borderRadius: 999, padding: '5px 11px', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-    backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
+    ...(arranging
+      ? {
+          outline: '1.5px dashed rgba(110,231,183,.55)',
+          outlineOffset: -6,
+          cursor: 'grab',
+          touchAction: 'none', // a touch-drag must never scroll the page instead
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
+          opacity: dragging ? 0.3 : 1,
+        }
+      : {}),
   }
   return (
     <div
+      data-tileid={id}
       data-size={size}
       data-orb={orb?.mode}
       data-roam={orb?.roam}
       data-pt={orb?.pt}
       className={`tile${variant ? ' ' + variant : ''} editable`}
       style={style}
+      onPointerDown={arranging ? onDragStart : undefined}
     >
       <div className="aurora" />
 
@@ -134,18 +139,23 @@ function TileFace({
       {/* Inert: clicking opens the slot (filled tile or connector), never navigates. */}
       {!arranging && <button type="button" className="hit" aria-label={`Open ${label}`} onClick={onOpen} />}
 
-      {/* Arrange mode: move + resize controls float over the tile. */}
+      {/* Arrange mode: drag hint + resize chip float over the tile. The overlay
+          itself is click-through so a drag can start anywhere on the tile. */}
       {arranging && (
         <div style={{
           position: 'absolute', inset: 0, zIndex: 6, display: 'flex', alignItems: 'center',
-          justifyContent: 'center', gap: 8, flexWrap: 'wrap', padding: 10,
+          justifyContent: 'center', gap: 8, flexWrap: 'wrap', padding: 10, pointerEvents: 'none',
         }}>
-          <button type="button" style={{ ...ctlBtn, opacity: canMoveBack ? 1 : 0.35 }} disabled={!canMoveBack}
-            aria-label={`Move ${label} earlier`} onClick={() => onMove?.(-1)}>◀</button>
-          <button type="button" style={ctlBtn} aria-label={`Resize ${label}`} onClick={onResize}
-            title="Cycle size">{SIZE_LABELS[size]} ⤢</button>
-          <button type="button" style={{ ...ctlBtn, opacity: canMoveFwd ? 1 : 0.35 }} disabled={!canMoveFwd}
-            aria-label={`Move ${label} later`} onClick={() => onMove?.(1)}>▶</button>
+          <span style={{
+            background: 'rgba(6,10,9,.85)', color: '#84848c', border: '1px solid rgba(255,255,255,.18)',
+            borderRadius: 999, padding: '5px 11px', fontSize: 12, fontWeight: 600,
+            backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
+          }}>⠿ drag</span>
+          <button type="button" onClick={onResize} aria-label={`Resize ${label}`} title="Cycle size" style={{
+            background: 'rgba(6,10,9,.85)', color: '#6EE7B7', border: '1px solid rgba(110,231,183,.5)',
+            borderRadius: 999, padding: '5px 11px', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+            backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', pointerEvents: 'auto',
+          }}>{SIZE_LABELS[size]} ⤢</button>
         </div>
       )}
     </div>
@@ -554,20 +564,77 @@ export default function DashboardGrid({ userId, arranging = false }: DashboardGr
     homeLayout.set(userId, { order: nextOrder, sizes: nextSizes })
   }
 
-  /** Swap a tile with its filled neighbour (arrange mode ◀ ▶). */
-  const moveTile = (id: string, dir: -1 | 1) => {
+  /* ── drag & drop (arrange mode): a fixed-position ghost follows the pointer,
+     and hovering another tile reorders the live grid underneath ── */
+  const [dragId, setDragId] = useState<string | null>(null)
+  const dragRef = useRef<{ id: string; clone: HTMLElement; sx: number; sy: number; lastTarget: string | null } | null>(null)
+
+  /** Move the dragged tile to the hovered tile's position in the order. */
+  const reorderTo = (id: string, targetId: string) => {
     setOrder((cur) => {
-      const filledIds = cur.filter((x) => filled[x])
-      const i = filledIds.indexOf(id)
-      const j = i + dir
-      if (i < 0 || j < 0 || j >= filledIds.length) return cur
-      const a = cur.indexOf(filledIds[i])
-      const b = cur.indexOf(filledIds[j])
+      const from = cur.indexOf(id)
+      const to = cur.indexOf(targetId)
+      if (from < 0 || to < 0 || from === to) return cur
       const next = [...cur]
-      ;[next[a], next[b]] = [next[b], next[a]]
+      next.splice(from, 1)
+      next.splice(to, 0, id)
       persistLayout(next, sizes)
       return next
     })
+  }
+
+  const startDrag = (id: string) => (e: React.PointerEvent) => {
+    if (!arranging || dragRef.current) return
+    if ((e.target as HTMLElement).closest('button')) return // the resize chip is a click, not a drag
+    e.preventDefault()
+    const el = e.currentTarget as HTMLElement
+    const rect = el.getBoundingClientRect()
+    const clone = el.cloneNode(true) as HTMLElement
+    Object.assign(clone.style, {
+      position: 'fixed',
+      left: rect.left + 'px',
+      top: rect.top + 'px',
+      width: rect.width + 'px',
+      height: rect.height + 'px',
+      margin: '0',
+      zIndex: '90',
+      pointerEvents: 'none',
+      transition: 'none',
+      opacity: '0.95',
+      transform: 'scale(1.02)',
+      boxShadow: '0 18px 50px rgba(0,0,0,.6)',
+    })
+    document.body.appendChild(clone)
+    dragRef.current = { id, clone, sx: e.clientX, sy: e.clientY, lastTarget: null }
+    setDragId(id)
+
+    const move = (ev: PointerEvent) => {
+      const d = dragRef.current
+      if (!d) return
+      d.clone.style.transform = `translate(${ev.clientX - d.sx}px, ${ev.clientY - d.sy}px) scale(1.02)`
+      // the ghost is pointer-transparent, so the element under the pointer is a live tile
+      const under = document
+        .elementsFromPoint(ev.clientX, ev.clientY)
+        .find((n): n is HTMLElement => n instanceof HTMLElement && !!n.dataset.tileid && n.dataset.tileid !== d.id)
+      const target = under?.dataset.tileid ?? null
+      if (target && target !== d.lastTarget) {
+        d.lastTarget = target
+        reorderTo(d.id, target)
+      }
+      if (!target) d.lastTarget = null
+    }
+    const up = () => {
+      const d = dragRef.current
+      if (d) d.clone.remove()
+      dragRef.current = null
+      setDragId(null)
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', up)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+    window.addEventListener('pointercancel', up)
   }
 
   /** Cycle a tile through the size vocabulary (arrange mode chip). */
@@ -676,7 +743,7 @@ export default function DashboardGrid({ userId, arranging = false }: DashboardGr
         scratched ? null : <VisionEmptyState onNewTile={() => setNewOpen(true)} />
       ) : (
         <div className="grid" style={{ ['--rows' as string]: rows }}>
-          {filledOrder.map((id, i) => {
+          {filledOrder.map((id) => {
             const isVee = id === 'vee'
             return (
               <TileFace
@@ -688,10 +755,9 @@ export default function DashboardGrid({ userId, arranging = false }: DashboardGr
                 size={sizeFor(id)}
                 onOpen={() => openSlot(id)}
                 arranging={arranging}
-                onMove={(dir) => moveTile(id, dir)}
+                dragging={dragId === id}
+                onDragStart={startDrag(id)}
                 onResize={() => resizeTile(id)}
-                canMoveBack={i > 0}
-                canMoveFwd={i < filledOrder.length - 1}
               />
             )
           })}

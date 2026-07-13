@@ -79,7 +79,7 @@ export default function CustomizePanel({ userId, chrome, onChange, onClose, arra
           background: arranging ? '#6EE7B7' : 'rgba(110,231,183,.08)', color: arranging ? '#04140d' : '#6EE7B7',
           border: '1px solid rgba(110,231,183,.4)',
         }}>
-          {arranging ? 'Done arranging' : 'Arrange tiles — move + resize'}
+          {arranging ? 'Done arranging' : 'Arrange tiles — drag + resize'}
         </button>
 
         {/* ── greeting ── */}
