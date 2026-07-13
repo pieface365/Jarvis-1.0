@@ -533,12 +533,11 @@ function Dock({ activeId, onSelect }: { activeId: string; onSelect: (id: string)
         </svg>
       ),
     },
-    ...SLOT_ORDER.map((id) => ({
+    // vee + brand intentionally left off the dock (still reachable from the grid)
+    ...SLOT_ORDER.filter((id) => id !== 'vee' && id !== 'brand').map((id) => ({
       id,
-      label: id === 'vee' ? VEE_TILE.label : CORE_TILES[id as keyof typeof CORE_TILES].label,
-      icon: id === 'vee'
-        ? <span style={{ fontFamily: 'Georgia, serif', fontStyle: 'italic', fontSize: 15, lineHeight: 1 }}>V</span>
-        : CORE_TILES[id as keyof typeof CORE_TILES].glyph,
+      label: CORE_TILES[id as keyof typeof CORE_TILES].label,
+      icon: CORE_TILES[id as keyof typeof CORE_TILES].glyph,
     })),
   ]
   return (
