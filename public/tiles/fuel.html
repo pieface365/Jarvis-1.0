@@ -36,6 +36,10 @@
   .fieldInput{background:var(--bg);border:1px solid var(--border);color:var(--fg);border-radius:10px;padding:9px 11px;font:inherit}
   .fieldInput:focus{outline:none;border-color:var(--brand)}
   .goalEdit .fieldInput{width:92px}
+  .planTop{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+  .planMeal{border:1px solid var(--border);border-radius:12px;background:var(--bg);padding:12px 14px;margin-bottom:10px}
+  .planHead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+  .planItems{margin-top:7px;line-height:1.6}
   .bar{height:10px;border-radius:var(--radius-pill);background:var(--track);overflow:hidden}
   .barFill{height:100%;border-radius:var(--radius-pill);background:var(--brand);transition:width var(--duration) ease}
   .barFill.over{background:var(--neg)}
@@ -79,15 +83,46 @@ const FOODS=[
   {name:'Almonds',cal:579,p:21,c:22,f:50},{name:'Peanut butter',cal:588,p:25,c:20,f:50},
   {name:'Olive oil',cal:884,p:0,c:0,f:100},{name:'Avocado',cal:160,p:2,c:9,f:15},
   {name:'Cheddar cheese',cal:402,p:25,c:1.3,f:33},{name:'Milk (whole)',cal:61,p:3.2,c:4.8,f:3.3},
-  {name:'Bread (slice)',cal:265,p:9,c:49,f:3.2},{name:'Tuna (canned)',cal:116,p:26,c:0,f:1}
+  {name:'Bread (slice)',cal:265,p:9,c:49,f:3.2},{name:'Tuna (canned)',cal:116,p:26,c:0,f:1},
+  {name:'Tofu (extra-firm)',cal:90,p:10,c:2,f:5},
+  {name:'Gold Standard Whey (Vanilla)',cal:395,p:79,c:10,f:5}
 ];
+
+/* ---- the meal plan: chicken/tofu recomp day ------------------------
+   139 lb · 5'11" · ~20-25% BF (skinny-fat pattern) · trains 6 days/week.
+   Strategy is RECOMP, not a hard cut: ~2,300-2,400 kcal (a whisper under
+   maintenance for this training load), protein pinned high so the face/
+   stomach fat drains while lifting adds muscle. One scoop = 31g whey. */
+const PLAN_TARGET = { cal:2400, p:150 };
+function planProtein(){ return store.planProtein==='tofu' ? 'tofu' : 'chicken'; }
+function planMeals(){
+  const t = planProtein()==='tofu';
+  const main = t ? ['Tofu (extra-firm)',275] : ['Chicken breast',150];
+  return [
+    { name:'Breakfast — vanilla protein oats', when:'~8:00',
+      items:[['Oats',70],['Gold Standard Whey (Vanilla)',31],['Banana',100],['Peanut butter',15]] },
+    { name:'Lunch — '+(t?'tofu':'chicken')+' rice bowl', when:'~12:30',
+      items:[main,['White rice',250],['Broccoli',150],['Olive oil',8]] },
+    { name:'Snack — yogurt + fruit', when:'pre-train',
+      items:[['Greek yogurt',170],['Apple',150]] },
+    { name:'Dinner — '+(t?'tofu':'chicken')+' + sweet potato', when:'post-train',
+      items:[main,['Sweet potato',300],['Broccoli',150],['Olive oil',8]] },
+    { name:'Evening — vanilla shake + almonds', when:'before bed',
+      items:[['Gold Standard Whey (Vanilla)',31],['Almonds',15]] },
+  ];
+}
+function foodByName(n){ return FOODS.find(f=>f.name===n); }
+function mealTotals(meal){
+  return meal.items.reduce((s,[n,g])=>{ const f=foodByName(n); if(!f) return s; const k=g/100;
+    s.cal+=f.cal*k; s.p+=f.p*k; s.c+=f.c*k; s.f+=f.f*k; return s; },{cal:0,p:0,c:0,f:0});
+}
 let store={};
 const $=id=>document.getElementById(id);
 function todayKey(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function persist(){window.Vitality.save(store);}
 function todaysLog(){return store[todayKey()]||[];}
 function setTodaysLog(l){store[todayKey()]=l;persist();}
-function goalCal(){return store.goalCal!=null?store.goalCal:2000;}
+function goalCal(){return store.goalCal!=null?store.goalCal:PLAN_TARGET.cal;}
 function setGoalCal(n){store.goalCal=n;persist();}
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 const round=n=>Math.round(n);
@@ -116,8 +151,25 @@ function logHtml(){
   const rows=log.map((e,i)=>'<div class="logRow"><div><div class="foodName">'+esc(e.name)+' <span class="meta">'+e.grams+'g</span></div><div class="nums">'+round(e.cal)+' kcal · '+round(e.p)+'P / '+round(e.c)+'C / '+round(e.f)+'F</div></div><button class="xBtn" data-del="'+i+'" title="Remove">×</button></div>').join('');
   return '<h2 class="sectionTitle">Logged today</h2><div class="logList">'+rows+'</div>';
 }
+function planHtml(){
+  const meals=planMeals();
+  const day=meals.reduce((s,m)=>{ const t=mealTotals(m); s.cal+=t.cal; s.p+=t.p; s.c+=t.c; s.f+=t.f; return s; },{cal:0,p:0,c:0,f:0});
+  const chip=(k,l)=>'<button class="btn'+(planProtein()===k?' btn-primary':'')+'" data-planprot="'+k+'" style="padding:6px 14px;font-size:12px">'+l+'</button>';
+  const rows=meals.map((m,i)=>{
+    const t=mealTotals(m);
+    return '<div class="planMeal"><div class="planHead"><div><div class="foodName">'+esc(m.name)+'</div>'
+      +'<div class="meta">'+esc(m.when)+' · '+round(t.cal)+' kcal · '+round(t.p)+'P / '+round(t.c)+'C / '+round(t.f)+'F</div></div>'
+      +'<button class="btn btn-primary" data-logmeal="'+i+'" style="white-space:nowrap">log it</button></div>'
+      +'<div class="meta planItems">'+m.items.map(([n,g])=>esc(n)+' '+g+'g').join(' · ')+'</div></div>';
+  }).join('');
+  return '<section class="card"><span class="cardName">Meal plan — recomp day</span>'
+    +'<div class="planTop"><div class="meta">Primary protein:</div>'+chip('chicken','Chicken')+chip('tofu','Tofu')+'</div>'
+    + rows
+    +'<div class="meta" style="margin-top:10px">Plan totals: <b style="color:var(--fg)">'+round(day.cal)+' kcal · '+round(day.p)+'g protein</b> / '+round(day.c)+'C / '+round(day.f)+'F — target ≤'+PLAN_TARGET.cal+' kcal, ≥'+PLAN_TARGET.p+'g protein. Tap "log it" as you eat each meal; swap or resize anything in Add food.'+(planProtein()==='tofu'?' Tofu day runs lower-protein — the two shakes cover the gap.':'')+'</div>'
+    +'</section>';
+}
 function headerHtml(){return '<header class="header"><h1 class="title">Fuel</h1><p class="subtitle">protein · carbs · fat</p></header>';}
-function render(){$('app').innerHTML=headerHtml()+summaryHtml()+searchHtml()+logHtml();}
+function render(){$('app').innerHTML=headerHtml()+summaryHtml()+planHtml()+searchHtml()+logHtml();}
 document.addEventListener('input',e=>{
   if(e.target.id==='q'){query=e.target.value;$('results').innerHTML=resultsInner();$('hint').textContent='';}
   if(e.target.id==='goal'){const n=Number(e.target.value);setGoalCal(isFinite(n)&&n>=0?n:0);render();$('goal').focus();}
@@ -134,7 +186,18 @@ document.addEventListener('click',e=>{
     setTodaysLog(log);query='';render();return;
   }
   const del=e.target.closest('[data-del]');
-  if(del){const log=todaysLog();log.splice(Number(del.getAttribute('data-del')),1);setTodaysLog(log);render();}
+  if(del){const log=todaysLog();log.splice(Number(del.getAttribute('data-del')),1);setTodaysLog(log);render();return;}
+  const pp=e.target.closest('[data-planprot]');
+  if(pp){store.planProtein=pp.getAttribute('data-planprot');persist();render();return;}
+  const lm=e.target.closest('[data-logmeal]');
+  if(lm){
+    const meal=planMeals()[Number(lm.getAttribute('data-logmeal'))];
+    if(!meal)return;
+    const log=todaysLog();
+    meal.items.forEach(([n,g])=>{ const f=foodByName(n); if(!f)return; const k=g/100;
+      log.push({name:f.name,grams:g,cal:f.cal*k,p:f.p*k,c:f.c*k,f:f.f*k}); });
+    setTodaysLog(log);render();
+  }
 });
 (async()=>{const d=await window.Vitality.load();store=(d&&typeof d==='object'&&!Array.isArray(d))?d:{};render();})();
 </script>
