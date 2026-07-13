@@ -95,7 +95,12 @@ const FOODS=[
   {name:'Cheddar cheese',cal:402,p:25,c:1.3,f:33},{name:'Milk (whole)',cal:61,p:3.2,c:4.8,f:3.3},
   {name:'Bread (slice)',cal:265,p:9,c:49,f:3.2},{name:'Tuna (canned)',cal:116,p:26,c:0,f:1},
   {name:'Tofu (extra-firm)',cal:90,p:10,c:2,f:5},
-  {name:'Gold Standard Whey (Vanilla)',cal:395,p:79,c:10,f:5}
+  {name:'Gold Standard Whey (Vanilla)',cal:395,p:79,c:10,f:5},
+  {name:'Spinach',cal:23,p:2.9,c:3.6,f:0.4},{name:'Bell pepper',cal:31,p:1,c:6,f:0.3},
+  {name:'Green beans',cal:31,p:1.8,c:7,f:0.2},{name:'Zucchini',cal:17,p:1.2,c:3.1,f:0.3},
+  {name:'Carrots',cal:41,p:0.9,c:10,f:0.2},{name:'Cucumber',cal:15,p:0.7,c:3.6,f:0.1},
+  {name:'Salad greens',cal:17,p:1.5,c:3,f:0.2},{name:'Mushrooms',cal:22,p:3.1,c:3.3,f:0.3},
+  {name:'Asparagus',cal:20,p:2.2,c:3.9,f:0.1},{name:'Edamame',cal:121,p:11,c:9,f:5}
 ];
 
 /* ---- the weekly meal schedule (Train-style day tabs) ----------------
@@ -110,49 +115,53 @@ const WEEK=['mon','tue','wed','thu','fri','sat','sun'];
 const DAY_LABEL={mon:'Mon',tue:'Tue',wed:'Wed',thu:'Thu',fri:'Fri',sat:'Sat',sun:'Sun'};
 const DAY_TYPE={mon:'lift',tue:'climb',wed:'lift',thu:'climb',fri:'lift',sat:'climb',sun:'rest'};
 const DAY_FOCUS={lift:'Lift day — training fuel',climb:'Climb day — carbs up for the wall',rest:'Rest day — lightest, protein stays'};
-function planTypeMeals(type){
-  if(type==='climb') return [
-    { id:'m1', name:'Breakfast — vanilla protein oats', when:'~8:00',
-      items:[['Oats',70],['Gold Standard Whey (Vanilla)',31],['Banana',100],['Peanut butter',15]] },
-    { id:'m2', name:'Lunch — @main pasta bowl', when:'~12:30',
-      items:[['@main',150],['Pasta (cooked)',250],['Broccoli',150],['Olive oil',8]] },
-    { id:'m3', name:'Pre-climb — quick carbs', when:'45 min before',
-      items:[['Banana',100],['Peanut butter',15]] },
-    { id:'m4', name:'Post-climb dinner — @main + potatoes', when:'after the gym',
-      items:[['@main',150],['Potato',350],['Broccoli',150],['Olive oil',8]] },
-    { id:'m5', name:'Evening — vanilla shake + yogurt', when:'before bed',
-      items:[['Gold Standard Whey (Vanilla)',31],['Greek yogurt',170]] },
-  ];
-  if(type==='rest') return [
-    { id:'m1', name:'Breakfast — yogurt whey bowl', when:'~9:00',
-      items:[['Greek yogurt',200],['Gold Standard Whey (Vanilla)',31],['Banana',100]] },
-    { id:'m2', name:'Lunch — @main avocado plate', when:'~13:00',
-      items:[['@main',150],['Avocado',70],['Broccoli',150],['Olive oil',8]] },
-    { id:'m3', name:'Snack — apple + almonds', when:'afternoon',
-      items:[['Apple',150],['Almonds',20]] },
-    { id:'m4', name:'Dinner — @main + sweet potato', when:'evening',
-      items:[['@main',150],['Sweet potato',300],['Broccoli',150],['Olive oil',8]] },
-    { id:'m5', name:'Evening — yogurt + peanut butter', when:'before bed',
-      items:[['Greek yogurt',170],['Peanut butter',15]] },
-  ];
-  return [ /* lift */
-    { id:'m1', name:'Breakfast — vanilla protein oats', when:'~8:00',
-      items:[['Oats',70],['Gold Standard Whey (Vanilla)',31],['Banana',100],['Peanut butter',15]] },
-    { id:'m2', name:'Lunch — @main rice bowl', when:'~12:30',
-      items:[['@main',150],['White rice',250],['Broccoli',150],['Olive oil',8]] },
-    { id:'m3', name:'Snack — yogurt + fruit', when:'pre-train',
-      items:[['Greek yogurt',170],['Apple',150]] },
-    { id:'m4', name:'Dinner — @main + sweet potato', when:'post-train',
-      items:[['@main',150],['Sweet potato',300],['Broccoli',150],['Olive oil',8]] },
-    { id:'m5', name:'Evening — vanilla shake + almonds', when:'before bed',
-      items:[['Gold Standard Whey (Vanilla)',31],['Almonds',15]] },
+/* Lunch + dinner rotate through the week (new combo every 2-3 days, two
+   veg per plate); breakfasts and snacks stay stable for easy prep. */
+const DAY_LD={
+  mon:{ lunch:{ name:'Lunch — @main rice bowl, broccoli + carrots', items:[['@main',150],['White rice',250],['Broccoli',100],['Carrots',100],['Olive oil',8]] },
+        dinner:{ name:'Dinner — @main, sweet potato + green beans', items:[['@main',150],['Sweet potato',300],['Green beans',150],['Olive oil',8]] } },
+  tue:{ lunch:{ name:'Lunch — @main pasta, spinach + zucchini', items:[['@main',150],['Pasta (cooked)',250],['Spinach',100],['Zucchini',150],['Olive oil',8]] },
+        dinner:{ name:'Post-climb — @main, potatoes, peppers + mushrooms', items:[['@main',150],['Potato',350],['Bell pepper',100],['Mushrooms',100],['Olive oil',8]] } },
+  wed:{ lunch:{ name:'Lunch — @main fajita bowl (peppers + avocado)', items:[['@main',150],['White rice',250],['Bell pepper',150],['Avocado',50],['Olive oil',5]] },
+        dinner:{ name:'Dinner — @main pasta, mushrooms + spinach', items:[['@main',150],['Pasta (cooked)',200],['Mushrooms',100],['Spinach',100],['Olive oil',8]] } },
+  thu:{ lunch:{ name:'Lunch — @main rice bowl, edamame + cucumber', items:[['@main',150],['White rice',230],['Edamame',75],['Cucumber',100],['Olive oil',8]] },
+        dinner:{ name:'Post-climb — @main pasta, zucchini + mushrooms', items:[['@main',150],['Pasta (cooked)',210],['Zucchini',150],['Mushrooms',100],['Olive oil',8]] } },
+  fri:{ lunch:{ name:'Lunch — @main stir-fry rice, green beans + mushrooms', items:[['@main',150],['White rice',250],['Green beans',100],['Mushrooms',100],['Olive oil',8]] },
+        dinner:{ name:'Dinner — @main, sweet potato + asparagus', items:[['@main',150],['Sweet potato',300],['Asparagus',150],['Olive oil',8]] } },
+  sat:{ lunch:{ name:'Lunch — @main pasta, peppers + spinach', items:[['@main',150],['Pasta (cooked)',250],['Bell pepper',100],['Spinach',100],['Olive oil',8]] },
+        dinner:{ name:'Post-climb — @main, potatoes, carrots + green beans', items:[['@main',150],['Potato',350],['Carrots',100],['Green beans',100],['Olive oil',8]] } },
+  sun:{ lunch:{ name:'Lunch — @main big salad (greens, cucumber, peppers, avocado)', items:[['@main',150],['Salad greens',100],['Cucumber',100],['Bell pepper',100],['Avocado',70],['Olive oil',8]] },
+        dinner:{ name:'Dinner — @main, sweet potato + asparagus', items:[['@main',150],['Sweet potato',250],['Asparagus',150],['Olive oil',8]] } },
+};
+function planDayMeals(k){
+  const type=DAY_TYPE[k];
+  const bfast = type==='rest'
+    ? { id:'m1', name:'Breakfast — yogurt whey bowl', when:'~9:00', items:[['Greek yogurt',200],['Gold Standard Whey (Vanilla)',31],['Banana',100]] }
+    : { id:'m1', name:'Breakfast — vanilla protein oats', when:'~8:00', items:[['Oats',70],['Gold Standard Whey (Vanilla)',31],['Banana',100],['Peanut butter',15]] };
+  const snack = type==='climb'
+    ? { id:'m3', name:'Pre-climb — quick carbs', when:'45 min before', items:[['Banana',100],['Peanut butter',15]] }
+    : type==='rest'
+      ? { id:'m3', name:'Snack — apple + almonds', when:'afternoon', items:[['Apple',150],['Almonds',20]] }
+      : { id:'m3', name:'Snack — yogurt + fruit', when:'pre-train', items:[['Greek yogurt',170],['Apple',150]] };
+  const evening = type==='climb'
+    ? { id:'m5', name:'Evening — vanilla shake + yogurt', when:'before bed', items:[['Gold Standard Whey (Vanilla)',31],['Greek yogurt',170]] }
+    : type==='rest'
+      ? { id:'m5', name:'Evening — yogurt + peanut butter', when:'before bed', items:[['Greek yogurt',170],['Peanut butter',15]] }
+      : { id:'m5', name:'Evening — vanilla shake + almonds', when:'before bed', items:[['Gold Standard Whey (Vanilla)',31],['Almonds',15]] };
+  const ld=DAY_LD[k];
+  return [
+    bfast,
+    { id:'m2', when:'~12:30', ...ld.lunch },
+    snack,
+    { id:'m4', when:(type==='climb'?'after the gym':type==='lift'?'post-train':'evening'), ...ld.dinner },
+    evening,
   ];
 }
-const PLAN_V=1;
+const PLAN_V=2;
 function ensurePlan(){
   if(store.plan && store.plan.v===PLAN_V) return;
   const days={};
-  WEEK.forEach(k=>{ days[k]={ meals: planTypeMeals(DAY_TYPE[k]) }; });
+  WEEK.forEach(k=>{ days[k]={ meals: planDayMeals(k) }; });
   store.plan={ v:PLAN_V, days };
   persist();
 }
