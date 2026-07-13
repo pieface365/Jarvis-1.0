@@ -30,7 +30,7 @@
   .cardName{font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:14px}
 
   /* entry form */
-  .entryGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  .entryGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:10px}
   @media(max-width:560px){.entryGrid{grid-template-columns:repeat(2,1fr)}}
   .field{display:flex;flex-direction:column;gap:6px}
   .fLabel{font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
@@ -188,7 +188,7 @@ function fmtHM(h){ if(h==null)return '—'; const hh=Math.floor(h),mm=Math.round
 function entries(){
   return Object.keys(store).filter(k=>/^\d{4}-\d{2}-\d{2}$/.test(k)).sort().map(k=>{
     const e=store[k]||{};
-    return {dateKey:k,hrv:num(e.hrv),rhr:num(e.rhr),sleepHours:num(e.sleepHours),sleepPerf:num(e.sleepPerf),feel:(typeof e.feel==='number'?e.feel:null),recovery:estRecovery(e)};
+    return {dateKey:k,hrv:num(e.hrv),rhr:num(e.rhr),sleepHours:num(e.sleepHours),sleepPerf:num(e.sleepPerf),feel:(typeof e.feel==='number'?e.feel:null),weight:num(e.weight),recovery:estRecovery(e)};
   });
 }
 
@@ -258,7 +258,7 @@ document.addEventListener('pointerout',e=>{
 });
 
 /* ---------- metric charts + the correlation finder ---------- */
-const CHART_TABS=[['trend','Overview'],['hrv','HRV'],['rhr','Resting HR'],['sleep','Sleep'],['corr','Correlation']];
+const CHART_TABS=[['trend','Overview'],['hrv','HRV'],['rhr','Resting HR'],['sleep','Sleep'],['weight','Weight'],['corr','Correlation']];
 
 /* one metric over the range: line + dots + latest/range caption */
 function metricChart(key,color,unit,fmt){
@@ -338,6 +338,7 @@ function chartBody(){
   if(chartTab==='hrv') return metricChart('hrv','#6EE7B7','ms');
   if(chartTab==='rhr') return metricChart('rhr','#e06a6c','bpm',v=>Math.round(v));
   if(chartTab==='sleep') return metricChart('sleepHours','#B794F6','h');
+  if(chartTab==='weight') return metricChart('weight','#F5B044','lb');
   if(chartTab==='corr') return corrChart();
   return chartSvg();
 }
@@ -404,6 +405,7 @@ function entryHtml(){
     + f('in-rhr','Resting HR · bpm','—','1')
     + f('in-sleepHours','Sleep · hours','—','0.1')
     + f('in-sleepPerf','Sleep score · %','—','1')
+    + f('in-weight','Weight · lb','—','0.1')
     + '</div><div class="hint" id="hint">'+(isToday
       ? 'Fill in what your band or app shows — recovery is estimated from HRV, resting HR and sleep.'
       : 'Editing a past day — every value (and the feel tap below) writes to '+fmtEditDate()+'. Charts update live.')+'</div></section>';
@@ -531,7 +533,7 @@ document.addEventListener('input',e=>{
        synced values) survive an edit; writes go to the SELECTED day */
     const k0=editDate||todayKey();
     const e2={...(store[k0]||{})};
-    ['hrv','rhr','sleepHours','sleepPerf'].forEach(k=>{const v=num($('in-'+k).value); if(v!=null)e2[k]=v; else delete e2[k];});
+    ['hrv','rhr','sleepHours','sleepPerf','weight'].forEach(k=>{const v=num($('in-'+k).value); if(v!=null)e2[k]=v; else delete e2[k];});
     store[k0]=e2;
     persist();
     renderOutput();
