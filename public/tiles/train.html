@@ -179,8 +179,8 @@
   .ex > * { position:relative; z-index:1; }
 
   .exHead { display:flex; align-items:center; gap:9px; }
-  .grip { flex:none; width:20px; height:26px; display:grid; place-items:center; color: rgba(255,255,255,.22); cursor:grab; touch-action:none; background:none; border:none; padding:0; }
-  .grip:hover { color: var(--muted); }
+  .grip { flex:none; width:20px; height:26px; display:grid; place-items:center; color: rgba(255,255,255,.45); cursor:grab; touch-action:none; background:none; border:none; padding:0; }
+  .grip:hover { color: var(--text); }
   .grip.dragging { cursor:grabbing; }
   .grip svg { width:14px; height:14px; fill: currentColor; }
   .exEye { flex:none; display:inline-flex; align-items:center; justify-content:center; background:none; border:none; cursor:pointer; color: var(--muted); width:24px; height:24px; transition: color .15s; }
@@ -1086,14 +1086,27 @@ function wireDrag(card, e, day){
   grip.addEventListener('pointerdown', ev=>{
     if(e.pinned){ return; } // pinned lifts hold the top
     ev.preventDefault(); grip.classList.add('dragging'); card.classList.add('drag-ghost');
-    const wrap=$('#exwrap'); const cards=[...wrap.querySelectorAll('.ex')];
-    const move=mev=>{ const y=mev.clientY; let target=null; cards.forEach(c=>{ if(c===card) return; const r=c.getBoundingClientRect(); if(y>r.top && y<r.bottom) target=c; }); if(target){ const r=target.getBoundingClientRect(); const after = y > r.top + r.height/2; wrap.insertBefore(card, after?target.nextSibling:target); } };
-    const up=()=>{ grip.classList.remove('dragging'); card.classList.remove('drag-ghost'); document.removeEventListener('pointermove',move); document.removeEventListener('pointerup',up);
+    const wrap=$('#exwrap');
+    /* same system as the vitals cards: a ghost follows the pointer while the
+       live list reorders underneath */
+    const r=card.getBoundingClientRect();
+    const ghost=card.cloneNode(true);
+    ghost.style.cssText='position:fixed;left:'+r.left+'px;top:'+r.top+'px;width:'+r.width+'px;margin:0;z-index:95;pointer-events:none;opacity:.95;background:var(--card);border:1px solid var(--hair);border-radius:14px;padding:12px 16px;box-shadow:0 18px 50px rgba(0,0,0,.6);';
+    document.body.appendChild(ghost);
+    const sx=ev.clientX, sy=ev.clientY;
+    const move=mev=>{
+      ghost.style.transform='translate('+(mev.clientX-sx)+'px,'+(mev.clientY-sy)+'px)';
+      const y=mev.clientY; let target=null;
+      [...wrap.querySelectorAll('.ex')].forEach(c=>{ if(c===card) return; const cr=c.getBoundingClientRect(); if(y>cr.top && y<cr.bottom) target=c; });
+      if(target){ const cr=target.getBoundingClientRect(); const after = y > cr.top + cr.height/2; wrap.insertBefore(card, after?target.nextSibling:target); }
+    };
+    const up=()=>{ ghost.remove(); grip.classList.remove('dragging'); card.classList.remove('drag-ghost');
+      document.removeEventListener('pointermove',move); document.removeEventListener('pointerup',up); document.removeEventListener('pointercancel',up);
       // commit new order to the day array (respecting pins at top)
       const ids=[...wrap.querySelectorAll('.ex')].map(c=>c.dataset.id);
       day.ex.sort((a,b)=> ids.indexOf(a.id)-ids.indexOf(b.id));
       render(); };
-    document.addEventListener('pointermove',move); document.addEventListener('pointerup',up);
+    document.addEventListener('pointermove',move); document.addEventListener('pointerup',up); document.addEventListener('pointercancel',up);
   });
 }
 
