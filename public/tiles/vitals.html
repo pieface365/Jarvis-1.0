@@ -77,6 +77,12 @@
   .legDot{width:12px;height:3px;border-radius:2px}
   .noteLine{font-size:12px;color:var(--muted);font-style:italic;margin-top:6px;line-height:1.5}
 
+  /* draggable card wrappers — a sheet-handle grip centered at each card's top */
+  .cardWrap{position:relative}
+  .cardGrip{position:absolute;top:0;left:50%;transform:translateX(-50%);z-index:5;background:none;border:none;color:var(--muted);opacity:.45;font-size:13px;letter-spacing:2px;line-height:1;padding:6px 18px;cursor:grab;touch-action:none}
+  .cardGrip:hover{opacity:1;color:var(--fg)}
+  .cardGrip:active{cursor:grabbing}
+
   /* entry date navigator — makes every day's vitals editable */
   .dateNav{display:flex;align-items:center;gap:6px}
   .dnBtn{appearance:none;background:var(--bg);border:1px solid var(--border);color:var(--muted);border-radius:8px;width:28px;height:28px;font-size:16px;line-height:1;cursor:pointer}
@@ -364,7 +370,7 @@ function entryHtml(){
       ? 'Fill in what your band or app shows — recovery is estimated from HRV, resting HR and sleep.'
       : 'Editing a past day — every value (and the feel tap below) writes to '+fmtEditDate()+'. Charts update live.')+'</div></section>';
 }
-function outputHtml(){
+function heroHtml(){
   const h=todaysEntry();
   const rec=estRecovery(h);
   const t=tone(rec);
@@ -379,7 +385,7 @@ function outputHtml(){
   const sleepRing=hasSleep
     ? ringWrap(sp,sleepTone(sp),'Sleep',typeof h.sleepHours==='number'?fmtHM(h.sleepHours):'')
     : ringWrap(null,'muted','Sleep','');
-  const hero='<section class="card"><span class="cardName">Today</span>'
+  return '<section class="card"><span class="cardName">Today</span>'
     +'<div class="hero">'+recRing+sleepRing+'</div>'
     +'<div class="statusBlock"><div class="statusWord" data-tone="'+t+'">'+statusWord+'</div><p class="statusLine">'+statusLine+'</p></div>'
     +'<div class="statRow">'
@@ -387,21 +393,98 @@ function outputHtml(){
     +'<div class="stat"><div class="statLabel">Resting HR</div><div class="statVal">'+(typeof h.rhr==='number'?Math.round(h.rhr)+'<small> bpm</small>':'—')+'</div></div>'
     +'<div class="stat"><div class="statLabel">Sleep</div><div class="statVal">'+(typeof h.sleepHours==='number'?fmtHM(h.sleepHours):'—')+'</div></div>'
     +'</div></section>';
-  const trends='<section class="card"><div class="chartHead"><span class="cardName" style="margin:0">Trends</span>'
+}
+function trendsHtml(){
+  return '<section class="card"><div class="chartHead"><span class="cardName" style="margin:0">Trends</span>'
     +'<div class="seg">'+[7,14,30].map(n=>'<button class="segBtn '+(range===n?'on':'')+'" data-range="'+n+'">'+n+'d</button>').join('')+'</div></div>'
     +'<div class="chartTabs">'+CHART_TABS.map(([k,l])=>'<button class="ctab'+(chartTab===k?' on':'')+'" data-charttab="'+k+'">'+l+'</button>').join('')+'</div>'
     + chartBody() + '</section>';
-  const guide='<section class="card"><span class="cardName">Today\'s guidance</span>'
+}
+function guideHtml(){
+  const h=todaysEntry();
+  const rec=estRecovery(h);
+  return '<section class="card"><span class="cardName">Today\'s guidance</span>'
     + tips(rec,h).map(x=>'<div class="tip"><span class="tipIcon">'+x[0]+'</span><span class="tipText">'+x[1]+'</span></div>').join('')
     +'</section>';
-  return feelHtml()+hero+trends+feelChartHtml()+guide;
 }
-function renderOutput(){$('out').innerHTML=outputHtml();}
+
+/* ---------- draggable card layout ----------
+   Every card lives in a [data-card] wrapper with a grip; the order persists in
+   the store under _cardOrder (non-date key — entries() date-filters, so the
+   data paths never see it). */
+const CARD_KEYS=['entry','feel','today','trends','felt','guide'];
+function cardHtml(k){
+  if(k==='entry') return entryHtml();
+  if(k==='feel') return feelHtml();
+  if(k==='today') return heroHtml();
+  if(k==='trends') return trendsHtml();
+  if(k==='felt') return feelChartHtml();
+  return guideHtml();
+}
+function cardOrder(){
+  const saved=Array.isArray(store._cardOrder)?store._cardOrder:[];
+  const out=[]; const seen={};
+  saved.forEach(k=>{ if(CARD_KEYS.includes(k)&&!seen[k]){ out.push(k); seen[k]=1; } });
+  CARD_KEYS.forEach(k=>{ if(!seen[k]) out.push(k); });
+  return out;
+}
+function renderOutput(){
+  /* refresh every card EXCEPT the entry inputs (typing keeps focus) */
+  cardOrder().forEach(k=>{
+    if(k==='entry') return;
+    const w=document.querySelector('[data-card="'+k+'"] .cardBody');
+    if(w) w.innerHTML=cardHtml(k);
+  });
+}
 function render(){
-  $('app').innerHTML='<header class="header"><h1 class="title">Vitals</h1><p class="subtitle">readiness · sleep · trends</p></header>'
-    + entryHtml() + '<div id="out"></div>';
-  renderOutput();
+  $('app').innerHTML='<header class="header"><h1 class="title">Vitals</h1><p class="subtitle">readiness · sleep · trends — drag ⠿ to reorder</p></header>'
+    + cardOrder().map(k=>'<div class="cardWrap" data-card="'+k+'">'
+        +'<button class="cardGrip" data-grip="'+k+'" aria-label="Drag to reorder" title="Drag to reorder">&#10495;</button>'
+        +'<div class="cardBody">'+cardHtml(k)+'</div></div>').join('');
 }
+
+/* card drag & drop: ghost follows the pointer; hovering another card reorders */
+let cardDrag=null;
+document.addEventListener('pointerdown',e=>{
+  const g=e.target.closest('[data-grip]');
+  if(!g||cardDrag) return;
+  e.preventDefault();
+  const k=g.getAttribute('data-grip');
+  const wrap=document.querySelector('[data-card="'+k+'"]');
+  const r=wrap.getBoundingClientRect();
+  const ghost=wrap.cloneNode(true);
+  ghost.style.cssText='position:fixed;left:'+r.left+'px;top:'+r.top+'px;width:'+r.width+'px;margin:0;z-index:90;pointer-events:none;opacity:.92;transform:scale(1.01);box-shadow:0 18px 50px rgba(0,0,0,.6);';
+  document.body.appendChild(ghost);
+  wrap.style.opacity='.3';
+  cardDrag={k,ghost,wrap,sx:e.clientX,sy:e.clientY,last:null};
+});
+document.addEventListener('pointermove',e=>{
+  const d=cardDrag; if(!d) return;
+  d.ghost.style.transform='translate('+(e.clientX-d.sx)+'px,'+(e.clientY-d.sy)+'px) scale(1.01)';
+  const under=document.elementsFromPoint(e.clientX,e.clientY).find(n=>n.getAttribute&&n.getAttribute('data-card')&&n.getAttribute('data-card')!==d.k);
+  const target=under?under.getAttribute('data-card'):null;
+  if(target&&target!==d.last){
+    d.last=target;
+    const cur=cardOrder();
+    cur.splice(cur.indexOf(d.k),1);
+    cur.splice(cur.indexOf(target),0,d.k);
+    store._cardOrder=cur; persist();
+    /* re-render and re-dim the dragged card (render rebuilds the DOM) */
+    render();
+    const w=document.querySelector('[data-card="'+d.k+'"]');
+    if(w){ w.style.opacity='.3'; d.wrap=w; }
+  }
+  if(!target) d.last=null;
+});
+function endCardDrag(){
+  const d=cardDrag; if(!d) return;
+  d.ghost.remove();
+  const w=document.querySelector('[data-card="'+d.k+'"]');
+  if(w) w.style.opacity='';
+  cardDrag=null;
+}
+document.addEventListener('pointerup',endCardDrag);
+document.addEventListener('pointercancel',endCardDrag);
 
 /* entry inputs stay mounted (never re-rendered) so focus is preserved */
 document.addEventListener('input',e=>{
