@@ -115,20 +115,6 @@
   .tipIcon{font-size:18px;flex-shrink:0;line-height:1.4}
   .tipText{font-size:13.5px;line-height:1.5;color:var(--muted-strong)}
   .tipText b{color:var(--fg)}
-
-  /* top summary banner — fixed above the draggable cards: what happened
-     today + what to focus on, at a glance */
-  .summaryBar{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border-radius:var(--radius-lg);border:1px solid var(--border);background:var(--surface);margin-bottom:18px}
-  .summaryBar[data-tone="good"]{border-color:rgba(110,231,183,.4);background:rgba(110,231,183,.05)}
-  .summaryBar[data-tone="watch"]{border-color:rgba(245,196,81,.4);background:rgba(245,196,81,.05)}
-  .summaryBar[data-tone="low"]{border-color:rgba(255,107,107,.4);background:rgba(255,107,107,.05)}
-  .sumDot{flex:none;width:10px;height:10px;border-radius:50%;margin-top:5px;background:var(--muted)}
-  .summaryBar[data-tone="good"] .sumDot{background:var(--pos);box-shadow:0 0 10px rgba(110,231,183,.6)}
-  .summaryBar[data-tone="watch"] .sumDot{background:var(--warn);box-shadow:0 0 10px rgba(245,196,81,.5)}
-  .summaryBar[data-tone="low"] .sumDot{background:var(--neg);box-shadow:0 0 10px rgba(255,107,107,.5)}
-  .sumBody{flex:1;min-width:0}
-  .sumOccurred{font-size:13.5px;color:var(--muted-strong);line-height:1.5}
-  .sumFocus{font-size:14px;color:var(--fg);line-height:1.5;margin-top:6px}
   @media (prefers-reduced-motion:reduce){.recRing::before{animation:none}.recFill{transition:none}}
 </style>
 </head>
@@ -197,12 +183,6 @@ function estRecovery(h){
 function tone(r){ if(r==null)return 'muted'; if(r>=67)return 'good'; if(r>=34)return 'watch'; return 'low'; }
 function sleepTone(p){ if(p==null)return 'muted'; if(p>=85)return 'good'; if(p>=60)return 'watch'; return 'low'; }
 function fmtHM(h){ if(h==null)return '—'; const hh=Math.floor(h),mm=Math.round((h-hh)*60); return hh+'h '+String(mm).padStart(2,'0')+'m'; }
-
-/* the weekly training shape, mirrored locally (same pattern as Fuel's
-   DAY_TYPE) — sealed tiles don't reach across into Train's program, so we
-   keep a tiny copy just for "climb / lift / rest" context in the summary. */
-const DAY_TYPE={0:'rest',1:'climb',2:'lift',3:'climb',4:'lift',5:'climb',6:'lift'}; /* Date.getDay(): 0=Sun */
-function dayType(){ return DAY_TYPE[new Date().getDay()]; }
 
 /* every dated entry, oldest -> newest, with derived recovery */
 function entries(){
@@ -430,37 +410,6 @@ function entryHtml(){
       ? 'Fill in what your band or app shows — recovery is estimated from HRV, resting HR and sleep.'
       : 'Editing a past day — every value (and the feel tap below) writes to '+fmtEditDate()+'. Charts update live.')+'</div></section>';
 }
-/* ---------- top summary banner ---------- */
-function summarizeOccurred(h){
-  const bits=[];
-  if(typeof h.sleepHours==='number') bits.push('slept '+fmtHM(h.sleepHours));
-  else if(typeof h.sleepPerf==='number') bits.push('sleep score '+Math.round(h.sleepPerf)+'%');
-  if(typeof h.hrv==='number') bits.push('HRV '+Math.round(h.hrv)+'ms');
-  if(typeof h.rhr==='number') bits.push('resting HR '+Math.round(h.rhr)+'bpm');
-  if(typeof h.feel==='number') bits.push('felt '+FEELS[h.feel].toLowerCase());
-  if(!bits.length) return 'Nothing logged yet today — add HRV, sleep or a feel tap below for a real readiness read.';
-  const s=bits.join(', ')+'.';
-  return s.charAt(0).toUpperCase()+s.slice(1);
-}
-function summarizeFocus(rec,t,dt,h){
-  if(rec==null) return 'Log today’s vitals above to get a tailored recovery read.';
-  if(dt==='rest') return t==='low' ? 'Full rest — recovery is low, so protect it.' : 'Rest day — nothing structured; an easy walk only if you feel like it.';
-  if(dt==='climb'){
-    if(t==='good') return 'Green light — push the grade on today’s hard attempts.';
-    if(t==='watch') return 'Climb, but keep it technical — save full-send attempts for a fresher day.';
-    return 'Easy jugs and technique only — skip the hard attempts today.';
-  }
-  if(t==='good') return 'Solid day to chase a PR on the main lift.';
-  if(t==='watch') return 'Train, but don’t chase the top-set number today.';
-  return 'Keep the weights light — protect the joints and let HRV recover.';
-}
-function summaryHtml(){
-  const h=todaysEntry(); const rec=estRecovery(h); const t=tone(rec); const dt=dayType();
-  return '<section class="summaryBar" data-tone="'+t+'"><div class="sumDot"></div><div class="sumBody">'
-    + '<div class="sumOccurred">'+summarizeOccurred(h)+'</div>'
-    + '<div class="sumFocus"><b>Focus today —</b> '+summarizeFocus(rec,t,dt,h)+'</div>'
-    + '</div></section>';
-}
 function heroHtml(){
   const h=todaysEntry();
   const rec=estRecovery(h);
@@ -521,7 +470,6 @@ function cardOrder(){
 }
 function renderOutput(){
   /* refresh every card EXCEPT the entry inputs (typing keeps focus) */
-  const sb=document.querySelector('.summaryBar'); if(sb) sb.outerHTML=summaryHtml();
   cardOrder().forEach(k=>{
     if(k==='entry') return;
     const w=document.querySelector('[data-card="'+k+'"] .cardBody');
@@ -530,7 +478,6 @@ function renderOutput(){
 }
 function render(){
   $('app').innerHTML='<header class="header"><h1 class="title">Vitals</h1><p class="subtitle">readiness · sleep · trends — drag ⠿ to reorder</p></header>'
-    + summaryHtml()
     + cardOrder().map(k=>'<div class="cardWrap" data-card="'+k+'">'
         +'<button class="cardGrip" data-grip="'+k+'" aria-label="Drag to reorder" title="Drag to reorder">&#10495;</button>'
         +'<div class="cardBody">'+cardHtml(k)+'</div></div>').join('');
