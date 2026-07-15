@@ -198,6 +198,11 @@
 
   .exMeta { font-size:11px; font-weight:600; color: var(--muted); letter-spacing:.12em; text-transform:uppercase; display:flex; align-items:center; gap:7px; flex-wrap:wrap; padding-left:29px; margin-top:10px; }
   .metaSep { opacity:.4; }
+  /* inline weight/reps editing right on the card — no popup needed */
+  .metaInput { background:transparent; border:none; outline:none; color:inherit; font:inherit; font-weight:700; letter-spacing:inherit; font-variant-numeric: tabular-nums; text-align:center; -moz-appearance:textfield; appearance:textfield; min-width:1.4ch; width:2.2ch; padding:0 1px; border-bottom:1px solid transparent; transition: border-color .15s, color .15s; }
+  .metaInput::-webkit-outer-spin-button, .metaInput::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+  .metaInput:hover { border-bottom-color: rgba(110,231,183,.35); }
+  .metaInput:focus { color: var(--mint); border-bottom-color: var(--mint); }
   .exNote { padding-left:29px; margin-top:9px; font-size:13px; color: var(--muted-strong); font-style:italic; display:flex; gap:7px; align-items:baseline; }
   .exNote .ndot { color: var(--mint); }
   .deloadTag { color: var(--muted-strong); border:1px solid var(--hair); border-radius:4px; padding:1px 6px; font-size:9px; letter-spacing:.12em; }
@@ -950,7 +955,10 @@ function renderCard(e, day){
   const rx=prescription(e);
   const card=document.createElement('div'); card.className='ex'+(e.collapsed?' collapsed':''); card.dataset.id=e.id;
   const tier = TIER_LABEL[e.tier]||('tier '+e.tier);
-  const metaBits = [tier, e.dur ? e.dur : rx.sets+' × '+rx.reps];
+  // weight + reps edit right on the card (sets/rest stay in Tune) — dur-based
+  // items (climbs, timed warm-ups) have no meaningful reps/weight to edit
+  const rxLive = e.dur ? e.dur : (rx.sets+' × <input class="metaInput mr" type="number" inputmode="numeric" min="1" value="'+rx.reps+'" aria-label="Reps" title="Edit reps"> @ <input class="metaInput mw" type="number" inputmode="decimal" step="0.5" min="0" value="'+e.kg+'" aria-label="Weight" title="Edit weight">'+STATE.unit+(e.perHand?'/ea':''));
+  const metaBits = [tier, rxLive];
   if(e.lastKg!=null) metaBits.push('last '+e.lastKg+' '+STATE.unit);
   /* readiness tags — only on the day whose session is actually today */
   const rTier = (day===STATE.days[todayDayKey()]) ? todayTier() : null;
@@ -977,6 +985,22 @@ function renderCard(e, day){
     + '<div class="pills"></div>';
   // header actions
   card.querySelectorAll('[data-act]').forEach(b=>{ b.onclick=(ev)=>{ ev.stopPropagation(); handleAct(b.dataset.act, e, day, b); }; });
+  // inline weight/reps editing — commits (and re-renders) on blur/Enter,
+  // same auto-fit-width pattern as the set pills below
+  const mr=card.querySelector('.metaInput.mr'), mw=card.querySelector('.metaInput.mw');
+  if(mr && mw){
+    const fit=(inp,min)=>{ inp.style.width=Math.max(min, String(inp.value||'').length+0.6)+'ch'; };
+    const fitR=()=>fit(mr,1.4), fitW=()=>fit(mw,2.2);
+    fitR(); fitW();
+    mr.addEventListener('input', fitR); mw.addEventListener('input', fitW);
+    [mr,mw].forEach(inp=>{
+      inp.addEventListener('click', ev=>ev.stopPropagation());
+      inp.addEventListener('pointerdown', ev=>ev.stopPropagation());
+      inp.addEventListener('keydown', ev=>{ if(ev.key==='Enter'){ ev.preventDefault(); inp.blur(); } });
+    });
+    mr.addEventListener('blur', ()=>{ const v=Math.round(parseFloat(mr.value)); if(Number.isFinite(v)&&v>0){ if(v!==e.reps){ e.reps=Math.min(50,v); render(); } } else { mr.value=e.reps; fitR(); } });
+    mw.addEventListener('blur', ()=>{ const v=parseFloat(mw.value); if(Number.isFinite(v)&&v>=0){ if(v!==e.kg){ e.kg=v; render(); } } else { mw.value=e.kg; fitW(); } });
+  }
   // pills
   const pillWrap=card.querySelector('.pills');
   for(let i=0;i<e.log.length;i++) pillWrap.appendChild(renderPill(e, rx, i));
