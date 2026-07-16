@@ -75,6 +75,16 @@
   @keyframes rise { to { opacity: 1; transform: none; } }
   .eyebrow { font-family: var(--vt-mono); text-transform: uppercase; letter-spacing: .2em; font-size: 11px; font-weight: 600; color: var(--muted); }
 
+  /* workout search — types here, opens Google results in a new tab */
+  .searchBar { display:flex; align-items:center; gap:9px; margin-top:14px; padding:9px 12px; background:var(--row); border:1px solid var(--line); border-radius:12px; transition:border-color .15s; }
+  .searchBar:focus-within { border-color: var(--mint); }
+  .searchBar svg { flex:none; width:15px; height:15px; fill:none; stroke:var(--muted); stroke-width:1.7; stroke-linecap:round; }
+  .searchBar input { flex:1; min-width:0; background:none; border:none; outline:none; color:var(--text); font:inherit; font-size:13.5px; }
+  .searchBar input::placeholder { color:var(--muted); font-style:italic; font-family:var(--serif); }
+  .searchBar input::-webkit-search-cancel-button { -webkit-appearance:none; }
+  .wsGo { flex:none; background:none; border:1px solid rgba(110,231,183,.35); color:var(--mint); border-radius:999px; padding:5px 13px; font-family:var(--serif); font-style:italic; font-size:13px; cursor:pointer; transition:background .15s, border-color .15s; }
+  .wsGo:hover { background:rgba(110,231,183,.1); border-color:var(--mint); }
+
   /* day tabs */
   .daytabs { display:flex; gap:3px; background: var(--row); border:1px solid var(--line); border-radius:12px; padding:4px; margin-top:14px; }
   /* 6 tabs (P/P/L/U/L/Rest) — slightly tighter than the 4-tab original so they fit one row */
@@ -543,6 +553,11 @@
   </aside>
   <div class="sheet" id="sheet">
     <div class="eyebrow">Weekly training plan</div>
+    <div class="searchBar" id="wsearch" role="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.8-4.8"/></svg>
+      <input id="wsq" type="search" placeholder="Search a workout — opens Google" aria-label="Search workouts on Google" autocomplete="off" />
+      <button class="wsGo" type="button">search</button>
+    </div>
     <div class="blockWrap" data-block="tabs"><button class="blockGrip" data-bgrip="tabs" aria-label="Drag to reorder" title="Drag to reorder">&#10495;</button><div class="daytabs" id="daytabs"></div></div>
     <div class="blockWrap" data-block="motto"><button class="blockGrip" data-bgrip="motto" aria-label="Drag to reorder" title="Drag to reorder">&#10495;</button><p class="motto" id="motto"></p></div>
     <div class="blockWrap" data-block="ready"><button class="blockGrip" data-bgrip="ready" aria-label="Drag to reorder" title="Drag to reorder">&#10495;</button><div id="readiness"></div></div>
@@ -1091,6 +1106,21 @@ function drawCompare(scrim){
     +'<div class="popBtns"><button class="pbtn ghost" id="cmpBack">back to calendar</button></div>';
   wrap.querySelector('#cmpBack').onclick=()=>drawPhysCal(scrim);
 }
+
+/* ---- workout search → Google, in a new tab -------------------------
+   The host grants allow-popups on the tile's sandbox, so a user gesture
+   can spawn an unsandboxed tab with the results. NOT a <form>: the
+   sandbox has no allow-forms, so submit events never fire — the button
+   click and the input's Enter key drive it directly instead. */
+(function(){
+  const go=()=>{
+    const q=document.getElementById('wsq').value.trim();
+    if(!q) return;
+    window.open('https://www.google.com/search?q='+encodeURIComponent(q), '_blank', 'noopener');
+  };
+  document.querySelector('#wsearch .wsGo').addEventListener('click', go);
+  document.getElementById('wsq').addEventListener('keydown', ev=>{ if(ev.key==='Enter'){ ev.preventDefault(); go(); } });
+})();
 
 /* ---- chart tooltips (hover a plot point) — shared by lifts + climb ---- */
 function tipDot(x,y,r,fill,tip){

@@ -201,7 +201,11 @@ function OpenTileOverlay({
             }}
             className="openFrame"
             srcDoc={withBridge(slot.html)}
-            sandbox="allow-scripts"
+            /* allow-popups(+escape) so a tile can open an external search
+               result in a NEW TAB on a user gesture (Train's workout search →
+               Google). The tile itself stays sealed: no same-origin, no
+               top-navigation — it can only spawn new, unsandboxed tabs. */
+            sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
             title={slot.name}
           />
         </div>
