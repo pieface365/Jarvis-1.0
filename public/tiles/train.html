@@ -102,19 +102,50 @@
   .goalLeft { font-family: var(--vt-mono); font-size:11px; color: var(--mint); white-space:nowrap; }
   .goalLeft.soon { color: var(--gold); }
 
-  /* physique tracker — clickable side card, twin styling to the goal card */
+  /* physique tracker — clickable side card + the month-calendar photo log */
   .physCard { margin-top:14px; padding:16px; border:1px solid var(--line); border-radius:var(--radius-lg); background:var(--card); backdrop-filter: blur(20px) saturate(1.2); -webkit-backdrop-filter: blur(20px) saturate(1.2); opacity:0; transform: translateY(14px); animation: rise .6s var(--spring) forwards; animation-delay:.14s; cursor:pointer; transition: border-color .2s, background .2s; }
   .physCard:hover { border-color: var(--mint); background: rgba(110,231,183,.04); }
   .physCard .gTitle { font-family: var(--vt-mono); text-transform:uppercase; letter-spacing:.18em; font-size:10px; font-weight:600; color: var(--muted); margin-bottom:11px; display:flex; align-items:center; justify-content:space-between; }
   .physCard .gTitle .go { color: var(--mint); letter-spacing:0; font-size:12px; }
+  .physCard .physThumb { width:100%; height:120px; object-fit:cover; object-position:top; border-radius:10px; border:1px solid var(--hair); display:block; margin-bottom:10px; }
   .physRow { display:flex; align-items:baseline; justify-content:space-between; gap:8px; padding:7px 0; border-top:1px solid var(--line); }
   .physRow:first-of-type { border-top:none; padding-top:0; }
   .physName { font-family: var(--serif); font-style:italic; font-size:15px; }
   .physVal { font-family: var(--vt-mono); font-size:11px; color: var(--text); white-space:nowrap; }
-  .physVal .pd { margin-left:6px; color: var(--mint); }
-  .physVal .pd.up { color: var(--gold); }
   .physEmpty { font-family: var(--serif); font-style:italic; font-size:13.5px; line-height:1.5; color: var(--muted); }
   .physFoot { font-family: var(--vt-mono); font-size:9.5px; letter-spacing:.08em; text-transform:uppercase; color: var(--muted); margin-top:10px; }
+
+  /* the month calendar inside the popup */
+  .calHead { display:flex; align-items:center; justify-content:space-between; margin-top:18px; }
+  .calMonth { font-family: var(--serif); font-style:italic; font-size:21px; }
+  .calNav { display:flex; gap:6px; }
+  .calNavBtn { background:none; border:1px solid var(--hair); color:var(--text); border-radius:9px; width:32px; height:32px; font-size:16px; line-height:1; cursor:pointer; transition:border-color .15s; }
+  .calNavBtn:hover:not(:disabled) { border-color:var(--mint); }
+  .calNavBtn:disabled { opacity:.3; cursor:default; }
+  .calGrid { display:grid; grid-template-columns:repeat(7,1fr); gap:5px; margin-top:14px; }
+  .calDow { font-family:var(--vt-mono); font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); text-align:center; padding-bottom:3px; }
+  .calDay { position:relative; aspect-ratio:3/4; border:1px solid var(--line); border-radius:9px; background:var(--row); overflow:hidden; cursor:pointer; padding:0; color:var(--muted); transition:border-color .15s, box-shadow .15s; }
+  .calDay:hover:not(:disabled) { border-color:var(--mint); }
+  .calDay:disabled { opacity:.28; cursor:default; }
+  .calDay img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+  .calDay .dnum { position:absolute; top:3px; left:5px; font-family:var(--vt-mono); font-size:9.5px; z-index:2; }
+  .calDay.hasPhoto .dnum { color:#fff; text-shadow:0 1px 4px rgba(0,0,0,.85); }
+  .calDay.today { border-color:var(--mint); box-shadow:0 0 10px rgba(110,231,183,.3); }
+  .calDay .addMark { position:absolute; inset:0; display:grid; place-items:center; color:var(--mint); font-size:17px; opacity:0; transition:opacity .15s; }
+  .calDay:hover .addMark { opacity:.9; }
+  .calFoot { font-family:var(--vt-mono); font-size:9.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin-top:14px; line-height:1.8; }
+
+  /* single-photo viewer + first↔latest compare */
+  .photoView img.main { width:100%; max-height:56vh; object-fit:contain; background:#000; border-radius:12px; border:1px solid var(--hair); display:block; margin-top:16px; }
+  .pvBar { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:12px; }
+  .pvDate { font-family:var(--serif); font-style:italic; font-size:15px; text-align:center; }
+  .pvBtn { background:none; border:1px solid var(--hair); color:var(--text); border-radius:999px; padding:7px 14px; font-size:12.5px; cursor:pointer; white-space:nowrap; transition:border-color .15s; }
+  .pvBtn:hover:not(:disabled) { border-color:var(--mint); }
+  .pvBtn:disabled { opacity:.3; cursor:default; }
+  .compareRow { display:flex; gap:10px; margin-top:16px; }
+  .compareRow figure { flex:1; margin:0; min-width:0; }
+  .compareRow img { width:100%; aspect-ratio:3/4; object-fit:cover; object-position:top; border-radius:10px; border:1px solid var(--hair); display:block; }
+  .compareRow figcaption { font-family:var(--vt-mono); font-size:9.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); text-align:center; margin-top:7px; }
 
   /* stacked (narrow) layout: lie the tile down as a compact row */
   @media (max-width: 780px) {
@@ -695,12 +726,21 @@ function buildState(){
   /* v bumps when the program's day structure changes, so stale saves rebuild */
   /* weekLog: 'YYYY-MM-DD' -> true for each date every exercise got fully
      logged — feeds the consistency ring (7/7 fills the circle). */
-  return { v:6, active:(SEED&&SEED.active)||'mon', unit:'lb', submitted:false, weekLog:{}, autoAdjust:true, autoAdjustDate:null, physique:{log:[]}, days };
+  return { v:6, active:(SEED&&SEED.active)||'mon', unit:'lb', submitted:false, weekLog:{}, autoAdjust:true, autoAdjustDate:null, physique:{photos:{}}, days };
 }
 /* STATE is filled by the async boot below once the dashboard bridge resolves. */
 let STATE = null;
-/* Fire-and-forget persistence through the dashboard bridge (no device storage). */
-function saveState(){ if(window.Vitality && typeof window.Vitality.save==='function') window.Vitality.save(STATE); }
+/* Fire-and-forget persistence through the dashboard bridge (no device storage).
+   With daily photos in STATE the payload runs to megabytes, so identical
+   back-to-back saves (render() fires on every tab click) are skipped. */
+let _lastSavedJson=null;
+function saveState(){
+  if(!(window.Vitality && typeof window.Vitality.save==='function')) return;
+  let s=null; try{ s=JSON.stringify(STATE); }catch(err){ /* save anyway */ }
+  if(s!==null && s===_lastSavedJson) return;
+  if(s!==null) _lastSavedJson=s;
+  window.Vitality.save(STATE);
+}
 
 /* ---- helpers on state -------------------------------------------- */
 const curDay = () => STATE.days[STATE.active];
@@ -851,84 +891,149 @@ function renderGoals(){
   el.style.display = rows ? '' : 'none';
 }
 
-/* ---- physique tracker: the clickable side card + its check-in popup --
-   STATE.physique.log = [{date:'YYYY-MM-DD', weight, waist, chest, arm,
-   shoulder}] sorted by date — weight in lb, girths in inches. The card
-   shows latest values with change since the FIRST check-in; tapping it
-   opens the logger. Feeds the Cancun lean-out and the 2028 build. */
-const PHYS_FIELDS = [
-  ['weight','Weight','lb'], ['waist','Waist','in'], ['chest','Chest','in'],
-  ['arm','Arm (flexed)','in'], ['shoulder','Shoulders','in'],
-];
-function physLog(){ return (STATE.physique && Array.isArray(STATE.physique.log)) ? STATE.physique.log : []; }
-/* first + latest entry that actually have this metric */
-function physSpan(key){
-  const l=physLog().filter(e=>typeof e[key]==='number');
-  return l.length ? { first:l[0], last:l[l.length-1], n:l.length } : null;
+/* ---- physique tracker: daily progress photos on a month calendar ------
+   STATE.physique.photos = { 'YYYY-MM-DD': dataURL } — one selfie a day,
+   downscaled hard (max 640px, jpeg .66 ≈ 40–80 KB) because the whole
+   tile state rides through localStorage/Supabase. Daily shots keep the
+   last 60 days; older weeks are thinned to their first photo so the
+   long 2028 arc stays comparable without eating the storage quota.
+   The side card shows the latest shot + streak; tap for the calendar. */
+let calMonth=null, pendingPhotoDate=null;
+function physPhotos(){
+  if(!STATE.physique || typeof STATE.physique!=='object') STATE.physique={};
+  if(!STATE.physique.photos || typeof STATE.physique.photos!=='object') STATE.physique.photos={};
+  return STATE.physique.photos;
+}
+function photoDates(){ return Object.keys(physPhotos()).filter(k=>/^\d{4}-\d{2}-\d{2}$/.test(k)).sort(); }
+function photoStreak(){ const ph=physPhotos(); let s=0, i=ph[today]?0:1; for(;;i++){ if(ph[dayKeyAgo(i)]) s++; else break; } return s; }
+function weekKeyOf(k){ const [y,m,d]=k.split('-').map(Number); const dt=new Date(y,m-1,d); dt.setDate(dt.getDate()-((dt.getDay()+6)%7)); return ymd(dt); }
+function thinPhotos(){
+  const ph=physPhotos(); const cutoff=dayKeyAgo(60); const seen={};
+  photoDates().forEach(k=>{ if(k>=cutoff) return; const w=weekKeyOf(k); if(seen[w]) delete ph[k]; else seen[w]=1; });
+}
+/* file → downscaled jpeg dataURL (canvas), so a phone shot lands small */
+function processPhoto(file, cb){
+  const fr=new FileReader();
+  fr.onload=()=>{
+    const img=new Image();
+    img.onload=()=>{
+      const MAX=640, sc=Math.min(1, MAX/Math.max(img.width,img.height));
+      const w=Math.max(1,Math.round(img.width*sc)), h=Math.max(1,Math.round(img.height*sc));
+      const c=document.createElement('canvas'); c.width=w; c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      cb(c.toDataURL('image/jpeg',0.66));
+    };
+    img.onerror=()=>cb(null);
+    img.src=fr.result;
+  };
+  fr.onerror=()=>cb(null);
+  fr.readAsDataURL(file);
 }
 function renderPhys(){
   const el = $('#physCard'); if(!el) return;
-  const log = physLog();
+  const ph=physPhotos(); const dates=photoDates();
   let body;
-  if(!log.length){
-    body = '<div class="physEmpty">No check-ins yet — tap to log weight and measurements.</div>';
+  if(!dates.length){
+    body='<div class="physEmpty">Daily progress photos — tap to open the month and take today’s.</div>';
   } else {
-    body = PHYS_FIELDS.map(([k,label,unit])=>{
-      const s=physSpan(k); if(!s) return '';
-      const d = s.n>1 ? r1(s.last[k]-s.first[k]) : null;
-      /* waist DOWN is the win; everything else growing is */
-      const up = d!=null && ((k==='waist') ? d>0 : false);
-      const delta = d==null ? '' : '<span class="pd'+(up?' up':'')+'">'+(d>=0?'+':'')+d+'</span>';
-      return '<div class="physRow"><span class="physName">'+label+'</span><span class="physVal">'+s.last[k]+' '+unit+delta+'</span></div>';
-    }).join('');
-    const last=log[log.length-1];
-    const [y,m,dd]=last.date.split('-').map(Number);
-    const ago=Math.round((new Date().setHours(0,0,0,0)-new Date(y,m-1,dd))/DAY);
-    body += '<div class="physFoot">'+(ago===0?'checked in today':ago===1?'checked in yesterday':'last check-in '+ago+'d ago — tap to update')+'</div>';
+    const last=dates[dates.length-1];
+    body='<img class="physThumb" src="'+ph[last]+'" alt="Latest progress photo">'
+      +'<div class="physRow"><span class="physName">Photos</span><span class="physVal">'+dates.length+'</span></div>'
+      +'<div class="physRow"><span class="physName">Streak</span><span class="physVal">'+photoStreak()+'d</span></div>'
+      +'<div class="physFoot">'+(ph[today]?'today ✓ — tap to review':'no shot today yet — tap to take it')+'</div>';
   }
-  el.innerHTML = '<div class="gTitle">Physique<span class="go">log →</span></div>'+body;
-  el.onclick = openPhysique;
-  el.onkeydown = ev=>{ if(ev.key==='Enter'||ev.key===' '){ ev.preventDefault(); openPhysique(); } };
+  el.innerHTML='<div class="gTitle">Physique<span class="go">calendar →</span></div>'+body;
+  el.onclick=openPhysique;
+  el.onkeydown=ev=>{ if(ev.key==='Enter'||ev.key===' '){ ev.preventDefault(); openPhysique(); } };
 }
 function openPhysique(){
-  const log = physLog();
-  const existing = log.find(e=>e.date===today);
-  const pre = existing || log[log.length-1] || {};
-  const rows = PHYS_FIELDS.map(([k,label,unit])=>
-    '<div class="field"><span class="lbl">'+label+'</span><div class="stepper">'
-    + '<input class="wInput" id="ph-'+k+'" type="number" inputmode="decimal" step="'+(k==='weight'?'0.1':'0.25')+'" min="0" placeholder="—" value="'+(typeof pre[k]==='number'?pre[k]:'')+'">'
-    + '<span class="wUnit">'+unit+'</span></div></div>').join('');
-  /* changes since the first check-in */
-  const deltas = PHYS_FIELDS.map(([k,label,unit])=>{
-    const s=physSpan(k); if(!s || s.n<2) return '';
-    const d=r1(s.last[k]-s.first[k]);
-    const good = (k==='waist') ? d<=0 : d>=0;
-    return '<div class="stat"><div class="k">'+label+'</div><div class="v'+(good?' up':'')+'">'+(d>=0?'+':'')+d+'<small style="font-size:11px;color:var(--muted)"> '+unit+'</small></div></div>';
-  }).filter(Boolean).join('');
-  const histRows = log.slice(-8).reverse().map(e=>
-    '<tr><td>'+fmtDate(e.date)+'</td>'
-    + PHYS_FIELDS.map(([k])=>'<td>'+(typeof e[k]==='number'?'<span class="num">'+e[k]+'</span>':'<span class="u">—</span>')+'</td>').join('')
-    + '</tr>').join('');
-  openPop(popHead('Physique tracker', existing?'Update today':'Check in')
-    + '<p class="formGist" style="font-size:14px;font-weight:500;color:var(--muted-strong)">Same conditions every time — morning, before food, after the bathroom. Weekly is plenty; the trend is what matters.</p>'
-    + '<div style="margin-top:6px">'+rows+'</div>'
-    + '<div class="popBtns"><button class="pbtn ghost" id="phCancel">cancel</button><button class="pbtn save" id="phSave">'+(existing?'update today':'save check-in')+'</button></div>'
-    + (deltas?'<div class="secLbl" style="margin-top:24px">Since first check-in</div><div class="stats" style="margin-top:0;padding-top:12px;border-top:none">'+deltas+'</div>':'')
-    + (histRows?'<table class="hist"><thead><tr><th>Date</th><th>Wt</th><th>Waist</th><th>Chest</th><th>Arm</th><th>Shldr</th></tr></thead><tbody>'+histRows+'</tbody></table>':''),
+  calMonth=today.slice(0,7);
+  openPop(popHead('Physique tracker','Progress photos')
+    + '<div id="physCal"></div>'
+    + '<input type="file" id="phFile" accept="image/*" style="display:none">',
     scrim=>{
-      scrim.querySelector('#phCancel').onclick=closePop;
-      scrim.querySelector('#phSave').onclick=()=>{
-        const entry={date:today};
-        let any=false;
-        PHYS_FIELDS.forEach(([k])=>{ const v=parseFloat(scrim.querySelector('#ph-'+k).value); if(Number.isFinite(v)&&v>0){ entry[k]=v; any=true; } });
-        if(!any){ closePop(); return; }
-        const l=physLog();
-        const i=l.findIndex(e=>e.date===today);
-        if(i>=0) l[i]=entry; else { l.push(entry); l.sort((a,b)=>a.date.localeCompare(b.date)); }
-        STATE.physique={log:l};
-        closePop(); render();
+      const inp=scrim.querySelector('#phFile');
+      inp.onchange=()=>{
+        const f=inp.files && inp.files[0]; inp.value='';
+        if(!f || !pendingPhotoDate) return;
+        const k=pendingPhotoDate; pendingPhotoDate=null;
+        processPhoto(f, url=>{
+          if(!url) return;
+          physPhotos()[k]=url; thinPhotos(); saveState(); renderPhys();
+          if(document.contains(scrim)) drawPhysCal(scrim);
+        });
       };
+      drawPhysCal(scrim);
     });
+}
+function shiftMonth(ym,d){ const [y,m]=ym.split('-').map(Number); const dt=new Date(y,m-1+d,1); return dt.getFullYear()+'-'+pad(dt.getMonth()+1); }
+function drawPhysCal(scrim){
+  const wrap=scrim.querySelector('#physCal'); if(!wrap) return;
+  const ph=physPhotos(); const dates=photoDates();
+  const [Y,M]=calMonth.split('-').map(Number);
+  const nDays=new Date(Y,M,0).getDate();
+  const off=(new Date(Y,M-1,1).getDay()+6)%7; /* Mon-start */
+  const monthName=new Date(Y,M-1,1).toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  const curMonth=today.slice(0,7);
+  let grid=['M','T','W','T','F','S','S'].map(d=>'<div class="calDow">'+d+'</div>').join('');
+  for(let i=0;i<off;i++) grid+='<div></div>';
+  for(let d=1; d<=nDays; d++){
+    const k=Y+'-'+pad(M)+'-'+pad(d);
+    const has=!!ph[k], future=k>today;
+    grid+='<button class="calDay'+(has?' hasPhoto':'')+(k===today?' today':'')+'" data-day="'+k+'"'+(future?' disabled':'')+' aria-label="'+fmtDate(k)+(has?' — view photo':' — add photo')+'">'
+      +(has?'<img src="'+ph[k]+'" alt="">':'')
+      +'<span class="dnum">'+d+'</span>'
+      +(!has&&!future?'<span class="addMark">+</span>':'')
+      +'</button>';
+  }
+  const kb=Math.round(JSON.stringify(ph).length/1024);
+  wrap.innerHTML=
+    '<div class="calHead"><span class="calMonth">'+monthName+'</span><div class="calNav">'
+    +'<button class="calNavBtn" id="calPrev" aria-label="Previous month">‹</button>'
+    +'<button class="calNavBtn" id="calNext" aria-label="Next month"'+(calMonth>=curMonth?' disabled':'')+'>›</button></div></div>'
+    +'<div class="calGrid">'+grid+'</div>'
+    +(dates.length>=2?'<div class="popBtns" style="margin-top:16px"><button class="pbtn ghost" id="calCompare">compare first ↔ latest</button></div>':'')
+    +'<div class="calFoot">'+(dates.length?dates.length+' photos · '+photoStreak()+'-day streak · ~'+kb+' kb stored':'tap today to take your first shot — same spot, same light, every day')
+    +'<br>daily shots keep 60 days; older weeks keep their first photo</div>';
+  wrap.querySelector('#calPrev').onclick=()=>{ calMonth=shiftMonth(calMonth,-1); drawPhysCal(scrim); };
+  wrap.querySelector('#calNext').onclick=()=>{ if(calMonth<curMonth){ calMonth=shiftMonth(calMonth,1); drawPhysCal(scrim); } };
+  wrap.querySelectorAll('.calDay[data-day]').forEach(b=> b.onclick=()=>{
+    const k=b.dataset.day;
+    if(physPhotos()[k]) drawPhotoView(scrim,k);
+    else { pendingPhotoDate=k; scrim.querySelector('#phFile').click(); }
+  });
+  const cmp=wrap.querySelector('#calCompare'); if(cmp) cmp.onclick=()=>drawCompare(scrim);
+}
+function drawPhotoView(scrim,k){
+  const wrap=scrim.querySelector('#physCal'); const ph=physPhotos(); const dates=photoDates();
+  const i=dates.indexOf(k); const ago=daysAgo(k);
+  wrap.innerHTML='<div class="photoView">'
+    +'<img class="main" src="'+ph[k]+'" alt="Progress photo, '+fmtDate(k)+'">'
+    +'<div class="pvBar">'
+    +'<button class="pvBtn" id="pvPrev"'+(i<=0?' disabled':'')+'>‹ prev</button>'
+    +'<span class="pvDate">'+fmtDate(k)+' · '+(ago===0?'today':ago+'d ago')+' · '+(i+1)+'/'+dates.length+'</span>'
+    +'<button class="pvBtn" id="pvNext"'+(i>=dates.length-1?' disabled':'')+'>next ›</button></div>'
+    +'<div class="popBtns" style="margin-top:14px">'
+    +'<button class="pbtn ghost" id="pvBack">calendar</button>'
+    +'<button class="pbtn ghost" id="pvRetake">retake</button>'
+    +'<button class="pbtn danger" id="pvDel">delete</button></div></div>';
+  wrap.querySelector('#pvBack').onclick=()=>drawPhysCal(scrim);
+  wrap.querySelector('#pvPrev').onclick=()=>{ if(i>0) drawPhotoView(scrim,dates[i-1]); };
+  wrap.querySelector('#pvNext').onclick=()=>{ if(i<dates.length-1) drawPhotoView(scrim,dates[i+1]); };
+  wrap.querySelector('#pvRetake').onclick=()=>{ pendingPhotoDate=k; scrim.querySelector('#phFile').click(); };
+  wrap.querySelector('#pvDel').onclick=()=>{ delete physPhotos()[k]; saveState(); renderPhys(); drawPhysCal(scrim); };
+}
+function drawCompare(scrim){
+  const wrap=scrim.querySelector('#physCal'); const ph=physPhotos(); const dates=photoDates();
+  if(dates.length<2){ drawPhysCal(scrim); return; }
+  const a=dates[0], b=dates[dates.length-1];
+  const gap=daysAgo(a)-daysAgo(b);
+  wrap.innerHTML='<div class="compareRow">'
+    +'<figure><img src="'+ph[a]+'" alt="First photo"><figcaption>'+fmtDate(a)+' · start</figcaption></figure>'
+    +'<figure><img src="'+ph[b]+'" alt="Latest photo"><figcaption>'+fmtDate(b)+' · latest</figcaption></figure></div>'
+    +'<div class="calFoot" style="text-align:center">'+gap+' days between — keep stacking</div>'
+    +'<div class="popBtns"><button class="pbtn ghost" id="cmpBack">back to calendar</button></div>';
+  wrap.querySelector('#cmpBack').onclick=()=>drawPhysCal(scrim);
 }
 
 /* ---- draggable blocks: side cards + the sheet's top blocks ----------
@@ -1478,7 +1583,8 @@ function patchProgramEdits(d){
   /* guards for fields newer than a given v:3 save */
   if(!d.weekLog) d.weekLog = {};
   if(d.autoAdjust===undefined){ d.autoAdjust=true; d.autoAdjustDate=null; }
-  if(!d.physique || !Array.isArray(d.physique.log)) d.physique = {log:[]};
+  if(!d.physique || typeof d.physique!=='object') d.physique = {photos:{}};
+  if(!d.physique.photos || typeof d.physique.photos!=='object') d.physique.photos = {};
   return d;
 }
 (async()=>{
@@ -1495,9 +1601,10 @@ function patchProgramEdits(d){
     if(d.weekLog && Object.keys(STATE.weekLog||{}).length===0) STATE.weekLog = d.weekLog;
     if(d.autoAdjust!==undefined && STATE.days!==d.days){ STATE.autoAdjust = d.autoAdjust; STATE.autoAdjustDate = d.autoAdjustDate||null; }
     if(d.uiOrder && !STATE.uiOrder) STATE.uiOrder = d.uiOrder;
-    if(d.physique && Array.isArray(d.physique.log) && d.physique.log.length && !(STATE.physique&&STATE.physique.log.length)) STATE.physique = d.physique;
+    if(d.physique && d.physique.photos && Object.keys(d.physique.photos).length && !(STATE.physique && STATE.physique.photos && Object.keys(STATE.physique.photos).length)) STATE.physique = d.physique;
   }
-  if(!STATE.physique || !Array.isArray(STATE.physique.log)) STATE.physique = {log:[]};
+  physPhotos(); /* normalizes STATE.physique.photos into place */
+  thinPhotos();
   render(); applyBlockOrder(); wireFresh();
   spawnParticles(document.querySelector('#vt-backdrop .wb-particles'));
 })();
