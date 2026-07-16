@@ -244,6 +244,9 @@
   .pillReset { background:none; border:none; cursor:pointer; padding:6px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; color:currentColor; opacity:.55; transition: opacity .15s, background .15s; }
   .pillReset svg { width:13px; height:13px; stroke:currentColor; fill:none; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
   .pillReset:hover { opacity:1; background: rgba(0,0,0,.12); }
+  .pillDel { flex:none; background:none; border:none; cursor:pointer; color:currentColor; opacity:.3; font-size:16px; line-height:1; padding:4px 7px; border-radius:50%; transition: opacity .15s, color .15s; }
+  .pillDel:hover { opacity:1; color:var(--fail); }
+  .pill.done .pillDel:hover { color:#7a1113; }
   .pill.done { background: var(--mint); border-color: var(--mint); color:#000; box-shadow: 0 0 22px rgba(110,231,183,.28); }
   .pill.done .pillIdx, .pill.done .pillTimes, .pill.done .pillUnit { color: rgba(0,0,0,.5); }
   .pill.done .pillInput { color:#000; }
@@ -1034,6 +1037,7 @@ function renderPill(e, rx, idx){
     + (logged
         ? '<span class="pillStatus">'+(pr?'<span class="pillPr">★ </span>':'')+status+'</span><button class="pillReset" aria-label="Undo set">'+IC_reset()+'</button>'
         : '<button class="pillHit" aria-label="Log set">hit it →</button><button class="pillMiss" aria-label="Mark missed">miss</button>')
+    + (e.log.length>1?'<button class="pillDel" aria-label="Delete set" title="Delete this set">×</button>':'')
     + '</div>';
   const wIn=row.querySelector('.w'), rIn=row.querySelector('.r');
   // lb weights run to 3 digits + decimals (185, 142.5) and reps to 2 digits (15) —
@@ -1049,6 +1053,7 @@ function renderPill(e, rx, idx){
   const hit=row.querySelector('.pillHit'); if(hit) hit.addEventListener('click',ev=>{ stop(ev); commit(); });
   const miss=row.querySelector('.pillMiss'); if(miss) miss.addEventListener('click',ev=>{ stop(ev); const kg=parseFloat(wIn.value)|| (e.lastKg!=null?e.lastKg:rx.kg); doLog(e, idx, kg, 0, true); });
   const reset=row.querySelector('.pillReset'); if(reset) reset.addEventListener('click',ev=>{ stop(ev); e.log[idx]=null; stopRest(e.id); render(); });
+  const del=row.querySelector('.pillDel'); if(del) del.addEventListener('click',ev=>{ stop(ev); if(e.log.length<=1) return; e.log.splice(idx,1); e.sets=e.log.length; rollupToday(e); render(); });
   return row;
 }
 function IC_reset(){ return '<svg viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none" stroke="currentColor"><path d="M3.5 6.5 A6 6 0 1 0 6 3.2"/><polyline points="2.4 2.4 3.7 6.6 8 5.2"/></svg>'; }
