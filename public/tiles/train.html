@@ -102,6 +102,20 @@
   .goalLeft { font-family: var(--vt-mono); font-size:11px; color: var(--mint); white-space:nowrap; }
   .goalLeft.soon { color: var(--gold); }
 
+  /* physique tracker — clickable side card, twin styling to the goal card */
+  .physCard { margin-top:14px; padding:16px; border:1px solid var(--line); border-radius:var(--radius-lg); background:var(--card); backdrop-filter: blur(20px) saturate(1.2); -webkit-backdrop-filter: blur(20px) saturate(1.2); opacity:0; transform: translateY(14px); animation: rise .6s var(--spring) forwards; animation-delay:.14s; cursor:pointer; transition: border-color .2s, background .2s; }
+  .physCard:hover { border-color: var(--mint); background: rgba(110,231,183,.04); }
+  .physCard .gTitle { font-family: var(--vt-mono); text-transform:uppercase; letter-spacing:.18em; font-size:10px; font-weight:600; color: var(--muted); margin-bottom:11px; display:flex; align-items:center; justify-content:space-between; }
+  .physCard .gTitle .go { color: var(--mint); letter-spacing:0; font-size:12px; }
+  .physRow { display:flex; align-items:baseline; justify-content:space-between; gap:8px; padding:7px 0; border-top:1px solid var(--line); }
+  .physRow:first-of-type { border-top:none; padding-top:0; }
+  .physName { font-family: var(--serif); font-style:italic; font-size:15px; }
+  .physVal { font-family: var(--vt-mono); font-size:11px; color: var(--text); white-space:nowrap; }
+  .physVal .pd { margin-left:6px; color: var(--mint); }
+  .physVal .pd.up { color: var(--gold); }
+  .physEmpty { font-family: var(--serif); font-style:italic; font-size:13.5px; line-height:1.5; color: var(--muted); }
+  .physFoot { font-family: var(--vt-mono); font-size:9.5px; letter-spacing:.08em; text-transform:uppercase; color: var(--muted); margin-top:10px; }
+
   /* stacked (narrow) layout: lie the tile down as a compact row */
   @media (max-width: 780px) {
     .weekCard { flex-direction:row; text-align:left; padding:14px 16px; gap:14px; }
@@ -109,6 +123,7 @@
     .weekText { align-items:flex-start; }
     .weekDays { justify-content:flex-start; margin-top:7px; }
     .goalCard { margin-top:12px; }
+    .physCard { margin-top:12px; }
   }
 
   /* readiness banner — today's recovery (synced from Fitbit via the Vitals
@@ -437,6 +452,7 @@
   <aside class="sideCol" id="sideCol">
     <div class="blockWrap" data-block="week"><button class="blockGrip" data-bgrip="week" aria-label="Drag to reorder" title="Drag to reorder">&#10495;</button><div class="weekCard" id="weekCard"></div></div>
     <div class="blockWrap" data-block="goal"><button class="blockGrip" data-bgrip="goal" aria-label="Drag to reorder" title="Drag to reorder">&#10495;</button><div class="goalCard" id="goalCard"></div></div>
+    <div class="blockWrap" data-block="phys"><button class="blockGrip" data-bgrip="phys" aria-label="Drag to reorder" title="Drag to reorder">&#10495;</button><div class="physCard" id="physCard" role="button" tabindex="0" aria-label="Open the physique tracker"></div></div>
   </aside>
   <div class="sheet" id="sheet">
     <div class="eyebrow">Weekly training plan</div>
@@ -679,7 +695,7 @@ function buildState(){
   /* v bumps when the program's day structure changes, so stale saves rebuild */
   /* weekLog: 'YYYY-MM-DD' -> true for each date every exercise got fully
      logged — feeds the consistency ring (7/7 fills the circle). */
-  return { v:6, active:(SEED&&SEED.active)||'mon', unit:'lb', submitted:false, weekLog:{}, autoAdjust:true, autoAdjustDate:null, days };
+  return { v:6, active:(SEED&&SEED.active)||'mon', unit:'lb', submitted:false, weekLog:{}, autoAdjust:true, autoAdjustDate:null, physique:{log:[]}, days };
 }
 /* STATE is filled by the async boot below once the dashboard bridge resolves. */
 let STATE = null;
@@ -835,11 +851,91 @@ function renderGoals(){
   el.style.display = rows ? '' : 'none';
 }
 
+/* ---- physique tracker: the clickable side card + its check-in popup --
+   STATE.physique.log = [{date:'YYYY-MM-DD', weight, waist, chest, arm,
+   shoulder}] sorted by date — weight in lb, girths in inches. The card
+   shows latest values with change since the FIRST check-in; tapping it
+   opens the logger. Feeds the Cancun lean-out and the 2028 build. */
+const PHYS_FIELDS = [
+  ['weight','Weight','lb'], ['waist','Waist','in'], ['chest','Chest','in'],
+  ['arm','Arm (flexed)','in'], ['shoulder','Shoulders','in'],
+];
+function physLog(){ return (STATE.physique && Array.isArray(STATE.physique.log)) ? STATE.physique.log : []; }
+/* first + latest entry that actually have this metric */
+function physSpan(key){
+  const l=physLog().filter(e=>typeof e[key]==='number');
+  return l.length ? { first:l[0], last:l[l.length-1], n:l.length } : null;
+}
+function renderPhys(){
+  const el = $('#physCard'); if(!el) return;
+  const log = physLog();
+  let body;
+  if(!log.length){
+    body = '<div class="physEmpty">No check-ins yet — tap to log weight and measurements.</div>';
+  } else {
+    body = PHYS_FIELDS.map(([k,label,unit])=>{
+      const s=physSpan(k); if(!s) return '';
+      const d = s.n>1 ? r1(s.last[k]-s.first[k]) : null;
+      /* waist DOWN is the win; everything else growing is */
+      const up = d!=null && ((k==='waist') ? d>0 : false);
+      const delta = d==null ? '' : '<span class="pd'+(up?' up':'')+'">'+(d>=0?'+':'')+d+'</span>';
+      return '<div class="physRow"><span class="physName">'+label+'</span><span class="physVal">'+s.last[k]+' '+unit+delta+'</span></div>';
+    }).join('');
+    const last=log[log.length-1];
+    const [y,m,dd]=last.date.split('-').map(Number);
+    const ago=Math.round((new Date().setHours(0,0,0,0)-new Date(y,m-1,dd))/DAY);
+    body += '<div class="physFoot">'+(ago===0?'checked in today':ago===1?'checked in yesterday':'last check-in '+ago+'d ago — tap to update')+'</div>';
+  }
+  el.innerHTML = '<div class="gTitle">Physique<span class="go">log →</span></div>'+body;
+  el.onclick = openPhysique;
+  el.onkeydown = ev=>{ if(ev.key==='Enter'||ev.key===' '){ ev.preventDefault(); openPhysique(); } };
+}
+function openPhysique(){
+  const log = physLog();
+  const existing = log.find(e=>e.date===today);
+  const pre = existing || log[log.length-1] || {};
+  const rows = PHYS_FIELDS.map(([k,label,unit])=>
+    '<div class="field"><span class="lbl">'+label+'</span><div class="stepper">'
+    + '<input class="wInput" id="ph-'+k+'" type="number" inputmode="decimal" step="'+(k==='weight'?'0.1':'0.25')+'" min="0" placeholder="—" value="'+(typeof pre[k]==='number'?pre[k]:'')+'">'
+    + '<span class="wUnit">'+unit+'</span></div></div>').join('');
+  /* changes since the first check-in */
+  const deltas = PHYS_FIELDS.map(([k,label,unit])=>{
+    const s=physSpan(k); if(!s || s.n<2) return '';
+    const d=r1(s.last[k]-s.first[k]);
+    const good = (k==='waist') ? d<=0 : d>=0;
+    return '<div class="stat"><div class="k">'+label+'</div><div class="v'+(good?' up':'')+'">'+(d>=0?'+':'')+d+'<small style="font-size:11px;color:var(--muted)"> '+unit+'</small></div></div>';
+  }).filter(Boolean).join('');
+  const histRows = log.slice(-8).reverse().map(e=>
+    '<tr><td>'+fmtDate(e.date)+'</td>'
+    + PHYS_FIELDS.map(([k])=>'<td>'+(typeof e[k]==='number'?'<span class="num">'+e[k]+'</span>':'<span class="u">—</span>')+'</td>').join('')
+    + '</tr>').join('');
+  openPop(popHead('Physique tracker', existing?'Update today':'Check in')
+    + '<p class="formGist" style="font-size:14px;font-weight:500;color:var(--muted-strong)">Same conditions every time — morning, before food, after the bathroom. Weekly is plenty; the trend is what matters.</p>'
+    + '<div style="margin-top:6px">'+rows+'</div>'
+    + '<div class="popBtns"><button class="pbtn ghost" id="phCancel">cancel</button><button class="pbtn save" id="phSave">'+(existing?'update today':'save check-in')+'</button></div>'
+    + (deltas?'<div class="secLbl" style="margin-top:24px">Since first check-in</div><div class="stats" style="margin-top:0;padding-top:12px;border-top:none">'+deltas+'</div>':'')
+    + (histRows?'<table class="hist"><thead><tr><th>Date</th><th>Wt</th><th>Waist</th><th>Chest</th><th>Arm</th><th>Shldr</th></tr></thead><tbody>'+histRows+'</tbody></table>':''),
+    scrim=>{
+      scrim.querySelector('#phCancel').onclick=closePop;
+      scrim.querySelector('#phSave').onclick=()=>{
+        const entry={date:today};
+        let any=false;
+        PHYS_FIELDS.forEach(([k])=>{ const v=parseFloat(scrim.querySelector('#ph-'+k).value); if(Number.isFinite(v)&&v>0){ entry[k]=v; any=true; } });
+        if(!any){ closePop(); return; }
+        const l=physLog();
+        const i=l.findIndex(e=>e.date===today);
+        if(i>=0) l[i]=entry; else { l.push(entry); l.sort((a,b)=>a.date.localeCompare(b.date)); }
+        STATE.physique={log:l};
+        closePop(); render();
+      };
+    });
+}
+
 /* ---- draggable blocks: side cards + the sheet's top blocks ----------
    Renderers target ids INSIDE the wrappers, so reordering is pure DOM
    surgery — move the wrapper nodes, everything keeps re-rendering. Order
    persists in STATE.uiOrder = { side:[...], top:[...] }. */
-const BLOCK_GROUPS = { side:['week','goal'], top:['tabs','motto','ready'] };
+const BLOCK_GROUPS = { side:['week','goal','phys'], top:['tabs','motto','ready'] };
 function groupOf(k){ return BLOCK_GROUPS.side.includes(k) ? 'side' : 'top'; }
 function blockOrder(group){
   const saved = (STATE && STATE.uiOrder && Array.isArray(STATE.uiOrder[group])) ? STATE.uiOrder[group] : [];
@@ -898,7 +994,7 @@ document.addEventListener('pointercancel',endBlockDrag);
 
 function render(){
   markConsistency(); applyAutoAdjust();
-  renderWeek(); renderGoals(); renderReadiness(); renderTabs(); renderDots(); renderHead(); renderProgress(); renderBody(); saveState();
+  renderWeek(); renderGoals(); renderPhys(); renderReadiness(); renderTabs(); renderDots(); renderHead(); renderProgress(); renderBody(); saveState();
 }
 function renderTabs(){
   const el = $('#daytabs');
@@ -1382,6 +1478,7 @@ function patchProgramEdits(d){
   /* guards for fields newer than a given v:3 save */
   if(!d.weekLog) d.weekLog = {};
   if(d.autoAdjust===undefined){ d.autoAdjust=true; d.autoAdjustDate=null; }
+  if(!d.physique || !Array.isArray(d.physique.log)) d.physique = {log:[]};
   return d;
 }
 (async()=>{
@@ -1398,7 +1495,9 @@ function patchProgramEdits(d){
     if(d.weekLog && Object.keys(STATE.weekLog||{}).length===0) STATE.weekLog = d.weekLog;
     if(d.autoAdjust!==undefined && STATE.days!==d.days){ STATE.autoAdjust = d.autoAdjust; STATE.autoAdjustDate = d.autoAdjustDate||null; }
     if(d.uiOrder && !STATE.uiOrder) STATE.uiOrder = d.uiOrder;
+    if(d.physique && Array.isArray(d.physique.log) && d.physique.log.length && !(STATE.physique&&STATE.physique.log.length)) STATE.physique = d.physique;
   }
+  if(!STATE.physique || !Array.isArray(STATE.physique.log)) STATE.physique = {log:[]};
   render(); applyBlockOrder(); wireFresh();
   spawnParticles(document.querySelector('#vt-backdrop .wb-particles'));
 })();
