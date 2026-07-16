@@ -27,8 +27,6 @@ export type CoreTileId =
   | 'peak'
   | 'brand'
   | 'finance'
-  | 'lifts'
-  | 'climb'
 
 /** A single live metric to surface on a tile (Train day, Fuel kcal). */
 export interface CoreStat {
@@ -168,46 +166,6 @@ export const CORE_TILES: Record<CoreTileId, CoreTile> = {
       </svg>
     ),
   },
-  lifts: {
-    id: 'lifts',
-    href: '/app/starter',
-    index: '08',
-    label: 'Lifts',
-    variant: 'live',
-    orb: { mode: 'wander' },
-    defaultSize: 'm',
-    glyph: (
-      <svg viewBox="-12 -12 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-        <line x1="-9" y1="8" x2="-9" y2="0" /><line x1="-3" y1="8" x2="-3" y2="-3" />
-        <line x1="3" y1="8" x2="3" y2="-1" /><line x1="9" y1="8" x2="9" y2="-8" />
-      </svg>
-    ),
-    art: (
-      <svg className="art" viewBox="0 0 434 118">
-        <path className="mot" d="M40 86 L118 70 L196 78 L274 50 L352 58 L400 38" />
-        <g className="orb"><circle className="glow" r="9" /><circle className="node" r="3.4" /></g>
-      </svg>
-    ),
-  },
-  climb: {
-    id: 'climb',
-    href: '/app/starter',
-    index: '09',
-    label: 'Climb',
-    orb: { mode: 'wander' },
-    defaultSize: 'm',
-    glyph: (
-      <svg viewBox="-12 -12 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round">
-        <path d="M-10 8 L-3 -4 L1 2 L5 -8 L10 8 Z" />
-      </svg>
-    ),
-    art: (
-      <svg className="art" viewBox="0 0 434 118">
-        <path className="mot" d="M40 92 L118 58 L182 74 L260 34 L330 52 L400 24" />
-        <g className="orb"><circle className="glow" r="9" /><circle className="node" r="3.4" /></g>
-      </svg>
-    ),
-  },
   finance: {
     id: 'finance',
     href: '/app/starter',
@@ -302,8 +260,6 @@ export const DEFAULT_HOME_ORDER: HomeTileId[] = [
   'vee',
   'brand',
   'peak',
-  'lifts',
-  'climb',
   'finance',
 ]
 

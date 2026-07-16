@@ -113,26 +113,6 @@ export function useTileHost(
         return
       }
 
-      if (msg.type === 'peek') {
-        // Read-only load of ANOTHER tile's data for the SAME user — the
-        // cross-tile seam that lets a graphing tile (Lifts) visualize what a
-        // logger tile (Train) owns. Same source preference as 'load' (cloud
-        // wins when sync is on). Writes stay strictly per-tile; peek can
-        // never mutate the target.
-        const target = typeof msg.tile === 'string' && msg.tile ? msg.tile : null
-        let data: unknown = null
-        if (target) {
-          data = await tileStore.loadData(userId, target)
-          if (syncEnabled()) {
-            const remote = await syncLoad(target)
-            if (remote != null) data = remote
-          }
-        }
-        src.postMessage({ source: 'vitality-host', type: 'peek:result', id: msg.id, data }, '*')
-        activity.current?.({ tileId, type: 'load', count: 0 })
-        return
-      }
-
       if (msg.type === 'report') {
         // One numeric life-stream into Vee. The host only forwards the raw stream
         // plus the SENDER's tileId (from our own registry, never the iframe's

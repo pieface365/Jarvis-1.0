@@ -18,7 +18,6 @@ const SHIM = `<script>
     if (!p) return;
     delete pending[m.id];
     if (m.type === 'load:result') p.resolve(m.data);
-    else if (m.type === 'peek:result') p.resolve(m.data);
     else if (m.type === 'save:ok') p.resolve(true);
     else if (m.type === 'save:error') p.reject(new Error(m.reason || 'save_failed'));
   });
@@ -34,7 +33,6 @@ const SHIM = `<script>
         if (!pending[id]) return;
         delete pending[id];
         if (type === 'load') resolve([]);
-        else if (type === 'peek') resolve(null);
         else reject(new Error('vitality_timeout'));
       }, 8000);
     });
@@ -42,10 +40,6 @@ const SHIM = `<script>
   window.Vitality = {
     save: function (data) { return call('save', { data: data }); },
     load: function () { return call('load', {}); },
-    /* read-only view of a SIBLING tile's data (same user) — lets a graphing
-       tile visualize data another tile owns (Lifts reading Train's log)
-       without duplicating it. Resolves null when absent. */
-    peek: function (tileId) { return call('peek', { tile: tileId }); },
     report: function (stream) {
       parent.postMessage({ source: 'vitality-tile', type: 'report', stream: stream }, '*');
     }
