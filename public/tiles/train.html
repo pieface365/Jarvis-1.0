@@ -39,11 +39,16 @@
   /* two columns: the standalone consistency tile on the left, the logger
      sheet on the right; stacks when the viewport can't fit both. */
   .shell { width: 100%; max-width: 880px; margin: auto; display: flex; gap: 18px; align-items: flex-start; }
-  .sideCol { flex: none; width: 216px; position: sticky; top: 16px; }
+  /* the side column scrolls on its own — with five cards it outgrows the
+     viewport, and sticky alone would strand whatever is below the fold */
+  .sideCol { flex: none; width: 216px; position: sticky; top: 16px; max-height: calc(100dvh - 32px); overflow-y: auto; overscroll-behavior: contain; padding: 4px 6px 12px 2px; margin: -4px -6px -12px -2px; scrollbar-width: thin; scrollbar-color: var(--hair) transparent; }
+  .sideCol::-webkit-scrollbar { width: 4px; }
+  .sideCol::-webkit-scrollbar-thumb { background: var(--hair); border-radius: 4px; }
+  .sideCol::-webkit-scrollbar-track { background: transparent; }
   .sheet { flex: 1; min-width: 0; }
   @media (max-width: 780px) {
     .shell { display: block; max-width: 640px; }
-    .sideCol { width: 100%; position: static; margin-bottom: 14px; }
+    .sideCol { width: 100%; position: static; margin: 0 0 14px; padding: 0; max-height: none; overflow: visible; }
   }
 
   /* ── inlined Vitality backdrop — mountains / glass atmosphere / particles,
