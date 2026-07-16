@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Lifts</title>
+<style>
+  /* Lifts — progressive-overload graphs, sealed & bridge-backed.
+     Owns NO training data: it peeks the Train tile's logged history through
+     the read-only bridge seam (window.Vitality.peek('train')) and graphs it.
+     Its own save/load only keeps view preferences (selected lift, range). */
+  :root{
+    --bg:#050506;--surface:#0e0e11;--border:#1d1d22;--brand:#6EE7B7;
+    --brand-soft:rgba(110,231,183,.08);--muted:#84848c;--muted-strong:#a8a8b0;--fg:#ededf0;
+    --gold:#f59e0b;--track:#17171b;
+    --radius-md:12px;--radius-lg:16px;--radius-pill:999px;
+    --font-display:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;
+    --font-mono:ui-monospace,SFMono-Regular,Menlo,"JetBrains Mono",monospace;
+    --serif:Georgia,"Times New Roman",serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-display);display:flex;justify-content:center;padding:40px 20px}
+  .shell{width:100%;max-width:640px}
+  .header{margin-bottom:22px}
+  .title{font-size:24px;font-weight:600;letter-spacing:-.01em;margin:0}
+  .subtitle{color:var(--muted);font-family:var(--font-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;margin:6px 0 0}
+  .card{border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);padding:18px;margin-bottom:14px}
+  .cardName{font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:14px}
+
+  /* stat chips */
+  .statRow{display:flex;gap:10px;flex-wrap:wrap}
+  .stat{flex:1;min-width:96px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-md);padding:12px 14px}
+  .statLabel{font-family:var(--font-mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+  .statVal{font-weight:700;font-size:1.15rem;margin-top:4px;font-variant-numeric:tabular-nums}
+  .statVal small{font-size:11px;color:var(--muted);font-weight:400}
+  .statVal.mint{color:var(--brand)} .statVal.gold{color:var(--gold)}
+
+  /* range + lift pickers */
+  .chartHead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
+  .seg{display:inline-flex;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-pill);padding:3px;gap:2px}
+  .segBtn{appearance:none;background:transparent;border:0;color:var(--muted);font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;padding:5px 11px;border-radius:var(--radius-pill);cursor:pointer}
+  .segBtn.on{background:var(--brand-soft);color:var(--brand)}
+  .pickRow{display:flex;gap:5px;margin:4px 0 12px;flex-wrap:wrap}
+  .pick{appearance:none;background:var(--bg);border:1px solid var(--border);color:var(--muted);border-radius:var(--radius-pill);padding:6px 12px;font-size:11.5px;font-weight:600;cursor:pointer;transition:color .15s,border-color .15s,background .15s}
+  .pick:hover{color:var(--fg)}
+  .pick.on{background:rgba(110,231,183,.1);border-color:#6EE7B7;color:#6EE7B7}
+
+  .chart{width:100%;height:150px;display:block;overflow:visible;margin-top:12px}
+  .legend{display:flex;gap:16px;margin-top:8px;flex-wrap:wrap}
+  .legItem{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .legDot{width:12px;height:3px;border-radius:2px}
+  .noteLine{font-size:12px;color:var(--muted);font-style:italic;margin-top:6px;line-height:1.5}
+  .deltaCap{text-align:center;font-family:var(--serif);font-style:italic;font-size:14px;color:var(--brand);margin-top:10px}
+  .deltaCap .mu{color:var(--muted)}
+
+  /* small-multiples grid */
+  .miniGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+  .mini{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-md);padding:12px 13px;cursor:pointer;text-align:left;color:inherit;font:inherit;transition:border-color .15s}
+  .mini:hover{border-color:var(--brand)}
+  .mini.on{border-color:var(--brand);background:rgba(110,231,183,.05)}
+  .miniName{font-family:var(--serif);font-style:italic;font-size:14px;line-height:1.25;min-height:2.5em}
+  .miniVal{font-family:var(--font-mono);font-size:11px;color:var(--fg);margin-top:6px}
+  .miniVal .d{color:var(--brand);margin-left:6px}
+  .miniVal .d.dn{color:var(--muted)}
+  .mini svg{width:100%;height:30px;display:block;margin-top:8px;overflow:visible}
+
+  /* chart tooltips */
+  #chartTip{position:fixed;z-index:99;display:none;pointer-events:none;background:#101014;border:1px solid rgba(255,255,255,.16);border-radius:8px;padding:6px 10px;font-family:var(--font-mono);font-size:11px;color:var(--fg);white-space:nowrap;box-shadow:0 10px 30px rgba(0,0,0,.55)}
+  .tipHit{cursor:pointer}
+</style>
+</head>
+<body>
+<main><div class="shell" id="app"></div></main>
+<script>
+let EX=[];            /* merged exercises from Train: [{id,name,tier,perHand,hist:[{date,kg,reps,sets}]}] */
+let prefs={};         /* our OWN saved state: {sel, range} */
+let peeked=false;     /* whether the bridge supports peek (host updated) */
+const $=id=>document.getElementById(id);
+const RANGES=[[30,'30d'],[90,'90d'],[180,'6m'],[9999,'all']];
+function todayKey(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function daysAgo(k){const [y,m,d]=k.split('-').map(Number);const t=new Date();t.setHours(0,0,0,0);return Math.round((t-new Date(y,m-1,d))/86400000);}
+function fmtDate(k){const [y,m,d]=k.split('-').map(Number);return new Date(y,m-1,d).toLocaleDateString('en-US',{month:'short',day:'numeric'});}
+const r1=n=>Math.round(n*10)/10;
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');}
+
+/* ---- pull the log out of Train's state ---- */
+function topReps(h){const d=(h.sets||[]).filter(x=>x&&!x.fail).map(x=>x.r);return d.length?Math.max(...d):0;}
+function collect(train){
+  const map={};
+  if(!train||typeof train!=='object'||!train.days) return [];
+  Object.values(train.days).forEach(day=>(day&&day.ex||[]).forEach(e=>{
+    if(!e||e.dur) return; /* timed items (climbs, warm-ups) have no load curve */
+    const m=map[e.id]||(map[e.id]={id:e.id,name:e.name,tier:e.tier,perHand:!!e.perHand,hist:{}});
+    (e.hist||[]).forEach(h=>{
+      if(h&&h.date&&typeof h.kg==='number'&&!h.off) m.hist[h.date]={kg:h.kg,reps:topReps(h),sets:(h.sets||[]).length};
+    });
+  }));
+  return Object.values(map)
+    .map(m=>({ ...m, hist:Object.keys(m.hist).sort().map(d=>({date:d,...m.hist[d]})) }))
+    .filter(m=>m.hist.length>0)
+    .sort((a,b)=> b.hist.length-a.hist.length || a.name.localeCompare(b.name));
+}
+const inRange=(k,r)=>daysAgo(k)<=r;
+function est1RM(kg,reps){ return reps>1 ? kg*(1+reps/30) : kg; }
+/* PRs: sessions whose top weight beat everything before them */
+function prCount(range){
+  let n=0;
+  EX.forEach(m=>{ let best=-1; m.hist.forEach(h=>{ if(h.kg>best){ if(best>=0 && inRange(h.date,range)) n++; best=h.kg; } }); });
+  return n;
+}
+function sessionsIn(range){
+  const days=new Set();
+  EX.forEach(m=>m.hist.forEach(h=>{ if(inRange(h.date,range)) days.add(h.date); }));
+  return days.size;
+}
+
+/* ---- tooltips (same pattern as Vitals) ---- */
+function tipDot(x,y,r,fill,tip,cls){
+  return '<circle cx="'+x+'" cy="'+y+'" r="'+r+'" fill="'+fill+'"'+(cls||'')+'/>'
+    + '<circle class="tipHit" cx="'+x+'" cy="'+y+'" r="10" fill="transparent" data-tip="'+esc(tip)+'"/>';
+}
+function tipEl(){let t=$('chartTip');if(!t){t=document.createElement('div');t.id='chartTip';document.body.appendChild(t);}return t;}
+function moveTip(e){const t=tipEl();let x=e.clientX+12,y=e.clientY-34;const w=t.offsetWidth||120;
+  if(x+w>window.innerWidth-8)x=e.clientX-w-12; if(y<8)y=e.clientY+18; t.style.left=x+'px';t.style.top=y+'px';}
+document.addEventListener('pointerover',e=>{const h=e.target.closest&&e.target.closest('.tipHit');if(!h)return;const t=tipEl();t.textContent=h.getAttribute('data-tip');t.style.display='block';moveTip(e);});
+document.addEventListener('pointermove',e=>{const t=$('chartTip');if(!t||t.style.display!=='block')return;if(e.target.closest&&e.target.closest('.tipHit'))moveTip(e);else t.style.display='none';});
+document.addEventListener('pointerout',e=>{if(e.target.closest&&e.target.closest('.tipHit')){const rel=e.relatedTarget;if(!(rel&&rel.closest&&rel.closest('.tipHit'))){const t=$('chartTip');if(t)t.style.display='none';}}});
+
+/* ---- the main chart: top-set weight + est 1RM over the range ---- */
+function mainChart(m){
+  const range=prefs.range||90;
+  const list=m.hist.filter(h=>inRange(h.date,range));
+  if(list.length<2) return '<p class="noteLine">Fewer than two logged sessions for this lift in the window — log it in Train and the curve draws itself.</p>';
+  const W=320,H=140,padY=16,padX=8;
+  const w=list.map(h=>h.kg), rm=list.map(h=>est1RM(h.kg,h.reps));
+  let lo=Math.min(...w), hi=Math.max(...rm);
+  if(hi-lo<1e-9){hi+=5;lo-=5;} const span=hi-lo; lo-=span*.1; hi+=span*.1;
+  const oldest=Math.max(...list.map(h=>daysAgo(h.date)),1);
+  const dom=range===9999?oldest:Math.min(range,Math.max(oldest,1));
+  const X=k=>padX+Math.min(1,Math.max(0,1-daysAgo(k)/dom))*(W-padX*2);
+  const Y=v=>H-padY-((v-lo)/(hi-lo))*(H-padY*2);
+  const line=list.map((h,i)=>(i?'L':'M')+X(h.date).toFixed(1)+' '+Y(h.kg).toFixed(1)).join(' ');
+  const rmLine=list.map((h,i)=>(i?'L':'M')+X(h.date).toFixed(1)+' '+Y(est1RM(h.kg,h.reps)).toFixed(1)).join(' ');
+  let best=-1;
+  const dots=list.map(h=>{
+    const pr=h.kg>best; if(pr) best=h.kg;
+    return tipDot(X(h.date).toFixed(1),Y(h.kg).toFixed(1),3,pr?'#f59e0b':'#6EE7B7',
+      fmtDate(h.date)+' · '+h.kg+' lb × '+h.reps+(h.sets?' ('+h.sets+' sets)':'')+' · est 1RM '+Math.round(est1RM(h.kg,h.reps)));
+  }).join('');
+  const d=r1(list[list.length-1].kg-list[0].kg);
+  return '<svg class="chart" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" aria-hidden="true">'
+    + '<path d="'+rmLine+'" fill="none" stroke="rgba(255,255,255,.3)" stroke-width="1.4" stroke-dasharray="4 4"/>'
+    + '<path d="'+line+'" fill="none" stroke="#6EE7B7" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="filter:drop-shadow(0 0 5px rgba(110,231,183,.55))"/>'
+    + dots + '</svg>'
+    + '<div class="legend"><span class="legItem"><span class="legDot" style="background:#6EE7B7"></span>Top set (lb'+(m.perHand?'/ea':'')+')</span>'
+    + '<span class="legItem"><span class="legDot" style="background:rgba(255,255,255,.4)"></span>Est 1RM</span>'
+    + '<span class="legItem"><span class="legDot" style="background:#f59e0b"></span>PR session</span></div>'
+    + '<div class="deltaCap">'+(d>=0?'+':'')+d+' lb <span class="mu">· '+list.length+' sessions in this window</span></div>';
+}
+
+/* ---- sparkline card per lift ---- */
+function mini(m){
+  const on=prefs.sel===m.id;
+  const hist=m.hist;
+  const latest=hist[hist.length-1];
+  const d=hist.length>1?r1(latest.kg-hist[0].kg):null;
+  let svg='';
+  if(hist.length>1){
+    const W=130,H=28;
+    const w=hist.map(h=>h.kg);
+    let lo=Math.min(...w),hi=Math.max(...w); if(hi-lo<1e-9){hi+=1;lo-=1;}
+    const pts=hist.map((h,i)=>((i/(hist.length-1))*W).toFixed(1)+','+(H-2-((h.kg-lo)/(hi-lo))*(H-4)).toFixed(1));
+    svg='<svg viewBox="0 0 130 28" preserveAspectRatio="none"><polyline points="'+pts.join(' ')+'" fill="none" stroke="'+(on?'#6EE7B7':'#4d6e60')+'" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  }
+  return '<button class="mini'+(on?' on':'')+'" data-sel="'+m.id+'">'
+    + '<div class="miniName">'+m.name+'</div>'
+    + '<div class="miniVal">'+latest.kg+' lb'+(m.perHand?'/ea':'')
+    + (d!=null?'<span class="d'+(d<0?' dn':'')+'">'+(d>=0?'+':'')+d+'</span>':'')+'</div>'
+    + svg + '</button>';
+}
+
+function render(){
+  const app=$('app');
+  const head='<header class="header"><h1 class="title">Lifts</h1><p class="subtitle">progressive overload · from your Train log</p></header>';
+  if(!EX.length){
+    app.innerHTML=head+'<section class="card"><span class="cardName">No data yet</span>'
+      +'<p class="noteLine" style="font-size:14px">'+(peeked
+        ?'Nothing logged in Train yet. Hit some sets — every "hit it →" you log lands here as a data point, and the graphs draw themselves.'
+        :'Could not reach the Train log (reload the dashboard so the bridge picks up its newest powers), then reopen this tile.')+'</p></section>';
+    return;
+  }
+  const sel=EX.find(m=>m.id===prefs.sel)||EX[0];
+  const range=prefs.range||90;
+  app.innerHTML=head
+    /* summary chips */
+    +'<section class="card"><span class="cardName">This window</span><div class="statRow">'
+    +'<div class="stat"><div class="statLabel">Sessions</div><div class="statVal">'+sessionsIn(range)+'</div></div>'
+    +'<div class="stat"><div class="statLabel">PRs set</div><div class="statVal gold">'+prCount(range)+'</div></div>'
+    +'<div class="stat"><div class="statLabel">Lifts tracked</div><div class="statVal mint">'+EX.length+'</div></div>'
+    +'</div></section>'
+    /* the big chart */
+    +'<section class="card"><div class="chartHead"><span class="cardName" style="margin:0">'+sel.name+'</span>'
+    +'<div class="seg">'+RANGES.map(([n,l])=>'<button class="segBtn '+(range===n?'on':'')+'" data-range="'+n+'">'+l+'</button>').join('')+'</div></div>'
+    +'<div class="pickRow">'+EX.slice(0,10).map(m=>'<button class="pick'+(m.id===sel.id?' on':'')+'" data-sel="'+m.id+'">'+m.name.split(' ').slice(0,2).join(' ')+'</button>').join('')+'</div>'
+    +mainChart(sel)+'</section>'
+    /* every lift, sparklined */
+    +'<section class="card"><span class="cardName">Every lift</span><div class="miniGrid">'+EX.map(mini).join('')+'</div></section>';
+}
+
+document.addEventListener('click',e=>{
+  const s=e.target.closest('[data-sel]');
+  if(s){ prefs.sel=s.getAttribute('data-sel'); window.Vitality.save(prefs); render(); return; }
+  const r=e.target.closest('[data-range]');
+  if(r){ prefs.range=parseInt(r.getAttribute('data-range'),10)||90; window.Vitality.save(prefs); render(); }
+});
+
+(async()=>{
+  try{ const d=await window.Vitality.load(); prefs=(d&&typeof d==='object'&&!Array.isArray(d))?d:{}; }catch(e){ prefs={}; }
+  if(window.Vitality && typeof window.Vitality.peek==='function'){
+    peeked=true;
+    try{ EX=collect(await window.Vitality.peek('train')); }catch(e){ EX=[]; }
+  }
+  render();
+})();
+</script>
+</body>
+</html>

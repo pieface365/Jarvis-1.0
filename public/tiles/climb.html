@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Climb</title>
+<style>
+  /* Climb — bouldering session log + grade progression, sealed & bridge-backed.
+     Manual logging (the wall doesn't sync): tap grades after a session, and the
+     tile tracks max flash / max send over time against the goals — flash V5,
+     project V6–V7 — plus the classic sends pyramid. */
+  :root{
+    --bg:#050506;--surface:#0e0e11;--border:#1d1d22;--brand:#6EE7B7;
+    --brand-soft:rgba(110,231,183,.08);--muted:#84848c;--muted-strong:#a8a8b0;--fg:#ededf0;
+    --gold:#f59e0b;--flash:#a7f3d0;--send:#6EE7B7;--try:#f5c451;
+    --radius-md:12px;--radius-lg:16px;--radius-pill:999px;
+    --font-display:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;
+    --font-mono:ui-monospace,SFMono-Regular,Menlo,"JetBrains Mono",monospace;
+    --serif:Georgia,"Times New Roman",serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-display);display:flex;justify-content:center;padding:40px 20px}
+  .shell{width:100%;max-width:640px}
+  .header{margin-bottom:22px}
+  .title{font-size:24px;font-weight:600;letter-spacing:-.01em;margin:0}
+  .subtitle{color:var(--muted);font-family:var(--font-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;margin:6px 0 0}
+  .card{border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);padding:18px;margin-bottom:14px}
+  .cardName{font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:14px}
+
+  /* headline stats */
+  .statRow{display:flex;gap:10px;flex-wrap:wrap}
+  .stat{flex:1;min-width:96px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-md);padding:12px 14px}
+  .statLabel{font-family:var(--font-mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+  .statVal{font-weight:700;font-size:1.3rem;margin-top:4px;font-variant-numeric:tabular-nums}
+  .statVal small{font-size:11px;color:var(--muted);font-weight:400;margin-left:5px}
+  .statVal.flash{color:var(--flash)} .statVal.send{color:var(--send)} .statVal.try{color:var(--try)}
+  .goalTag{display:inline-block;font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--border);border-radius:4px;padding:1px 6px;margin-top:7px;color:var(--muted)}
+  .goalTag.hit{border-color:var(--brand);color:var(--brand)}
+
+  /* session logger */
+  .logDate{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+  .dnDate{background:var(--bg);border:1px solid var(--border);color:var(--fg);border-radius:8px;padding:5px 9px;font:inherit;font-size:12.5px;color-scheme:dark}
+  .modeBtn{appearance:none;background:var(--bg);border:1px solid var(--border);color:var(--muted);border-radius:var(--radius-pill);padding:6px 13px;font-size:12px;font-weight:600;cursor:pointer;transition:color .15s,border-color .15s}
+  .modeBtn.minus{color:#e06a6c;border-color:rgba(224,106,108,.55)}
+  .rowLbl{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:12px 0 7px;display:flex;align-items:center;gap:7px}
+  .rowLbl .sw{width:9px;height:9px;border-radius:50%}
+  .gradeRow{display:flex;gap:5px;flex-wrap:wrap}
+  .gr{position:relative;appearance:none;background:var(--bg);border:1px solid var(--border);color:var(--muted);border-radius:9px;min-width:40px;padding:8px 4px;font-family:var(--font-mono);font-size:11.5px;font-weight:600;cursor:pointer;transition:color .15s,border-color .15s,background .15s}
+  .gr:hover{color:var(--fg);border-color:var(--muted)}
+  .gr .n{position:absolute;top:-7px;right:-5px;min-width:17px;height:17px;border-radius:999px;font-size:9.5px;line-height:17px;text-align:center;padding:0 4px;color:#04140d;font-weight:700}
+  .gr.hasN{color:var(--fg)}
+  .gradeRow.flash .gr.hasN{border-color:var(--flash)} .gradeRow.flash .gr .n{background:var(--flash)}
+  .gradeRow.send  .gr.hasN{border-color:var(--send)}  .gradeRow.send  .gr .n{background:var(--send)}
+  .gradeRow.try   .gr.hasN{border-color:var(--try)}   .gradeRow.try   .gr .n{background:var(--try)}
+  .hint{color:var(--muted);font-size:12px;font-family:var(--font-mono);margin-top:12px;line-height:1.6}
+
+  /* charts */
+  .chart{width:100%;height:150px;display:block;overflow:visible;margin-top:10px}
+  .legend{display:flex;gap:16px;margin-top:8px;flex-wrap:wrap}
+  .legItem{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .legDot{width:12px;height:3px;border-radius:2px}
+  .noteLine{font-size:12px;color:var(--muted);font-style:italic;margin-top:6px;line-height:1.5}
+
+  /* pyramid */
+  .pyr{display:flex;flex-direction:column;gap:6px}
+  .pyrRow{display:flex;align-items:center;gap:10px}
+  .pyrG{font-family:var(--font-mono);font-size:11px;color:var(--muted);width:30px;text-align:right}
+  .pyrTrack{flex:1;height:16px;background:var(--bg);border:1px solid var(--border);border-radius:6px;overflow:hidden;display:flex}
+  .pyrFlash{background:var(--flash);height:100%}
+  .pyrSend{background:rgba(110,231,183,.45);height:100%}
+  .pyrN{font-family:var(--font-mono);font-size:10.5px;color:var(--muted-strong);width:56px}
+
+  /* recent sessions */
+  .sess{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid var(--border);font-size:13.5px}
+  .sess:first-of-type{border-top:none;padding-top:0}
+  .sessDate{font-family:var(--serif);font-style:italic;color:var(--muted);white-space:nowrap}
+  .sessSum{text-align:right;color:var(--muted-strong)}
+  .sessSum b{color:var(--fg);font-weight:600}
+
+  #chartTip{position:fixed;z-index:99;display:none;pointer-events:none;background:#101014;border:1px solid rgba(255,255,255,.16);border-radius:8px;padding:6px 10px;font-family:var(--font-mono);font-size:11px;color:var(--fg);white-space:nowrap;box-shadow:0 10px 30px rgba(0,0,0,.55)}
+  .tipHit{cursor:pointer}
+</style>
+</head>
+<body>
+<main><div class="shell" id="app"></div></main>
+<script>
+/* store = { v:1, sessions: { 'YYYY-MM-DD': { flash:{'5':1}, send:{'4':2}, try:{'6':3} } } }
+   grade keys are the V-number as a string. */
+let store={v:1,sessions:{}};
+let logDate=null;      /* which date the logger edits (defaults today) */
+let removeMode=false;  /* toggled: taps subtract instead of add */
+const GRADES=[0,1,2,3,4,5,6,7,8,9,10];
+const KINDS=[['flash','Flashed','var(--flash)'],['send','Sent (worked)','var(--send)'],['try','Project attempts','var(--try)']];
+const GOAL_FLASH=5, GOAL_PROJ=6;
+const $=id=>document.getElementById(id);
+function todayKey(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function daysAgo(k){const [y,m,d]=k.split('-').map(Number);const t=new Date();t.setHours(0,0,0,0);return Math.round((t-new Date(y,m-1,d))/86400000);}
+function fmtDate(k){const [y,m,d]=k.split('-').map(Number);return new Date(y,m-1,d).toLocaleDateString('en-US',{month:'short',day:'numeric'});}
+function persist(){window.Vitality.save(store);}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');}
+function sessDates(){return Object.keys(store.sessions).filter(k=>/^\d{4}-\d{2}-\d{2}$/.test(k)).sort();}
+function sessOf(k){return store.sessions[k]||null;}
+function count(s,kind,g){return (s&&s[kind]&&s[kind][g])||0;}
+function maxGrade(s,kinds){ let m=null; kinds.forEach(kind=>{ GRADES.forEach(g=>{ if(count(s,kind,String(g))>0 && (m==null||g>m)) m=g; }); }); return m; }
+function totalClimbs(s){ let n=0; KINDS.forEach(([k])=>GRADES.forEach(g=>{ n+=count(s,k,String(g)); })); return n; }
+
+/* all-time headline numbers */
+function bestFlash(){ let b=null; sessDates().forEach(k=>{ const m=maxGrade(sessOf(k),['flash']); if(m!=null&&(b==null||m>b)) b=m; }); return b; }
+function bestSend(){ let b=null; sessDates().forEach(k=>{ const m=maxGrade(sessOf(k),['flash','send']); if(m!=null&&(b==null||m>b)) b=m; }); return b; }
+function projectGrade(){ /* hardest grade attempted in the last 45 days */
+  let b=null; sessDates().forEach(k=>{ if(daysAgo(k)>45) return; const m=maxGrade(sessOf(k),['try']); if(m!=null&&(b==null||m>b)) b=m; }); return b;
+}
+
+/* ---- tooltips ---- */
+function tipDot(x,y,r,fill,tip){
+  return '<circle cx="'+x+'" cy="'+y+'" r="'+r+'" fill="'+fill+'"/>'
+    + '<circle class="tipHit" cx="'+x+'" cy="'+y+'" r="10" fill="transparent" data-tip="'+esc(tip)+'"/>';
+}
+function tipEl(){let t=$('chartTip');if(!t){t=document.createElement('div');t.id='chartTip';document.body.appendChild(t);}return t;}
+function moveTip(e){const t=tipEl();let x=e.clientX+12,y=e.clientY-34;const w=t.offsetWidth||120;
+  if(x+w>window.innerWidth-8)x=e.clientX-w-12; if(y<8)y=e.clientY+18; t.style.left=x+'px';t.style.top=y+'px';}
+document.addEventListener('pointerover',e=>{const h=e.target.closest&&e.target.closest('.tipHit');if(!h)return;const t=tipEl();t.textContent=h.getAttribute('data-tip');t.style.display='block';moveTip(e);});
+document.addEventListener('pointermove',e=>{const t=$('chartTip');if(!t||t.style.display!=='block')return;if(e.target.closest&&e.target.closest('.tipHit'))moveTip(e);else t.style.display='none';});
+document.addEventListener('pointerout',e=>{if(e.target.closest&&e.target.closest('.tipHit')){const rel=e.relatedTarget;if(!(rel&&rel.closest&&rel.closest('.tipHit'))){const t=$('chartTip');if(t)t.style.display='none';}}});
+
+/* ---- headline card ---- */
+function statsHtml(){
+  const bf=bestFlash(), bs=bestSend(), pj=projectGrade();
+  const tag=(v,goal,label)=> '<div class="goalTag'+(v!=null&&v>=goal?' hit':'')+'">'+(v!=null&&v>=goal?'goal hit — onward':label)+'</div>';
+  return '<section class="card"><span class="cardName">Where you stand</span><div class="statRow">'
+    +'<div class="stat"><div class="statLabel">Best flash</div><div class="statVal flash">'+(bf!=null?'V'+bf:'—')+'</div>'+tag(bf,GOAL_FLASH,'goal V'+GOAL_FLASH)+'</div>'
+    +'<div class="stat"><div class="statLabel">Best send</div><div class="statVal send">'+(bs!=null?'V'+bs:'—')+'</div>'+tag(bs,GOAL_PROJ,'goal V'+GOAL_PROJ+'–V7')+'</div>'
+    +'<div class="stat"><div class="statLabel">Projecting</div><div class="statVal try">'+(pj!=null?'V'+pj:'—')+'</div><div class="goalTag">last 45 days</div></div>'
+    +'</div></section>';
+}
+
+/* ---- session logger ---- */
+function loggerHtml(){
+  const k=logDate||todayKey();
+  const s=sessOf(k);
+  const isToday=k===todayKey();
+  const rows=KINDS.map(([kind,label,color])=>
+    '<div class="rowLbl"><span class="sw" style="background:'+color+'"></span>'+label+'</div>'
+    +'<div class="gradeRow '+kind+'">'+GRADES.map(g=>{
+      const n=count(s,kind,String(g));
+      return '<button class="gr'+(n>0?' hasN':'')+'" data-kind="'+kind+'" data-g="'+g+'">V'+g+(n>0?'<span class="n">'+n+'</span>':'')+'</button>';
+    }).join('')+'</div>').join('');
+  return '<section class="card"><div class="logDate"><span class="cardName" style="margin:0">'+(isToday?'Log today’s session':'Editing · '+fmtDate(k))+'</span>'
+    +'<span style="display:inline-flex;gap:8px;align-items:center">'
+    +'<input class="dnDate" id="logDate" type="date" value="'+k+'" max="'+todayKey()+'">'
+    +'<button class="modeBtn'+(removeMode?' minus':'')+'" id="modeBtn">'+(removeMode?'− removing':'+ adding')+'</button></span></div>'
+    +rows
+    +'<div class="hint">Tap a grade after each climb — flash = first go, sent = any go, attempts = project burns. Tap "'+(removeMode?'− removing':'+ adding')+'" to flip.</div>'
+    +'</section>';
+}
+
+/* ---- progression chart: max flash + max send per session ---- */
+function progressChart(){
+  const dates=sessDates();
+  const pts=dates.map(k=>({k, f:maxGrade(sessOf(k),['flash']), s:maxGrade(sessOf(k),['flash','send'])})).filter(p=>p.f!=null||p.s!=null);
+  if(pts.length<2) return '<section class="card"><span class="cardName">Progression</span><p class="noteLine">Two logged sessions and the grade curve appears — with your V'+GOAL_FLASH+' flash and V'+GOAL_PROJ+' project goals drawn in.</p></section>';
+  const W=320,H=150,padY=14,padX=8;
+  const hi=Math.max(GOAL_PROJ+1, ...pts.map(p=>Math.max(p.f||0,p.s||0)))+0.5;
+  const lo=Math.max(0, Math.min(...pts.map(p=>Math.min(p.f!=null?p.f:99,p.s!=null?p.s:99)))-1);
+  const oldest=Math.max(...pts.map(p=>daysAgo(p.k)),1);
+  const X=k=>padX+Math.min(1,Math.max(0,1-daysAgo(k)/oldest))*(W-padX*2);
+  const Y=v=>H-padY-((v-lo)/(hi-lo))*(H-padY*2);
+  const line=key=>{ const l=pts.filter(p=>p[key]!=null); return l.length>1?'<path d="'+l.map((p,i)=>(i?'L':'M')+X(p.k).toFixed(1)+' '+Y(p[key]).toFixed(1)).join(' ')+'" fill="none" stroke="'+(key==='f'?'#a7f3d0':'#6EE7B7')+'" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>':''; };
+  const dots=pts.map(p=>
+    (p.s!=null?tipDot(X(p.k).toFixed(1),Y(p.s).toFixed(1),3,'#6EE7B7',fmtDate(p.k)+' · sent V'+p.s):'')
+    +(p.f!=null?tipDot(X(p.k).toFixed(1),Y(p.f).toFixed(1),3,'#a7f3d0',fmtDate(p.k)+' · flashed V'+p.f):'')).join('');
+  const goal=(v,label,col)=>'<line x1="'+padX+'" y1="'+Y(v).toFixed(1)+'" x2="'+(W-padX)+'" y2="'+Y(v).toFixed(1)+'" stroke="'+col+'" stroke-width="1" stroke-dasharray="5 4" opacity=".55"/>'
+    +'<text x="'+(W-padX)+'" y="'+(Y(v)-4).toFixed(1)+'" text-anchor="end" fill="'+col+'" font-size="9" font-family="var(--font-mono)" letter-spacing=".08em">'+label+'</text>';
+  return '<section class="card"><span class="cardName">Progression</span>'
+    +'<svg class="chart" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" aria-hidden="true">'
+    +goal(GOAL_FLASH,'FLASH GOAL V'+GOAL_FLASH,'#a7f3d0')+goal(GOAL_PROJ,'PROJECT GOAL V'+GOAL_PROJ+'–V7','#f5c451')
+    +line('s')+line('f')+dots+'</svg>'
+    +'<div class="legend"><span class="legItem"><span class="legDot" style="background:#a7f3d0"></span>Max flash</span>'
+    +'<span class="legItem"><span class="legDot" style="background:#6EE7B7"></span>Max send</span></div></section>';
+}
+
+/* ---- pyramid: total flashes+sends per grade ---- */
+function pyramidHtml(){
+  const tot={};
+  GRADES.forEach(g=>{ tot[g]={f:0,s:0}; });
+  sessDates().forEach(k=>{ const s=sessOf(k); GRADES.forEach(g=>{ tot[g].f+=count(s,'flash',String(g)); tot[g].s+=count(s,'send',String(g)); }); });
+  const rows=GRADES.slice().reverse().filter(g=>tot[g].f+tot[g].s>0);
+  if(!rows.length) return '';
+  const max=Math.max(...rows.map(g=>tot[g].f+tot[g].s));
+  return '<section class="card"><span class="cardName">The pyramid — every send</span><div class="pyr">'
+    +rows.map(g=>{
+      const f=tot[g].f, s=tot[g].s, w=100/max;
+      return '<div class="pyrRow"><span class="pyrG">V'+g+'</span><div class="pyrTrack">'
+        +(f?'<div class="pyrFlash" style="width:'+(f*w).toFixed(1)+'%" title="'+f+' flashed"></div>':'')
+        +(s?'<div class="pyrSend" style="width:'+(s*w).toFixed(1)+'%" title="'+s+' sent"></div>':'')
+        +'</div><span class="pyrN">'+(f+s)+(f?' · '+f+'⚡':'')+'</span></div>';
+    }).join('')
+    +'</div><div class="legend" style="margin-top:12px"><span class="legItem"><span class="legDot" style="background:#a7f3d0"></span>Flashed</span><span class="legItem"><span class="legDot" style="background:rgba(110,231,183,.45)"></span>Sent</span></div></section>';
+}
+
+/* ---- recent sessions ---- */
+function recentHtml(){
+  const dates=sessDates().slice(-6).reverse();
+  if(!dates.length) return '';
+  const rows=dates.map(k=>{
+    const s=sessOf(k);
+    const bits=[];
+    GRADES.slice().reverse().forEach(g=>{
+      const f=count(s,'flash',String(g)), sd=count(s,'send',String(g)), t=count(s,'try',String(g));
+      if(f) bits.push(f+'×V'+g+' flash'); if(sd) bits.push(sd+'×V'+g); if(t&&!f&&!sd) bits.push('V'+g+' burns');
+    });
+    return '<div class="sess"><span class="sessDate">'+fmtDate(k)+'</span><span class="sessSum"><b>'+totalClimbs(s)+' climbs</b>'+(bits.length?' · '+bits.slice(0,3).join(', '):'')+'</span></div>';
+  }).join('');
+  return '<section class="card"><span class="cardName">Recent sessions</span>'+rows+'</section>';
+}
+
+function render(){
+  $('app').innerHTML='<header class="header"><h1 class="title">Climb</h1><p class="subtitle">flash V'+GOAL_FLASH+' · project V'+GOAL_PROJ+'–V7 · gravity vault</p></header>'
+    +statsHtml()+loggerHtml()+progressChart()+pyramidHtml()+recentHtml();
+}
+
+document.addEventListener('click',e=>{
+  const gr=e.target.closest('.gr');
+  if(gr){
+    const kind=gr.getAttribute('data-kind'), g=gr.getAttribute('data-g');
+    const k=logDate||todayKey();
+    const s=store.sessions[k]||(store.sessions[k]={});
+    const bucket=s[kind]||(s[kind]={});
+    bucket[g]=Math.max(0,(bucket[g]||0)+(removeMode?-1:1));
+    if(!bucket[g]) delete bucket[g];
+    if(!Object.keys(bucket).length) delete s[kind];
+    if(!Object.keys(s).length) delete store.sessions[k];
+    persist(); render(); return;
+  }
+  if(e.target.closest('#modeBtn')){ removeMode=!removeMode; render(); }
+});
+document.addEventListener('input',e=>{
+  if(e.target&&e.target.id==='logDate'){
+    const v=e.target.value;
+    if(/^\d{4}-\d{2}-\d{2}$/.test(v)&&v<=todayKey()){ logDate=v; render(); }
+  }
+});
+
+(async()=>{
+  let d=null; try{ d=await window.Vitality.load(); }catch(e){}
+  store=(d&&typeof d==='object'&&!Array.isArray(d)&&d.sessions)?d:{v:1,sessions:{}};
+  render();
+})();
+</script>
+</body>
+</html>
