@@ -119,6 +119,70 @@ const mcpHandler = createMcpHandler(
     )
 
     server.registerTool(
+      'log_food',
+      {
+        title: 'Log food to the Fuel tile',
+        description:
+          "WRITE. Append one food entry with macros to the dashboard's Fuel tile daily log. Use this after estimating a meal from a photo or description — amounts are for the EATEN PORTION, not per 100g. The dashboard shows it the next time the Fuel tile loads.",
+        inputSchema: {
+          name: z.string().min(1).max(80).describe('Short dish name, e.g. "Chicken burrito bowl"'),
+          grams: z.number().positive().max(5000).describe('Estimated weight of the eaten portion in grams'),
+          calories: z.number().min(0).max(10000).describe('Calories in the eaten portion'),
+          protein_g: z.number().min(0).max(1000),
+          carbs_g: z.number().min(0).max(1000),
+          fat_g: z.number().min(0).max(1000),
+          date: z
+            .string()
+            .regex(/^\d{4}-\d{2}-\d{2}$/)
+            .optional()
+            .describe("Log date YYYY-MM-DD in the user's timezone; omit for today (America/New_York)"),
+        },
+      },
+      async ({ name, grams, calories, protein_g, carbs_g, fat_g, date }): Promise<ToolResult> => {
+        const c = db()
+        if (!c) return NO_DB
+        // The Fuel tile's store lives in tile_data under the bare 'fuel' row —
+        // the same row lib/sync.ts writes and the dashboard prefers on load.
+        const key =
+          date ??
+          new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'America/New_York',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+          }).format(new Date())
+        const { data: row, error: readErr } = await c
+          .from('tile_data')
+          .select('data')
+          .eq('tile_id', 'fuel')
+          .maybeSingle()
+        if (readErr) return fail('Could not read the fuel data. Did you run supabase/sync.sql?')
+        const store =
+          row?.data && typeof row.data === 'object' && !Array.isArray(row.data)
+            ? (row.data as Record<string, unknown>)
+            : {}
+        const log = Array.isArray(store[key]) ? (store[key] as Record<string, number | string>[]) : []
+        log.push({ name, grams: Math.round(grams), cal: calories, p: protein_g, c: carbs_g, f: fat_g })
+        store[key] = log
+        const { error } = await c
+          .from('tile_data')
+          .upsert({ tile_id: 'fuel', data: store, updated_at: new Date().toISOString() }, { onConflict: 'tile_id' })
+        if (error) return fail('Could not save the entry.')
+        let dayCal = 0
+        let dayP = 0
+        for (const e of log) {
+          dayCal += Number(e.cal) || 0
+          dayP += Number(e.p) || 0
+        }
+        return text(
+          `Logged ${name} (${Math.round(calories)} kcal, ${Math.round(protein_g)}g protein) to ${key}. ` +
+            `Day so far: ${Math.round(dayCal)} kcal, ${Math.round(dayP)}g protein across ${log.length} entries. ` +
+            `The Fuel tile shows it on its next load.`,
+        )
+      },
+    )
+
+    server.registerTool(
       'delete_tile',
       {
         title: 'Clear a tile',

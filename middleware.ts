@@ -34,6 +34,10 @@ export async function middleware(req: NextRequest) {
   if (!pass) return NextResponse.next()
   const { pathname } = req.nextUrl
   if (pathname === '/api/gate') return NextResponse.next()
+  // The MCP connector authenticates itself (MCP_TOKEN bearer / OAuth JWT) and
+  // returns 503 when unconfigured — the cookie gate would only lock Claude out,
+  // since MCP clients can never present the browser cookie.
+  if (pathname.startsWith('/api/mcp')) return NextResponse.next()
   const cookie = req.cookies.get(GATE_COOKIE)?.value
   if (cookie && cookie === (await gateToken(pass))) return NextResponse.next()
   if (pathname.startsWith('/api/')) {
