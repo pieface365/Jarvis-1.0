@@ -12,6 +12,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.112.1",
     "@modelcontextprotocol/sdk": "1.26.0",
     "@supabase/supabase-js": "^2.105.4",
     "mcp-handler": "^1.1.0",

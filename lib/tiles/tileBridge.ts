@@ -18,10 +18,11 @@ const SHIM = `<script>
     if (!p) return;
     delete pending[m.id];
     if (m.type === 'load:result') p.resolve(m.data);
+    else if (m.type === 'estimate:result') p.resolve(m.data);
     else if (m.type === 'save:ok') p.resolve(true);
     else if (m.type === 'save:error') p.reject(new Error(m.reason || 'save_failed'));
   });
-  function call(type, extra) {
+  function call(type, extra, timeoutMs) {
     return new Promise(function (resolve, reject) {
       var id = 'v' + (++seq);
       pending[id] = { resolve: resolve, reject: reject };
@@ -33,13 +34,18 @@ const SHIM = `<script>
         if (!pending[id]) return;
         delete pending[id];
         if (type === 'load') resolve([]);
+        else if (type === 'estimate') resolve({ ok: false, error: 'timeout' });
         else reject(new Error('vitality_timeout'));
-      }, 8000);
+      }, timeoutMs || 8000);
     });
   }
   window.Vitality = {
     save: function (data) { return call('save', { data: data }); },
     load: function () { return call('load', {}); },
+    /* AI food estimate: the host relays the photo to the server's Claude
+       vision route (the tile's opaque origin can't carry the gate cookie
+       itself). Long timeout — a vision call can take tens of seconds. */
+    estimateFood: function (image) { return call('estimate', { image: image }, 90000); },
     report: function (stream) {
       parent.postMessage({ source: 'vitality-tile', type: 'report', stream: stream }, '*');
     }

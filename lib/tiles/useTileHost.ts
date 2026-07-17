@@ -113,6 +113,27 @@ export function useTileHost(
         return
       }
 
+      if (msg.type === 'estimate') {
+        // Relay a food photo to the server's Claude vision route. The host
+        // page is same-origin, so the gate cookie rides along — the sealed
+        // tile (opaque origin) could never send it itself. Always settle the
+        // request; the tile shows the error code to the user.
+        let data: unknown = { ok: false, error: 'network' }
+        try {
+          const res = await fetch('/api/fuel/estimate', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ image: msg.image }),
+          })
+          data = await res.json()
+        } catch {
+          /* keep the network error payload */
+        }
+        src.postMessage({ source: 'vitality-host', type: 'estimate:result', id: msg.id, data }, '*')
+        activity.current?.({ tileId, type: 'load', count: 0 })
+        return
+      }
+
       if (msg.type === 'report') {
         // One numeric life-stream into Vee. The host only forwards the raw stream
         // plus the SENDER's tileId (from our own registry, never the iframe's

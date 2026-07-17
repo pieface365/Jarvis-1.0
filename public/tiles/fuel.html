@@ -341,7 +341,8 @@ function renderSide(){
    everywhere. Found products cache in store._products, and adding one
    pushes into todaysLog like any other food — the Today ring, on-plan
    marks and macros all just see food. */
-let scanStatus='Snap the barcode, or type its digits.', scanOk=true, scanProd=null, scanBusy=false, scanCode='';
+let scanStatus='Snap the barcode, type its digits — or photo the whole plate and Claude estimates it.', scanOk=true, scanProd=null, scanBusy=false, scanCode='';
+let aiEst=null; /* {name, portion_grams, cal, protein_g, carbs_g, fat_g, confidence, notes} */
 function scanHtml(){
   const p=scanProd;
   const prodRow = p
@@ -349,19 +350,28 @@ function scanHtml(){
       +'<div class="meta">'+round(p.per100.cal)+' kcal · '+round(p.per100.p)+'P / '+round(p.per100.c)+'C / '+round(p.per100.f)+'F per 100g</div></div>'
       +'<div style="display:flex;align-items:center;gap:8px"><input class="fieldInput gramInput" id="scanGrams" type="number" min="0" placeholder="g" value="100" /><button class="btn btn-primary" data-scanadd>Add</button></div></div>'
     : '';
+  const a=aiEst;
+  const aiRow = a
+    ? '<div class="foodRow scanResult"><div><div class="foodName">'+esc(a.name)+' <span class="meta">· Claude estimate ('+esc(a.confidence)+' confidence)</span></div>'
+      +'<div class="meta">~'+round(a.portion_grams)+'g portion · '+round(a.cal)+' kcal · '+round(a.protein_g)+'P / '+round(a.carbs_g)+'C / '+round(a.fat_g)+'F</div>'
+      +(a.notes?'<div class="meta">'+esc(a.notes)+'</div>':'')+'</div>'
+      +'<div style="display:flex;align-items:center;gap:8px"><input class="fieldInput gramInput" id="aiMult" type="number" min="0" step="0.25" value="1" title="Portion multiplier — 0.5 if you ate half" /><button class="btn btn-primary" data-aiadd>Add</button></div></div>'
+    : '';
   const recents=(store._recentScans||[]).map(c=>store._products&&store._products[c]).filter(Boolean);
   const chips=recents.length
     ? '<div class="chipRow">'+recents.map(r=>'<button class="chip" data-scanrecent="'+esc(r.code)+'" title="'+esc(r.name)+'">'+esc(r.name)+'</button>').join('')+'</div>'
     : '';
-  return '<h2 class="sectionTitle" style="margin-top:0">Scan a barcode</h2>'
+  return '<h2 class="sectionTitle" style="margin-top:0">Scan or snap</h2>'
     +'<div class="scanRow">'
-    +'<button class="btn btn-primary" data-scanphoto'+(scanBusy?' disabled':'')+'>&#128247; photo of the barcode</button>'
-    +'<input class="fieldInput" id="scanCode" type="text" inputmode="numeric" autocomplete="off" placeholder="or type the digits" value="'+esc(scanCode)+'" />'
+    +'<button class="btn btn-primary" data-scanphoto'+(scanBusy?' disabled':'')+'>&#128247; barcode</button>'
+    +'<button class="btn btn-primary" data-platephoto'+(scanBusy?' disabled':'')+'>&#127869;&#65039; estimate a plate</button>'
+    +'<input class="fieldInput" id="scanCode" type="text" inputmode="numeric" autocomplete="off" placeholder="or type barcode digits" value="'+esc(scanCode)+'" />'
     +'<button class="btn" data-scanlookup'+(scanBusy?' disabled':'')+'>look up</button>'
     +'</div>'
     +'<input id="scanFile" type="file" accept="image/*" capture="environment" style="display:none">'
+    +'<input id="plateFile" type="file" accept="image/*" capture="environment" style="display:none">'
     +'<div class="hint'+(scanOk?' ok':'')+'" id="scanStatus">'+esc(scanStatus)+'</div>'
-    +prodRow+chips;
+    +prodRow+aiRow+chips;
 }
 function renderScan(){ const w=document.querySelector('[data-card="scan"] .cardBody'); if(w) w.innerHTML=scanHtml(); }
 function noteScan(msg,ok){ scanStatus=msg; scanOk=!!ok; renderScan(); }
@@ -395,6 +405,50 @@ async function lookupBarcode(raw){
       : 'Lookup failed — check the connection and try again.');
   }
   scanBusy=false; renderScan();
+}
+/* plate photo → downscale → the host relays it to the server's Claude vision
+   route → macro estimate for the whole visible portion */
+function downscalePlate(file){
+  return new Promise(res=>{
+    const fr=new FileReader();
+    fr.onload=()=>{
+      const img=new Image();
+      img.onload=()=>{
+        const MAX=1024, sc=Math.min(1, MAX/Math.max(img.width,img.height));
+        const w=Math.max(1,Math.round(img.width*sc)), h=Math.max(1,Math.round(img.height*sc));
+        const c=document.createElement('canvas'); c.width=w; c.height=h;
+        c.getContext('2d').drawImage(img,0,0,w,h);
+        res(c.toDataURL('image/jpeg',0.8));
+      };
+      img.onerror=()=>res(null);
+      img.src=fr.result;
+    };
+    fr.onerror=()=>res(null);
+    fr.readAsDataURL(file);
+  });
+}
+async function estimatePlate(file){
+  if(!(window.Vitality && typeof window.Vitality.estimateFood==='function')){
+    noteScan('AI estimates load with the page — reload the dashboard, then try again.');
+    return;
+  }
+  scanBusy=true; aiEst=null; noteScan('Asking Claude to size up the plate… (can take ~15s)',true);
+  const url=await downscalePlate(file);
+  if(!url){ scanBusy=false; noteScan('Couldn’t read that photo — try again.'); return; }
+  let r=null;
+  try{ r=await window.Vitality.estimateFood(url); }catch(err){ r=null; }
+  scanBusy=false;
+  if(!r || !r.ok || !r.est){
+    const code=r&&r.error;
+    noteScan(code==='no_key' ? 'AI estimates need an ANTHROPIC_API_KEY on the server — add it to .env.local and the Vercel env, then redeploy.'
+      : code==='rate_limited' ? 'Claude is rate-limited right now — try again in a minute.'
+      : code==='timeout' ? 'The estimate timed out — try again.'
+      : 'Estimate failed — check the connection and try again.');
+    renderScan(); return;
+  }
+  aiEst=r.est;
+  noteScan('Claude sized it up — it’s an estimate, so adjust the portion multiplier if you ate more or less.',true);
+  renderScan();
 }
 async function decodeBarcodePhoto(file){
   if(!('BarcodeDetector' in window)){
@@ -526,10 +580,29 @@ document.addEventListener('change',e=>{
     e.target.value='';
     if(f) decodeBarcodePhoto(f);
   }
+  if(e.target.id==='plateFile'){
+    const f=e.target.files&&e.target.files[0];
+    e.target.value='';
+    if(f) estimatePlate(f);
+  }
 });
 document.addEventListener('click',e=>{
   const sp=e.target.closest('[data-scanphoto]');
   if(sp){ const f=$('scanFile'); if(f) f.click(); return; }
+  const pp2=e.target.closest('[data-platephoto]');
+  if(pp2){ const f=$('plateFile'); if(f) f.click(); return; }
+  const aa=e.target.closest('[data-aiadd]');
+  if(aa){
+    const a=aiEst; if(!a) return;
+    const mEl=$('aiMult'); const mult=Number(mEl&&mEl.value);
+    if(!isFinite(mult)||mult<=0){ noteScan('Set the portion multiplier (1 = the whole visible portion).'); return; }
+    const log=todaysLog();
+    log.push({ name:a.name+' (AI est.)', grams:Math.round(a.portion_grams*mult), cal:a.cal*mult, p:a.protein_g*mult, c:a.carbs_g*mult, f:a.fat_g*mult });
+    setTodaysLog(log);
+    aiEst=null;
+    scanStatus='Added '+esc(a.name)+' to today.'; scanOk=true;
+    render(); return;
+  }
   const sl=e.target.closest('[data-scanlookup]');
   if(sl){ lookupBarcode(scanCode); return; }
   const sr=e.target.closest('[data-scanrecent]');
