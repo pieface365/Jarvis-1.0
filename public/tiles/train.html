@@ -211,6 +211,29 @@
   .compareRow img { width:100%; aspect-ratio:3/4; object-fit:cover; object-position:top; border-radius:10px; border:1px solid var(--hair); display:block; }
   .compareRow figcaption { font-family:var(--vt-mono); font-size:9.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); text-align:center; margin-top:7px; }
 
+  /* plate math + warm-up ramp popup */
+  .plateBarRow { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:18px; padding:12px 0; border-bottom:1px solid var(--line); }
+  .plateBarRow .lbl { color:var(--muted-strong); font-size:14px; font-weight:500; }
+  .plateRows { margin-top:4px; }
+  .plateRow { display:flex; align-items:center; gap:12px; padding:12px 0; border-top:1px solid var(--line); }
+  .plateRow:first-child { border-top:none; }
+  .plateRow .pset { font-family:var(--vt-mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); width:74px; flex:none; }
+  .plateRow .pw { font-family:var(--serif); font-style:italic; font-size:17px; width:76px; flex:none; font-variant-numeric:tabular-nums; }
+  .plateRow.main .pw, .plateRow.main .pset { color:var(--mint); }
+  .plateRow .chips { flex:1; display:flex; flex-wrap:wrap; gap:5px; }
+  .plateChip { font-family:var(--vt-mono); font-size:11px; padding:3px 8px; border-radius:6px; border:1px solid var(--hair); color:var(--muted-strong); font-variant-numeric:tabular-nums; }
+  .plateChip.big { border-color:rgba(110,231,183,.45); color:var(--mint); }
+  .plateChip.bare { border-style:dashed; color:var(--muted); }
+  .plateFoot { font-family:var(--vt-mono); font-size:9.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin-top:14px; line-height:1.8; }
+
+  /* bodyweight log inside the physique popup */
+  .bwRow { display:flex; align-items:center; gap:9px; margin-top:12px; }
+  .bwLbl { font-family:var(--serif); font-style:italic; font-size:14px; color:var(--muted-strong); flex:1; }
+  .bwIn { background:var(--bg); border:1px solid var(--line); border-radius:10px; color:var(--text); font:inherit; font-size:15px; font-variant-numeric:tabular-nums; padding:8px 11px; width:92px; text-align:right; -moz-appearance:textfield; appearance:textfield; }
+  .bwIn::-webkit-outer-spin-button, .bwIn::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+  .bwIn:focus { outline:none; border-color:var(--mint); }
+  .bwTrend { font-family:var(--vt-mono); font-size:11px; color:var(--mint); white-space:nowrap; }
+
   /* stacked (narrow) layout: lie the tile down as a compact row */
   @media (max-width: 780px) {
     .weekCard { flex-direction:row; text-align:left; padding:14px 16px; gap:14px; }
@@ -848,6 +871,7 @@ const IC = {
   eyeOpen:'<path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12Z"/><circle cx="12" cy="12" r="3"/>',
   eyeOff:'<path d="M3 3l18 18M10.6 10.7a3 3 0 0 0 4 4M9.9 5.2A9.8 9.8 0 0 1 12 5c7 0 10.5 7 10.5 7a17 17 0 0 1-3.2 4M6.1 6.1A17 17 0 0 0 1.5 12S5 19 12 19a9.7 9.7 0 0 0 3.9-.8"/>',
   reset:'<path d="M3.5 6.5 A6 6 0 1 0 6 3.2"/><polyline points="2.4 2.4 3.7 6.6 8 5.2"/>',
+  plates:'<path d="M2.5 12h1.5M20 12h1.5M6 8v8M18 8v8M9 9.5v5M15 9.5v5M9 12h6"/>',
 };
 function dotsIcon(){ return '<svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="18" cy="12" r="1.7"/></svg>'; }
 function gripIcon(){ return '<svg viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>'; }
@@ -984,6 +1008,21 @@ function physPhotos(){
   return STATE.physique.photos;
 }
 function photoDates(){ return Object.keys(physPhotos()).filter(k=>/^\d{4}-\d{2}-\d{2}$/.test(k)).sort(); }
+/* daily bodyweight rides in the same physique store: {'YYYY-MM-DD': lb} */
+function physWeights(){
+  if(!STATE.physique || typeof STATE.physique!=='object') STATE.physique={};
+  if(!STATE.physique.weights || typeof STATE.physique.weights!=='object') STATE.physique.weights={};
+  return STATE.physique.weights;
+}
+function weightDates(){ return Object.keys(physWeights()).filter(k=>/^\d{4}-\d{2}-\d{2}$/.test(k)).sort(); }
+/* lb/week: 7-day average vs the 7 days before it — noise-proof vs any single weigh-in */
+function weightTrend(){
+  const w=physWeights(); const ds=weightDates();
+  const win=(a,b)=>ds.filter(k=>{ const n=daysAgo(k); return n>=a&&n<b; });
+  const avg=l=>l.length?l.reduce((s,k)=>s+w[k],0)/l.length:null;
+  const cur=avg(win(0,7)), prev=avg(win(7,14));
+  return (cur!=null&&prev!=null)? r1(cur-prev) : null;
+}
 function photoStreak(){ const ph=physPhotos(); let s=0, i=ph[today]?0:1; for(;;i++){ if(ph[dayKeyAgo(i)]) s++; else break; } return s; }
 function weekKeyOf(k){ const [y,m,d]=k.split('-').map(Number); const dt=new Date(y,m-1,d); dt.setDate(dt.getDate()-((dt.getDay()+6)%7)); return ymd(dt); }
 const PHOTO_BUDGET=1200000; /* ~1.2MB of photo data — keeps the whole tile under the host's per-tile save cap */
@@ -1020,14 +1059,22 @@ function processPhoto(file, cb){
 function renderPhys(){
   const el = $('#physCard'); if(!el) return;
   const ph=physPhotos(); const dates=photoDates();
+  const bw=physWeights(); const wds=weightDates();
+  const bwRow=(()=>{
+    if(!wds.length) return '';
+    const t=weightTrend();
+    return '<div class="physRow"><span class="physName">Weight</span><span class="physVal">'+bw[wds[wds.length-1]]+' lb'
+      +(t!=null?' <span style="color:var(--mint)">'+(t>0?'+':'')+t+'/wk</span>':'')+'</span></div>';
+  })();
   let body;
   if(!dates.length){
-    body='<div class="physEmpty">Daily progress photos — tap to open the month and take today’s.</div>';
+    body='<div class="physEmpty">Daily progress photos + morning weight — tap to open the month and log today’s.</div>'+bwRow;
   } else {
     const last=dates[dates.length-1];
     body='<img class="physThumb" src="'+ph[last]+'" alt="Latest progress photo">'
       +'<div class="physRow"><span class="physName">Photos</span><span class="physVal">'+dates.length+'</span></div>'
       +'<div class="physRow"><span class="physName">Streak</span><span class="physVal">'+photoStreak()+'d</span></div>'
+      +bwRow
       +'<div class="physFoot">'+(ph[today]?'today ✓ — tap to review':'no shot today yet — tap to take it')+'</div>';
   }
   el.innerHTML='<div class="gTitle">Physique<span class="go">calendar →</span></div>'+body;
@@ -1080,9 +1127,21 @@ function drawPhysCal(scrim){
     +'<button class="calNavBtn" id="calPrev" aria-label="Previous month">‹</button>'
     +'<button class="calNavBtn" id="calNext" aria-label="Next month"'+(calMonth>=curMonth?' disabled':'')+'>›</button></div></div>'
     +'<div class="calGrid">'+grid+'</div>'
+    +bwSectionHtml()
     +(dates.length>=2?'<div class="popBtns" style="margin-top:16px"><button class="pbtn ghost" id="calCompare">compare first ↔ latest</button></div>':'')
     +'<div class="calFoot">'+(dates.length?dates.length+' photos · '+photoStreak()+'-day streak · ~'+kb+' kb stored':'tap today to take your first shot — same spot, same light, every day')
     +'<br>daily shots keep 60 days; older weeks keep their first photo</div>';
+  const bwIn=wrap.querySelector('#bwIn');
+  if(bwIn){
+    const commit=()=>{
+      const raw=bwIn.value.trim(); const bw=physWeights();
+      if(raw===''){ if(bw[today]!=null){ delete bw[today]; saveState(); renderPhys(); drawPhysCal(scrim); } return; }
+      const v=parseFloat(raw);
+      if(Number.isFinite(v)&&v>=50&&v<=500 && bw[today]!==r1(v)){ bw[today]=r1(v); saveState(); renderPhys(); drawPhysCal(scrim); }
+    };
+    bwIn.addEventListener('keydown',ev=>{ if(ev.key==='Enter'){ ev.preventDefault(); bwIn.blur(); } });
+    bwIn.addEventListener('blur',commit);
+  }
   wrap.querySelector('#calPrev').onclick=()=>{ calMonth=shiftMonth(calMonth,-1); drawPhysCal(scrim); };
   wrap.querySelector('#calNext').onclick=()=>{ if(calMonth<curMonth){ calMonth=shiftMonth(calMonth,1); drawPhysCal(scrim); } };
   wrap.querySelectorAll('.calDay[data-day]').forEach(b=> b.onclick=()=>{
@@ -1091,6 +1150,35 @@ function drawPhysCal(scrim){
     else { pendingPhotoDate=k; scrim.querySelector('#phFile').click(); }
   });
   const cmp=wrap.querySelector('#calCompare'); if(cmp) cmp.onclick=()=>drawCompare(scrim);
+}
+/* the bodyweight strip under the calendar: today's entry + the trend curve */
+function bwSectionHtml(){
+  const bw=physWeights(); const ds=weightDates();
+  const t=weightTrend();
+  return '<div class="secLbl" style="margin-top:22px">Bodyweight</div>'
+    +'<div class="bwRow"><span class="bwLbl">'+(bw[today]!=null?'logged today ✓':'this morning?')+'</span>'
+    +'<input class="bwIn" id="bwIn" type="number" inputmode="decimal" step="0.1" min="50" max="500" placeholder="—" value="'+(bw[today]!=null?bw[today]:'')+'">'
+    +'<span class="wUnit">lb</span>'
+    +(t!=null?'<span class="bwTrend">'+(t>0?'+':'')+t+' lb/wk</span>':'')
+    +'</div>'
+    +bwChartSvg(ds,bw);
+}
+function bwChartSvg(ds,bw){
+  if(ds.length<2) return '<div class="calFoot" style="margin-top:10px">weigh in most mornings — the 7-day trend beats any single number</div>';
+  const W=320,H=110,padY=14,padX=8;
+  const vals=ds.map(k=>bw[k]);
+  let lo=Math.min(...vals), hi=Math.max(...vals);
+  if(hi-lo<2){ hi+=1; lo-=1; } const span=hi-lo; lo-=span*.15; hi+=span*.15;
+  const oldest=Math.max(...ds.map(k=>daysAgo(k)),1);
+  const X=k=>padX+Math.min(1,Math.max(0,1-daysAgo(k)/oldest))*(W-padX*2);
+  const Y=v=>H-padY-((v-lo)/(hi-lo))*(H-padY*2);
+  const line=ds.map((k,i)=>(i?'L':'M')+X(k).toFixed(1)+' '+Y(bw[k]).toFixed(1)).join(' ');
+  const dots=ds.map(k=>tipDot(X(k).toFixed(1),Y(bw[k]).toFixed(1),2.6,'#6EE7B7',fmtDate(k)+' · '+bw[k]+' lb')).join('');
+  const d=r1(vals[vals.length-1]-vals[0]);
+  return '<svg class="pchart" style="height:110px" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" aria-hidden="true">'
+    +'<path d="'+line+'" fill="none" stroke="var(--mint)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="filter:drop-shadow(0 0 5px rgba(110,231,183,.45))"/>'
+    +dots+'</svg>'
+    +'<div class="delta-cap">'+(d>=0?'+':'')+d+' lb <span class="mu">· '+ds.length+' weigh-ins since '+fmtDate(ds[0])+'</span></div>';
 }
 function drawPhotoView(scrim,k){
   const wrap=scrim.querySelector('#physCal'); const ph=physPhotos(); const dates=photoDates();
@@ -1497,7 +1585,11 @@ function renderProgress(){
   prog.style.display='';
   const t=dayTotals(d); const pct = t.total? Math.round(t.logged/t.total*100):0;
   $('#pfill').style.width=pct+'%';
-  $('#plabel').innerHTML = '<b>'+t.logged+'</b> of '+t.total+' logged';
+  /* tonnage: every hit set's weight × reps (both hands for /ea lifts) */
+  let ton=0;
+  d.ex.forEach(e=>{ if(e.dur) return; e.log.forEach(s=>{ if(s&&!s.fail) ton+=s.kg*s.reps*(e.perHand?2:1); }); });
+  $('#plabel').innerHTML = '<b>'+t.logged+'</b> of '+t.total+' logged'
+    +(ton>0?' · <b>'+Math.round(ton).toLocaleString('en-US')+'</b> '+STATE.unit+' moved':'');
 }
 function renderBody(){
   const wrap=$('#exwrap'); const d=curDay();
@@ -1532,7 +1624,11 @@ function renderCard(e, day){
   // items (climbs, timed warm-ups) have no meaningful reps/weight to edit
   const rxLive = e.dur ? e.dur : (rx.sets+' × <input class="metaInput mr" type="number" inputmode="numeric" min="1" value="'+rx.reps+'" aria-label="Reps" title="Edit reps"> @ <input class="metaInput mw" type="number" inputmode="decimal" step="0.5" min="0" value="'+e.kg+'" aria-label="Weight" title="Edit weight">'+STATE.unit+(e.perHand?'/ea':''));
   const metaBits = [tier, rxLive];
-  if(e.lastKg!=null) metaBits.push('last '+e.lastKg+' '+STATE.unit);
+  // "last" shows the PREVIOUS session in full (weight × top reps · date) —
+  // the number to beat — not today's own rollup
+  const prevSess=(e.hist||[]).filter(h=>h&&!h.off&&h.date!==today).slice(-1)[0];
+  if(prevSess) metaBits.push('last '+prevSess.kg+'×'+topReps(prevSess)+' · '+fmtDate(prevSess.date));
+  else if(e.lastKg!=null) metaBits.push('last '+e.lastKg+' '+STATE.unit);
   /* readiness tags — only on the day whose session is actually today */
   const rTier = (day===STATE.days[todayDayKey()]) ? todayTier() : null;
   const capTag = (rTier==='amber' && e.tier===1) ? '<span class="capTag">cap top set</span>' : '';
@@ -1553,6 +1649,7 @@ function renderCard(e, day){
     +   '<button class="actionPill" data-act="swap">'+svg(IC.swap,' fill="none" stroke="currentColor"')+'<span class="pl">swap</span></button>'
     +   '<button class="actionPill" data-act="history">'+svg(IC.history,' fill="none" stroke="currentColor"')+'<span class="pl">history</span></button>'
     +   '<button class="actionPill" data-act="tune">'+svg(IC.tune,' fill="none" stroke="currentColor"')+'<span class="pl">tune</span></button>'
+    +   (plateEligible(e)?'<button class="actionPill" data-act="plates">'+svg(IC.plates,' fill="none" stroke="currentColor"')+'<span class="pl">plates</span></button>':'')
     + '</div>'
     + '<div class="restSlot"></div>'
     + '<div class="pills"></div>';
@@ -1658,7 +1755,54 @@ function handleAct(act, e, day, btn){
   else if(act==='history'){ openHistory(e); }
   else if(act==='swap'){ openSwap(e); }
   else if(act==='tune'){ openTune(e); }
+  else if(act==='plates'){ openPlates(e); }
   else if(act==='menu'){ openMenu(e, day, btn); }
+}
+
+/* ====================================================================
+   PLATE MATH + WARM-UP RAMP (barbell / Smith lifts only)
+   ================================================================= */
+const PLATES=[45,35,25,10,5,2.5];
+function plateEligible(e){
+  const eq=(LIB[e.id]&&LIB[e.id].equipment)||'';
+  return !e.dur && !e.perHand && (eq==='Barbell'||eq==='Smith machine');
+}
+/* greedy per-side breakdown — bar and target are multiples of 5, plates go
+   down to 2.5/side (5 total), so any target ≥ bar loads exactly */
+function perSidePlates(total,bar){
+  let rem=(total-bar)/2; const out=[];
+  PLATES.forEach(p=>{ while(rem>=p-1e-9){ out.push(p); rem-=p; } });
+  return out;
+}
+function roundLoadable(w,bar){ return Math.max(bar, Math.round(w/5)*5); }
+function openPlates(e){
+  openPop(popHead('Plates · warm-up', e.name)+'<div id="platesPop"></div>', scrim=>drawPlates(scrim,e));
+}
+function drawPlates(scrim,e){
+  const wrap=scrim.querySelector('#platesPop'); if(!wrap) return;
+  const bar=(typeof e.barWt==='number'&&e.barWt>0)?e.barWt:45;
+  const rx=prescription(e);
+  const work=roundLoadable(rx.kg,bar);
+  const ramp=[{set:'warm-up ×10', w:bar}];
+  [[0.55,'55% ×5'],[0.75,'75% ×3'],[0.9,'90% ×1']].forEach(([f,label])=>{
+    const w=roundLoadable(work*f,bar);
+    if(w>ramp[ramp.length-1].w && w<work) ramp.push({set:label, w});
+  });
+  ramp.push({set:rx.sets+' × '+rx.reps, w:work, main:true});
+  const chips=w=>{
+    const ps=perSidePlates(w,bar);
+    if(!ps.length) return '<span class="plateChip bare">empty bar</span>';
+    return ps.map(p=>'<span class="plateChip'+(p>=45?' big':'')+'">'+p+'</span>').join('');
+  };
+  wrap.innerHTML=
+    '<div class="plateBarRow"><span class="lbl">Bar weight</span>'
+    +'<div class="stepper"><button class="step minus" id="barDn">−</button><span class="stepVal">'+bar+' lb</span><button class="step" id="barUp">+</button></div></div>'
+    +'<div class="plateRows">'+ramp.map(r=>
+      '<div class="plateRow'+(r.main?' main':'')+'"><span class="pset">'+r.set+'</span><span class="pw">'+r.w+' lb</span><span class="chips">'+chips(r.w)+'</span></div>'
+    ).join('')+'</div>'
+    +'<div class="plateFoot">plates per SIDE · working weight '+(rx.kg===work?work:rx.kg+' → '+work)+' lb'+(e.deload?' (deload −10%)':'')+'<br>smith bars vary — set yours once and it sticks</div>';
+  scrim.querySelector('#barDn').onclick=()=>{ e.barWt=Math.max(15,bar-5); saveState(); drawPlates(scrim,e); };
+  scrim.querySelector('#barUp').onclick=()=>{ e.barWt=Math.min(65,bar+5); saveState(); drawPlates(scrim,e); };
 }
 
 /* ====================================================================
@@ -1666,7 +1810,26 @@ function handleAct(act, e, day, btn){
    ================================================================= */
 const restTimers={};
 function startRest(e){ stopRest(e.id); const rx=prescription(e); restTimers[e.id]={remaining:rx.rest, handle:null}; tickRest(e); const card=document.querySelector('.ex[data-id="'+e.id+'"]'); if(card) mountRestBar(card, e); }
-function tickRest(e){ const t=restTimers[e.id]; if(!t) return; t.handle=setInterval(()=>{ t.remaining-=1; updateRest(e.id); },1000); }
+function tickRest(e){ const t=restTimers[e.id]; if(!t) return; t.handle=setInterval(()=>{ t.remaining-=1; if(t.remaining===0) restDing(); updateRest(e.id); },1000); }
+/* soft two-tone ding when rest runs out — the AudioContext is created on the
+   set-log gesture chain, so autoplay policy allows it; failures stay silent */
+let _ac=null;
+function restDing(){
+  try{
+    _ac=_ac||new (window.AudioContext||window.webkitAudioContext)();
+    if(_ac.state==='suspended') _ac.resume();
+    [[880,0],[1318.5,0.18]].forEach(([f,at])=>{
+      const o=_ac.createOscillator(), g=_ac.createGain();
+      o.type='sine'; o.frequency.value=f;
+      const t0=_ac.currentTime+at;
+      g.gain.setValueAtTime(0.0001,t0);
+      g.gain.exponentialRampToValueAtTime(0.12,t0+0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001,t0+0.18);
+      o.connect(g); g.connect(_ac.destination);
+      o.start(t0); o.stop(t0+0.22);
+    });
+  }catch(err){ /* no audio available — the bar still flips to "go →" */ }
+}
 function stopRest(id){ const t=restTimers[id]; if(t&&t.handle) clearInterval(t.handle); delete restTimers[id]; }
 function mountRestBar(card, e){ const slot=card.querySelector('.restSlot'); const t=restTimers[e.id]; if(!t||!slot){ if(slot)slot.innerHTML=''; return; }
   const over=t.remaining<=0;
@@ -1973,7 +2136,8 @@ function patchProgramEdits(d){
     if(d.weekLog && Object.keys(STATE.weekLog||{}).length===0) STATE.weekLog = d.weekLog;
     if(d.autoAdjust!==undefined && STATE.days!==d.days){ STATE.autoAdjust = d.autoAdjust; STATE.autoAdjustDate = d.autoAdjustDate||null; }
     if(d.uiOrder && !STATE.uiOrder) STATE.uiOrder = d.uiOrder;
-    if(d.physique && d.physique.photos && Object.keys(d.physique.photos).length && !(STATE.physique && STATE.physique.photos && Object.keys(STATE.physique.photos).length)) STATE.physique = d.physique;
+    const hadPhys = d.physique && ((d.physique.photos && Object.keys(d.physique.photos).length) || (d.physique.weights && Object.keys(d.physique.weights).length));
+    if(hadPhys && !(STATE.physique && STATE.physique.photos && Object.keys(STATE.physique.photos).length)) STATE.physique = d.physique;
     if(d.climbLog && d.climbLog.sessions && Object.keys(d.climbLog.sessions).length && !(STATE.climbLog && STATE.climbLog.sessions && Object.keys(STATE.climbLog.sessions).length)) STATE.climbLog = d.climbLog;
     if(d.liftsView && !STATE.liftsView) STATE.liftsView = d.liftsView;
   }
