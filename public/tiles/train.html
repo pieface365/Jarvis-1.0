@@ -805,12 +805,20 @@ let STATE = null;
    With daily photos in STATE the payload runs to megabytes, so identical
    back-to-back saves (render() fires on every tab click) are skipped. */
 let _lastSavedJson=null;
+function noteSave(ok){
+  const el=document.querySelector('.store-note'); if(!el) return;
+  if(ok){ el.textContent='Saved to your Vitality dashboard.'; el.style.color=''; }
+  else { el.textContent='⚠ Save failed — storage is full. Delete a few physique photos, then log anything to retry.'; el.style.color='var(--fail)'; }
+}
 function saveState(){
   if(!(window.Vitality && typeof window.Vitality.save==='function')) return;
   let s=null; try{ s=JSON.stringify(STATE); }catch(err){ /* save anyway */ }
   if(s!==null && s===_lastSavedJson) return;
   if(s!==null) _lastSavedJson=s;
-  window.Vitality.save(STATE);
+  window.Vitality.save(STATE).then(
+    ()=>noteSave(true),
+    ()=>{ _lastSavedJson=null; noteSave(false); } /* un-skip so the next change retries */
+  );
 }
 
 /* ---- helpers on state -------------------------------------------- */
@@ -978,9 +986,16 @@ function physPhotos(){
 function photoDates(){ return Object.keys(physPhotos()).filter(k=>/^\d{4}-\d{2}-\d{2}$/.test(k)).sort(); }
 function photoStreak(){ const ph=physPhotos(); let s=0, i=ph[today]?0:1; for(;;i++){ if(ph[dayKeyAgo(i)]) s++; else break; } return s; }
 function weekKeyOf(k){ const [y,m,d]=k.split('-').map(Number); const dt=new Date(y,m-1,d); dt.setDate(dt.getDate()-((dt.getDay()+6)%7)); return ymd(dt); }
+const PHOTO_BUDGET=1200000; /* ~1.2MB of photo data — keeps the whole tile under the host's per-tile save cap */
 function thinPhotos(){
   const ph=physPhotos(); const cutoff=dayKeyAgo(60); const seen={};
   photoDates().forEach(k=>{ if(k>=cutoff) return; const w=weekKeyOf(k); if(seen[w]) delete ph[k]; else seen[w]=1; });
+  /* hard byte budget: if the weekly thinning wasn't enough, drop the OLDEST
+     photos (never the newest) until the log fits — silent data loss on save
+     is worse than losing the most distant history */
+  let keys=photoDates();
+  let total=keys.reduce((s,k)=>s+(ph[k]?ph[k].length:0),0);
+  while(keys.length>1 && total>PHOTO_BUDGET){ total-=ph[keys[0]].length; delete ph[keys[0]]; keys.shift(); }
 }
 /* file → downscaled jpeg dataURL (canvas), so a phone shot lands small */
 function processPhoto(file, cb){
@@ -988,11 +1003,13 @@ function processPhoto(file, cb){
   fr.onload=()=>{
     const img=new Image();
     img.onload=()=>{
-      const MAX=640, sc=Math.min(1, MAX/Math.max(img.width,img.height));
+      /* 512px/q0.62 ≈ 20–40KB per shot — sized so ~2 months of dailies plus
+         weekly history fit the PHOTO_BUDGET without tripping the save cap */
+      const MAX=512, sc=Math.min(1, MAX/Math.max(img.width,img.height));
       const w=Math.max(1,Math.round(img.width*sc)), h=Math.max(1,Math.round(img.height*sc));
       const c=document.createElement('canvas'); c.width=w; c.height=h;
       c.getContext('2d').drawImage(img,0,0,w,h);
-      cb(c.toDataURL('image/jpeg',0.66));
+      cb(c.toDataURL('image/jpeg',0.62));
     };
     img.onerror=()=>cb(null);
     img.src=fr.result;

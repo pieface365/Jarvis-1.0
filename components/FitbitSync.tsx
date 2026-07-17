@@ -100,15 +100,30 @@ export default function FitbitSync({ userId }: { userId: string }) {
           }
           const train = await loadTileData(userId, 'train')
           if (train && typeof train === 'object' && !Array.isArray(train)) {
-            // existing state (any version — the tile's boot migrates): ride along
-            ;(train as any).readiness = readiness
-            await saveTileData(userId, 'train', train)
+            // Skip the write when readiness is already current — the train blob
+            // carries the physique photo log, so a no-op rewrite re-uploads
+            // megabytes on every dashboard load.
+            const prev = (train as any).readiness
+            const same =
+              prev &&
+              prev.date === readiness.date &&
+              prev.recovery === readiness.recovery &&
+              prev.hrv === readiness.hrv &&
+              prev.rhr === readiness.rhr &&
+              prev.sleepHours === readiness.sleepHours &&
+              prev.hrvBase === readiness.hrvBase
+            if (!same) {
+              // existing state (any version — the tile's boot migrates): ride along
+              ;(train as any).readiness = readiness
+              await saveTileData(userId, 'train', train)
+              console.info('[fitbit] readiness synced for', readiness.date, '— recovery', readiness.recovery + '%')
+            }
           } else {
             // tile never opened in this browser: seed a bare object; the tile
             // adopts .readiness off the raw load even when it rebuilds state
             await saveTileData(userId, 'train', { readiness })
+            console.info('[fitbit] readiness synced for', readiness.date, '— recovery', readiness.recovery + '%')
           }
-          console.info('[fitbit] readiness synced for', readiness.date, '— recovery', readiness.recovery + '%')
         }
       } catch {
         /* offline or dev server hiccup — the tile still works manually */

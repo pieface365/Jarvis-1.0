@@ -232,7 +232,12 @@ function deleteTile(userId: string, id: string) {
   }
 }
 
-const MAX_TILE_DATA = 512 * 1024 // ~512KB per tile, protects the shared localStorage budget
+/* ~2MB per tile. Train carries the physique photo log (jpegs as data URLs,
+   budgeted to ~1.2MB tile-side), so the old 512KB cap would silently drop
+   EVERY train save once photos accumulated. 2MB leaves room for that budget
+   plus program state while staying inside the ~5MB localStorage origin quota
+   (the Supabase branch above has no such limit). */
+const MAX_TILE_DATA = 2 * 1024 * 1024
 
 /** Persist a tile's data. Returns whether the write actually landed so callers
  *  never tell the user "Saved" for a payload that was silently dropped (oversized

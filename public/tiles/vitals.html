@@ -134,7 +134,7 @@ let editDate=null;    /* which day the entry card edits (null until boot = today
 const $=id=>document.getElementById(id);
 const round=n=>Math.round(n);
 const clamp01=x=>Math.max(0,Math.min(1,x));
-function persist(){window.Vitality.save(store);}
+function persist(){window.Vitality.save(store).catch(()=>{});} /* host may reject (quota); tile state stays live */
 function todayKey(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function num(v){const n=Number(v);return (v===''||v==null||!isFinite(n))?null:n;}
 function todaysEntry(){return store[todayKey()]||{};}

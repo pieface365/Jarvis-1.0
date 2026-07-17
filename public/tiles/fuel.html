@@ -220,7 +220,7 @@ function mealTotals(meal){
 let store={};
 const $=id=>document.getElementById(id);
 function todayKey(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
-function persist(){window.Vitality.save(store);}
+function persist(){window.Vitality.save(store).catch(()=>{});} /* host may reject (quota); tile state stays live */
 function todaysLog(){return store[todayKey()]||[];}
 function setTodaysLog(l){store[todayKey()]=l;persist();}
 function goalCal(){return store.goalCal!=null?store.goalCal:PLAN_TARGET.cal;}
@@ -600,7 +600,7 @@ document.addEventListener('click',e=>{
     log.push({ name:a.name+' (AI est.)', grams:Math.round(a.portion_grams*mult), cal:a.cal*mult, p:a.protein_g*mult, c:a.carbs_g*mult, f:a.fat_g*mult });
     setTodaysLog(log);
     aiEst=null;
-    scanStatus='Added '+esc(a.name)+' to today.'; scanOk=true;
+    scanStatus='Added '+a.name+' to today.'; scanOk=true; /* raw — scanHtml escapes on render */
     render(); return;
   }
   const sl=e.target.closest('[data-scanlookup]');
