@@ -371,6 +371,9 @@
   animation:openPage .32s var(--vease) both}
 .veeTiles .openOverlay.openFull .openTop{padding:max(14px,env(safe-area-inset-top)) 20px 12px;
   border-bottom:1px solid rgba(255,255,255,.06)}
+/* the floating dock (z85) hovers over the page bottom — stop the tile's iframe
+   above it so the last rows of content can never hide behind it */
+.veeTiles .openOverlay.openFull .openFrame{height:calc(100% - 88px - env(safe-area-inset-bottom, 0px))}
 .veeTiles .openBack{display:inline-flex;align-items:center;gap:10px;border:0;background:none;cursor:pointer;
   font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
   color:rgba(167,243,208,.78);padding:4px 2px;transition:color .18s var(--vease)}
