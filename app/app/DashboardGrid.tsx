@@ -27,6 +27,32 @@ import CoachPanel from '@/components/CoachPanel'
 // The fixed slot roster (the seeded order + sizes), minus the Library tile.
 const SLOT_ORDER = DEFAULT_HOME_ORDER.filter((id) => id !== 'library') as string[]
 
+/* ── the Coach tile ──
+   Coach isn't a sealed slot — tapping it opens the AI chat panel — but it sits
+   in the grid as an always-present tile (like Library in the full app): it
+   drags, resizes, and packs like the rest. Kept out of SLOT_ORDER so the dock
+   roster, slot discovery, and the "+ New tile" slot picker never see it. */
+const GRID_ORDER = [...SLOT_ORDER, 'coach']
+
+const COACH_TILE = {
+  index: '08',
+  label: 'Coach',
+  variant: undefined as string | undefined,
+  orb: { mode: 'wander' },
+  glyph: (
+    <svg viewBox="-12 -12 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 -1.5 C9 2.6 5 5.8 0 5.8 c-.9 0 -1.8 -.1 -2.6 -.3 L-8 7.5 l1.3 -3.1 C-8.1 3.1 -9 1 -9 -1.5 c0 -4.1 4 -7.4 9 -7.4 s9 3.3 9 7.4 Z" />
+      <path d="M-3.5 -1.5 h.01 M0 -1.5 h.01 M3.5 -1.5 h.01" />
+    </svg>
+  ),
+  art: (
+    <svg className="art" viewBox="0 0 210 118">
+      <path className="mot" d="M38 66 Q70 44 105 60 T172 50" />
+      <g className="orb"><circle className="glow" r="9" /><circle className="node" r="3.4" /></g>
+    </svg>
+  ),
+}
+
 type FilledMap = Record<string, string> // slotId -> sealed HTML
 
 /* ── the Vee centre art (wire feeds + ring pulse), animated by veeTilesAnim ── */
@@ -79,7 +105,7 @@ function TileFace({
 }: {
   id: string
   isVee: boolean
-  core: CoreTile | null
+  core: Pick<CoreTile, 'index' | 'label' | 'variant' | 'orb' | 'glyph' | 'art'> | null
   pos: { x: number; y: number; w: number; h: number } | undefined
   size: TileSize
   onOpen: () => void
@@ -616,7 +642,7 @@ export default function DashboardGrid({ userId, arranging = false }: DashboardGr
   const { register, unregister } = useTileHost(userId, undefined, () => {})
 
   // The user's arrangement (order + per-tile sizes), persisted per user.
-  const [order, setOrder] = useState<string[]>(SLOT_ORDER)
+  const [order, setOrder] = useState<string[]>(GRID_ORDER)
   const [sizes, setSizes] = useState<Record<string, TileSize>>({})
 
   useEffect(() => {
@@ -627,7 +653,7 @@ export default function DashboardGrid({ userId, arranging = false }: DashboardGr
       /* ignore */
     }
     const saved = homeLayout.get(userId)
-    setOrder(resolveOrder(saved.order, SLOT_ORDER))
+    setOrder(resolveOrder(saved.order, GRID_ORDER))
     setSizes(saved.sizes || {})
     // Cloud copy wins when sync is on, so an arrangement made in one browser
     // (or before a redeploy) shows up in every other one.
@@ -636,7 +662,7 @@ export default function DashboardGrid({ userId, arranging = false }: DashboardGr
         const remote = (await syncLoad('_homeLayout')) as { order?: string[]; sizes?: Record<string, TileSize> } | null
         if (remote && Array.isArray(remote.order)) {
           homeLayout.set(userId, { order: remote.order, sizes: remote.sizes || {} })
-          setOrder(resolveOrder(remote.order, SLOT_ORDER))
+          setOrder(resolveOrder(remote.order, GRID_ORDER))
           setSizes(remote.sizes || {})
         }
       })()
@@ -644,7 +670,12 @@ export default function DashboardGrid({ userId, arranging = false }: DashboardGr
   }, [userId])
 
   const sizeFor = (id: string): TileSize =>
-    sizes[id] ?? ((id === 'vee' ? coreDefaultSize('vee') : coreDefaultSize(id as Parameters<typeof coreDefaultSize>[0])) as TileSize)
+    sizes[id] ??
+    ((id === 'coach'
+      ? 's'
+      : id === 'vee'
+        ? coreDefaultSize('vee')
+        : coreDefaultSize(id as Parameters<typeof coreDefaultSize>[0])) as TileSize)
 
   const persistLayout = (nextOrder: string[], nextSizes: Record<string, TileSize>) => {
     homeLayout.set(userId, { order: nextOrder, sizes: nextSizes })
@@ -782,8 +813,14 @@ export default function DashboardGrid({ userId, arranging = false }: DashboardGr
 
   // The board shows ONLY tiles that actually exist, in the USER'S order. A fresh
   // scaffold has none, so it boots to the blank "see the vision" canvas; tiles
-  // appear as they're built (/tile) or installed.
-  const filledOrder = useMemo(() => order.filter((id) => filled[id]), [order, filled])
+  // appear as they're built (/tile) or installed. Coach rides along whenever the
+  // board has any content (a coach with nothing to read belongs to onboarding, not
+  // the empty canvas).
+  const hasContent = useMemo(() => order.some((id) => filled[id]), [order, filled])
+  const filledOrder = useMemo(
+    () => order.filter((id) => (id === 'coach' ? hasContent : filled[id])),
+    [order, filled, hasContent],
+  )
 
   // Layout: pure function of (which tiles exist, the user's sizes, cols).
   const { positions, rows } = useMemo(() => {
@@ -818,7 +855,8 @@ export default function DashboardGrid({ userId, arranging = false }: DashboardGr
     else setConnectId(id)
   }
 
-  const labelFor = (id: string) => (id === 'vee' ? VEE_TILE.label : CORE_TILES[id as keyof typeof CORE_TILES].label)
+  const labelFor = (id: string) =>
+    id === 'vee' ? VEE_TILE.label : id === 'coach' ? COACH_TILE.label : CORE_TILES[id as keyof typeof CORE_TILES].label
 
   const isEmpty = filledOrder.length === 0
 
@@ -832,15 +870,16 @@ export default function DashboardGrid({ userId, arranging = false }: DashboardGr
         <div className="grid" style={{ ['--rows' as string]: rows }}>
           {filledOrder.map((id) => {
             const isVee = id === 'vee'
+            const isCoach = id === 'coach'
             return (
               <TileFace
                 key={id}
                 id={id}
                 isVee={isVee}
-                core={isVee ? null : CORE_TILES[id as keyof typeof CORE_TILES]}
+                core={isVee ? null : isCoach ? COACH_TILE : CORE_TILES[id as keyof typeof CORE_TILES]}
                 pos={positions.get(id)}
                 size={sizeFor(id)}
-                onOpen={() => openSlot(id)}
+                onOpen={() => (isCoach ? setCoachOpen(true) : openSlot(id))}
                 arranging={arranging}
                 dragging={dragId === id}
                 onDragStart={startDrag(id)}
@@ -926,7 +965,7 @@ export default function DashboardGrid({ userId, arranging = false }: DashboardGr
           type="button"
           onClick={() => {
             homeLayout.reset(userId)
-            setOrder(SLOT_ORDER)
+            setOrder(GRID_ORDER)
             setSizes({})
             if (syncEnabled()) void syncSave('_homeLayout', { order: [], sizes: {} }, new Date().toISOString())
           }}
