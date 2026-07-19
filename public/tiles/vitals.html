@@ -65,6 +65,15 @@
   .statLabel{font-family:var(--font-mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
   .statVal{font-weight:700;font-size:1.15rem;margin-top:4px;font-variant-numeric:tabular-nums}
   .statVal small{font-size:11px;color:var(--muted);font-weight:400}
+  .statDelta{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.04em;margin-top:4px;font-variant-numeric:tabular-nums}
+
+  /* week in review rows */
+  .wkRow{display:flex;align-items:baseline;gap:10px;padding:9px 0;border-top:1px solid var(--border)}
+  .wkRow:first-of-type{border-top:none;padding-top:0}
+  .wkName{flex:1;color:var(--muted-strong);font-size:13.5px}
+  .wkVal{font-weight:700;font-variant-numeric:tabular-nums}
+  .wkVal small{color:var(--muted);font-weight:400;font-size:11px}
+  .wkDelta{font-family:var(--font-mono);font-size:11px;min-width:64px;text-align:right;font-variant-numeric:tabular-nums}
 
   /* chart */
   .chartHead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
@@ -190,6 +199,24 @@ function entries(){
     const e=store[k]||{};
     return {dateKey:k,hrv:num(e.hrv),rhr:num(e.rhr),sleepHours:num(e.sleepHours),sleepPerf:num(e.sleepPerf),feel:(typeof e.feel==='number'?e.feel:null),weight:num(e.weight),recovery:estRecovery(e)};
   });
+}
+
+/* windowed averages over the dated entries: days-ago in [a,b) */
+function daysAgoK(k){ const [y,m,d]=k.split('-').map(Number); const t=new Date(); t.setHours(0,0,0,0); return Math.round((t-new Date(y,m-1,d))/86400000); }
+function winAvg(key,a,b){
+  const vals=entries().filter(d=>{ const n=daysAgoK(d.dateKey); return n>=a&&n<b&&typeof d[key]==='number'; }).map(d=>d[key]);
+  return vals.length ? vals.reduce((s,v)=>s+v,0)/vals.length : null;
+}
+/* today vs the trailing 7-day average (yesterday back), colored by whether
+   the direction is good for that metric */
+function chipDelta(key,val,goodDir,unit){
+  if(typeof val!=='number') return '';
+  const base=winAvg(key,1,8); if(base==null) return '';
+  const d=val-base;
+  const shown=key==='sleepHours'?Math.round(Math.abs(d)*10)/10:Math.round(Math.abs(d));
+  if(!shown) return '<div class="statDelta" style="color:var(--muted)">= 7d avg</div>';
+  const good=goodDir==='up'?d>0:d<0;
+  return '<div class="statDelta" style="color:'+(good?'var(--pos)':'var(--neg)')+'">'+(d>0?'▲':'▼')+' '+shown+unit+' vs 7d</div>';
 }
 
 function ringWrap(value,toneStr,cap,sub){
@@ -429,11 +456,76 @@ function heroHtml(){
     +'<div class="hero">'+recRing+sleepRing+'</div>'
     +'<div class="statusBlock"><div class="statusWord" data-tone="'+t+'">'+statusWord+'</div><p class="statusLine">'+statusLine+'</p></div>'
     +'<div class="statRow">'
-    +'<div class="stat"><div class="statLabel">HRV</div><div class="statVal">'+(typeof h.hrv==='number'?Math.round(h.hrv)+'<small> ms</small>':'—')+'</div></div>'
-    +'<div class="stat"><div class="statLabel">Resting HR</div><div class="statVal">'+(typeof h.rhr==='number'?Math.round(h.rhr)+'<small> bpm</small>':'—')+'</div></div>'
-    +'<div class="stat"><div class="statLabel">Sleep</div><div class="statVal">'+(typeof h.sleepHours==='number'?fmtHM(h.sleepHours):'—')+'</div></div>'
+    +'<div class="stat"><div class="statLabel">HRV</div><div class="statVal">'+(typeof h.hrv==='number'?Math.round(h.hrv)+'<small> ms</small>':'—')+'</div>'+chipDelta('hrv',h.hrv,'up',' ms')+'</div>'
+    +'<div class="stat"><div class="statLabel">Resting HR</div><div class="statVal">'+(typeof h.rhr==='number'?Math.round(h.rhr)+'<small> bpm</small>':'—')+'</div>'+chipDelta('rhr',h.rhr,'down',' bpm')+'</div>'
+    +'<div class="stat"><div class="statLabel">Sleep</div><div class="statVal">'+(typeof h.sleepHours==='number'?fmtHM(h.sleepHours):'—')+'</div>'+chipDelta('sleepHours',h.sleepHours,'up','h')+'</div>'
     +'</div></section>';
 }
+/* ---------- week in review: last 7 days vs the 7 before ---------- */
+function weekHtml(){
+  const rows=[
+    ['Recovery','recovery','%','up',v=>Math.round(v)],
+    ['Sleep','sleepHours','h/night','up',v=>Math.round(v*10)/10],
+    ['HRV','hrv','ms','up',v=>Math.round(v)],
+    ['Resting HR','rhr','bpm','down',v=>Math.round(v)],
+  ];
+  let any=false;
+  const html=rows.map(([label,key,unit,dir,f])=>{
+    const cur=winAvg(key,0,7), prev=winAvg(key,7,14);
+    if(cur==null) return '';
+    any=true;
+    let delta='<span style="color:var(--muted)">—</span>';
+    if(prev!=null){
+      const d=cur-prev, shown=f(Math.abs(d));
+      if(!shown) delta='<span style="color:var(--muted)">=</span>';
+      else { const good=dir==='up'?d>0:d<0;
+        delta='<span style="color:'+(good?'var(--pos)':'var(--neg)')+'">'+(d>0?'+':'−')+shown+'</span>'; }
+    }
+    return '<div class="wkRow"><span class="wkName">'+label+'</span><span class="wkVal">'+f(cur)+' <small>'+unit+'</small></span><span class="wkDelta">'+delta+'</span></div>';
+  }).join('');
+  if(!any) return '<section class="card"><span class="cardName">Week in review</span><p class="noteLine">Averages appear once this week has vitals — the numbers compare to the week before.</p></section>';
+  /* sleep debt vs the 8h line, over the nights that have data */
+  const nights=entries().filter(d=>daysAgoK(d.dateKey)<7&&typeof d.sleepHours==='number');
+  let debtLine='';
+  if(nights.length){
+    const debt=nights.reduce((s,d)=>s+(8-d.sleepHours),0);
+    debtLine = debt>0.25
+      ? '<div class="hint" style="color:var(--warn)">Sleep debt '+fmtHM(debt)+' across '+nights.length+' night'+(nights.length>1?'s':'')+' (vs 8h) — one earlier night pays it down fastest.</div>'
+      : '<div class="hint" style="color:var(--pos)">No sleep debt — '+fmtHM(Math.abs(debt))+' ahead of the 8h line this week.</div>';
+  }
+  return '<section class="card"><span class="cardName">Week in review — vs last week</span>'+html+debtLine+'</section>';
+}
+
+/* ---------- recovery heatmap: 12 Mon-start weeks, tap a day to edit ---------- */
+function heatHtml(){
+  const WEEKS=12, cell=11, gap=3;
+  const now=new Date(); now.setHours(0,0,0,0);
+  const start=new Date(now); start.setDate(now.getDate()-((now.getDay()+6)%7)-(WEEKS-1)*7);
+  const W=30+WEEKS*(cell+gap), H=7*(cell+gap)-gap+2;
+  const toneColor={good:'#6EE7B7',watch:'#f5c451',low:'#ff6b6b'};
+  let cells='', logged=0;
+  for(let c=0;c<WEEKS;c++) for(let r=0;r<7;r++){
+    const d=new Date(start); d.setDate(start.getDate()+c*7+r);
+    if(d>now) continue;
+    const k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    const e=store[k]; const rec=e?estRecovery(e):null;
+    const hasAny=e&&Object.keys(e).length>0;
+    const fill=rec!=null?toneColor[tone(rec)]:(hasAny?'#3a3a42':'var(--track)');
+    if(rec!=null) logged++;
+    const tip=fmtTipDate(k)+(rec!=null?' · Recovery '+rec+'%':' · no data')+((e&&typeof e.sleepHours==='number')?' · '+fmtHM(e.sleepHours):'');
+    cells+='<rect class="tipHit" data-heatday="'+k+'" data-tip="'+esc2(tip)+'" x="'+(30+c*(cell+gap))+'" y="'+(r*(cell+gap))+'" width="'+cell+'" height="'+cell+'" rx="2.5" fill="'+fill+'"'
+      +(k===todayKey()?' stroke="#6EE7B7" stroke-width="1.2"':'')
+      +(rec==null?' opacity=".5"':'')+'/>';
+  }
+  const lbl=(r,t)=>'<text x="0" y="'+(r*(cell+gap)+cell-2)+'" fill="var(--muted)" font-size="8" font-family="ui-monospace,Menlo,monospace" letter-spacing=".08em">'+t+'</text>';
+  return '<section class="card"><span class="cardName">Recovery heatmap — last '+WEEKS+' weeks</span>'
+    +'<svg class="chart" style="height:'+(H+6)+'px" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMinYMid meet" aria-hidden="true">'+lbl(0,'MON')+lbl(3,'THU')+lbl(6,'SUN')+cells+'</svg>'
+    +'<div class="legend"><span class="legItem"><span class="legDot" style="background:#6EE7B7"></span>Primed</span>'
+    +'<span class="legItem"><span class="legDot" style="background:#f5c451"></span>Moderate</span>'
+    +'<span class="legItem"><span class="legDot" style="background:#ff6b6b"></span>Run down</span>'
+    +'<span class="legItem" style="color:var(--muted)">'+(logged?'tap a day to edit it':'fills in as you check in')+'</span></div></section>';
+}
+
 function trendsHtml(){
   return '<section class="card"><div class="chartHead"><span class="cardName" style="margin:0">Trends</span>'
     +'<div class="seg">'+[7,14,30].map(n=>'<button class="segBtn '+(range===n?'on':'')+'" data-range="'+n+'">'+n+'d</button>').join('')+'</div></div>'
@@ -452,12 +544,14 @@ function guideHtml(){
    Every card lives in a [data-card] wrapper with a grip; the order persists in
    the store under _cardOrder (non-date key — entries() date-filters, so the
    data paths never see it). */
-const CARD_KEYS=['entry','feel','today','trends','felt','guide'];
+const CARD_KEYS=['entry','feel','today','week','trends','heat','felt','guide'];
 function cardHtml(k){
   if(k==='entry') return entryHtml();
   if(k==='feel') return feelHtml();
   if(k==='today') return heroHtml();
+  if(k==='week') return weekHtml();
   if(k==='trends') return trendsHtml();
+  if(k==='heat') return heatHtml();
   if(k==='felt') return feelChartHtml();
   return guideHtml();
 }
@@ -465,7 +559,9 @@ function cardOrder(){
   const saved=Array.isArray(store._cardOrder)?store._cardOrder:[];
   const out=[]; const seen={};
   saved.forEach(k=>{ if(CARD_KEYS.includes(k)&&!seen[k]){ out.push(k); seen[k]=1; } });
-  CARD_KEYS.forEach(k=>{ if(!seen[k]) out.push(k); });
+  /* cards added after an order was saved slot in at their canonical spot
+     instead of dangling at the end */
+  CARD_KEYS.forEach(k=>{ if(!seen[k]) out.splice(Math.min(CARD_KEYS.indexOf(k),out.length),0,k); });
   return out;
 }
 function renderOutput(){
@@ -550,6 +646,8 @@ document.addEventListener('click',e=>{
   if(ct){ chartTab=ct.getAttribute('data-charttab'); renderOutput(); return; }
   const dn=e.target.closest('[data-datenav]');
   if(dn){ shiftEditDate(parseInt(dn.getAttribute('data-datenav'),10)); render(); return; }
+  const hd=e.target.closest('[data-heatday]');
+  if(hd){ const k=hd.getAttribute('data-heatday'); if(/^\d{4}-\d{2}-\d{2}$/.test(k)&&k<=todayKey()){ editDate=k; render(); } return; }
   const fb=e.target.closest('[data-feel]');
   if(fb){
     const v=parseInt(fb.getAttribute('data-feel'),10);
