@@ -74,6 +74,13 @@
   .xBtn:hover{color:var(--neg);border-color:var(--neg-line)}
   .empty{color:var(--muted);font-size:13px;padding:10px 0}
   .hint{color:var(--neg);font-size:12px;font-family:var(--font-mono);min-height:14px;margin-top:6px}
+  .status.win{color:var(--brand)}
+  .caffSys{font-family:var(--font-mono);font-size:11px;letter-spacing:.02em;color:var(--muted-strong);margin:-4px 0 12px}
+  .caffSys.warn{color:var(--warn)}
+  .recap{font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:10px}
+  .recap b{color:var(--fg)}
+  #chartTip{position:fixed;z-index:99;display:none;pointer-events:none;background:#101014;border:1px solid rgba(255,255,255,.16);border-radius:8px;padding:6px 10px;font-family:var(--font-mono);font-size:11px;color:var(--fg);white-space:nowrap;box-shadow:0 10px 30px rgba(0,0,0,.55)}
+  .tipHit{cursor:pointer}
 </style>
 </head>
 <body>
@@ -89,7 +96,7 @@ const $=id=>document.getElementById(id);
 
 /* ---- persistence ---- */
 function todayKey(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
-function persist(){window.Vitality.save(store);}
+function persist(){window.Vitality.save(store).catch(()=>{});} /* host may reject (quota); tile state stays live */
 function today(){
   if(!store.log||typeof store.log!=='object')store.log={};
   let d=store.log[todayKey()];
@@ -156,6 +163,113 @@ function coach(){
   return {warn:false,txt:'Cut-off '+clockOf(caffCutoff())+' · '+Math.round(CAFF_CEIL-total)+' mg left today'};
 }
 
+/* ---- active caffeine + when it clears to sleep-safe ---- */
+const SLEEP_SAFE=50; /* mg still circulating that most people can sleep through */
+function clearTime(){
+  const now=nowT();
+  if(bodyAt(now)<=SLEEP_SAFE) return null;
+  for(let dt=0.25;dt<=24;dt+=0.25){ if(bodyAt(now+dt)<=SLEEP_SAFE) return now+dt; }
+  return null;
+}
+/* tonight's bedtime in absolute hours from today 00:00 */
+function bedAbs(){ const {wake,bed}=wakeBed(); return bed<wake?bed+24:bed; }
+
+/* ---- best training window + the day's low point ---- */
+function bestWindow(curve,peak){
+  const {wake,bed}=wakeBed();
+  const thr=Math.max(60,peak.e*0.88);
+  const inDay=t=>bed>wake?(t>=wake&&t<=bed):(t>=wake||t<=bed);
+  const idx=curve.indexOf(peak);
+  if(idx<0) return null;
+  let i0=idx,i1=idx;
+  while(i0>0 && curve[i0-1].e>=thr && inDay(curve[i0-1].t)) i0--;
+  while(i1<curve.length-1 && curve[i1+1].e>=thr && inDay(curve[i1+1].t)) i1++;
+  return {from:curve[i0].t,to:curve[i1].t};
+}
+function worstDip(curve){
+  const {wake,bed}=wakeBed();
+  const L=(((bed-wake)%24)+24)%24||16;
+  let best=null;
+  curve.forEach(p=>{
+    const aw=(((p.t-wake)%24)+24)%24;
+    if(aw<1.5||aw>L-2) return; /* skip wake inertia + winddown — they always sag */
+    if(!best||p.e<best.e) best=p;
+  });
+  return best;
+}
+
+/* ---- history: daily totals from the per-day log ---- */
+function lastNDates(n){
+  return Array.from({length:n},(_,i)=>{ const d=new Date(); d.setDate(d.getDate()-(n-1-i));
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); });
+}
+function fmtDay(k){ const [y,m,d]=k.split('-').map(Number); return new Date(y,m-1,d).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}); }
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+function dayInfo(k){
+  const d=(store.log&&store.log[k])||null;
+  const caff=(d&&Array.isArray(d.caff))?d.caff:[];
+  const total=caff.reduce((s,l)=>s+(+l.mg||0),0);
+  const late=caff.some(l=>l.t>caffCutoff());
+  return { total, doses:caff.length, late, slept:(d&&d.slept!=null)?d.slept:null, any:caff.length>0||(d&&d.slept!=null) };
+}
+function historyHtml(){
+  const days=lastNDates(14).map(k=>({k,...dayInfo(k)}));
+  if(days.filter(d=>d.any).length<2)
+    return '<section class="card"><span class="cardName">History — last 14 days</span><p class="empty">Log doses (and sleep) for a couple of days and your caffeine pattern charts here.</p></section>';
+  const W=560,H=150,padX=8,top=14,base=H-16;
+  const maxY=Math.max(CAFF_CEIL*1.12,...days.map(d=>d.total));
+  const slot=(W-padX*2)/14, bw=slot*0.58;
+  const Y=v=>base-(v/maxY)*(base-top);
+  let bars='';
+  days.forEach((d,i)=>{
+    if(!d.any) return;
+    const x=padX+i*slot+(slot-bw)/2;
+    const fill=d.total>=CAFF_CEIL?'var(--neg)':d.late?'var(--warn)':'var(--brand)';
+    const h=d.total>0?(base-Y(d.total)):2;
+    const y=d.total>0?Y(d.total):base-2;
+    const tip=fmtDay(d.k)+' · '+Math.round(d.total)+' mg ('+d.doses+' dose'+(d.doses===1?'':'s')+')'
+      +(d.late?' · past cut-off':'')+(d.slept!=null?' · slept '+d.slept+'h':'');
+    bars+='<rect class="tipHit" data-tip="'+esc(tip)+'" x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+h.toFixed(1)+'" rx="2.5" fill="'+fill+'"'+(d.total>0?'':' opacity=".4"')+'/>';
+  });
+  const cy=Y(CAFF_CEIL);
+  const ceil='<line x1="'+padX+'" y1="'+cy.toFixed(1)+'" x2="'+(W-padX)+'" y2="'+cy.toFixed(1)+'" stroke="rgba(255,255,255,.35)" stroke-width="1" stroke-dasharray="5 4"/>'
+    +'<text x="'+(W-padX)+'" y="'+(cy-4).toFixed(1)+'" text-anchor="end" class="axl">CEILING '+CAFF_CEIL+'</text>';
+  const w7=days.slice(-7);
+  const dosed=w7.filter(d=>d.doses>0), lateN=w7.filter(d=>d.late).length;
+  const sleptD=w7.filter(d=>d.slept!=null);
+  const avgMg=dosed.length?Math.round(dosed.reduce((s,d)=>s+d.total,0)/dosed.length):0;
+  const avgSl=sleptD.length?Math.round(sleptD.reduce((s,d)=>s+d.slept,0)/sleptD.length*10)/10:null;
+  const recap='<div class="recap">7-day: <b>'+avgMg+' mg</b> avg'+(lateN?' · <b style="color:var(--warn)">'+lateN+'</b> day'+(lateN===1?'':'s')+' past cut-off':' · clean on the cut-off')+(avgSl!=null?' · slept <b>'+avgSl+'h</b> avg':'')+'</div>';
+  return '<section class="card"><span class="cardName">History — last 14 days</span>'
+    +'<svg viewBox="0 0 '+W+' '+H+'" class="chart" aria-hidden="true">'+ceil+bars+'</svg>'
+    +'<div class="legend"><span><i class="swatch" style="border-color:var(--brand)"></i>in bounds</span>'
+    +'<span><i class="swatch" style="border-color:var(--warn)"></i>dose past cut-off</span>'
+    +'<span><i class="swatch" style="border-color:var(--neg)"></i>over '+CAFF_CEIL+' mg</span></div>'
+    +recap+'</section>';
+}
+
+/* ---- chart tooltips (hover a bar, or anywhere on the energy curve) ---- */
+function tipEl(){ let t=$('chartTip'); if(!t){ t=document.createElement('div'); t.id='chartTip'; document.body.appendChild(t); } return t; }
+function moveTip(e){ const t=tipEl(); let x=e.clientX+12,y=e.clientY-34; const w=t.offsetWidth||120;
+  if(x+w>window.innerWidth-8)x=e.clientX-w-12; if(y<8)y=e.clientY+18; t.style.left=x+'px'; t.style.top=y+'px'; }
+document.addEventListener('pointermove',e=>{
+  const closest=s=>e.target.closest&&e.target.closest(s);
+  const svg=closest('#ecurve');
+  if(svg){
+    const r=svg.getBoundingClientRect();
+    const xf=(e.clientX-r.left)/r.width*CW;
+    const tt=clamp((xf-CX0)/(CX1-CX0)*24,0,24);
+    const t=tipEl(); t.textContent=clockOf(tt)+' · '+Math.round(energyAt(tt).e)+' energy';
+    t.style.display='block'; moveTip(e); return;
+  }
+  const hit=closest('.tipHit');
+  if(hit){ const t=tipEl(); t.textContent=hit.getAttribute('data-tip'); t.style.display='block'; moveTip(e); return; }
+  const t=$('chartTip'); if(t) t.style.display='none';
+});
+document.addEventListener('pointerout',e=>{
+  if(e.relatedTarget==null){ const t=$('chartTip'); if(t) t.style.display='none'; }
+});
+
 /* ---- chart geometry ---- */
 const CW=560,CX0=10,CX1=550,CY0=14,CY1=130;
 function xOf(t){ return CX0+(clamp(t,0,24)/24)*(CX1-CX0); }
@@ -169,7 +283,7 @@ function chartHtml(){
   const area=eline+' L '+xOf(24).toFixed(1)+' '+CY1+' L '+xOf(0).toFixed(1)+' '+CY1+' Z';
   const grid=[6,12,18].map(h=>'<line x1="'+xOf(h)+'" y1="'+CY0+'" x2="'+xOf(h)+'" y2="'+CY1+'" class="grid"/>').join('');
   const labels=[[3,'3a'],[9,'9a'],[15,'3p'],[21,'9p']].map(a=>'<text x="'+xOf(a[0])+'" y="'+(CY1+15)+'" class="axl" text-anchor="middle">'+a[1]+'</text>').join('');
-  return '<svg viewBox="0 0 '+CW+' '+(CY1+22)+'" class="chart" role="img" aria-label="Predicted energy through the day">'
+  return '<svg viewBox="0 0 '+CW+' '+(CY1+22)+'" class="chart" id="ecurve" role="img" aria-label="Predicted energy through the day — hover for any time">'
     +'<defs><linearGradient id="fill" x1="0" y1="0" x2="0" y2="1">'
     +'<stop offset="0" stop-color="#6EE7B7" stop-opacity=".24"/><stop offset="1" stop-color="#6EE7B7" stop-opacity="0"/></linearGradient></defs>'
     +grid
@@ -187,8 +301,13 @@ function summaryHtml(){
     +'<div class="nowCell"><span class="n">'+nowE+'</span><span class="l">energy now</span></div>'
     +'<div class="nowCell r"><span class="n dim">'+Math.round(peak.e)+'</span><span class="l">peak · '+clockOf(peak.t)+'</span></div></div>';
   const status='<p class="status">'+clockOf(now)+' — '+statusOf(nowE)+'</p>';
-  const legend='<div class="legend"><span><i class="swatch"></i>with caffeine</span><span><i class="swatch base"></i>baseline rhythm</span></div>';
-  return '<section class="card"><span class="cardName">Today</span>'+head+status+chartHtml()+legend+'</section>';
+  /* when to schedule the hard work, and when not to */
+  const w=bestWindow(curve,peak), dip=worstDip(curve);
+  const winLine=(w&&w.to-w.from>=0.5)
+    ? '<p class="status win">best window '+clockOf(w.from)+'–'+clockOf(w.to)+(dip?' · low point ~'+clockOf(dip.t):'')+'</p>'
+    : (dip?'<p class="status win">low point ~'+clockOf(dip.t)+'</p>':'');
+  const legend='<div class="legend"><span><i class="swatch"></i>with caffeine</span><span><i class="swatch base"></i>baseline rhythm</span><span style="color:var(--muted)">hover the curve for any time</span></div>';
+  return '<section class="card"><span class="cardName">Today</span>'+head+status+winLine+chartHtml()+legend+'</section>';
 }
 function rhythmHtml(){
   const slept=today().slept;
@@ -206,15 +325,27 @@ function caffeineHtml(){
   const rows=log.length
     ? '<div class="logList">'+log.map(l=>'<div class="logRow"><div><div class="nm">'+Math.round(l.mg)+' mg <span class="meta">'+(l.label?l.label+' · ':'')+clockOf(l.t)+'</span></div></div><button class="xBtn" data-del="'+l.id+'" title="Remove">×</button></div>').join('')+'</div>'
     : '<p class="empty">No caffeine logged yet — add a dose to see the lift.</p>';
+  /* what's actually circulating right now, and when tonight is safe */
+  const act=Math.round(bodyAt(nowT()));
+  let sys='';
+  if(act>5){
+    if(act<=SLEEP_SAFE) sys='<div class="caffSys">~'+act+' mg still in your system — already sleep-safe (≤'+SLEEP_SAFE+' mg)</div>';
+    else {
+      const ct=clearTime();
+      const late=ct!=null&&ct>bedAbs();
+      sys='<div class="caffSys'+(late?' warn':'')+'">~'+act+' mg still in your system · sleep-safe (≤'+SLEEP_SAFE+' mg) '+(ct!=null?'by '+clockOf(ct):'in 24h+')+(late?' — after your bedtime':'')+'</div>';
+    }
+  }
   return '<section class="card"><span class="cardName">Caffeine</span>'
     +'<div class="caffHead"><span class="caffTotal'+(total>=CAFF_CEIL?' over':'')+'">'+Math.round(total)+' mg</span><span class="coach'+(c.warn?' warn':'')+'">'+c.txt+'</span></div>'
+    +sys
     +'<div class="presets">'+chips+'</div>'
     +'<div class="customAdd"><input class="fieldInput" id="caffMg" type="number" min="1" step="5" placeholder="mg" /><button class="btn-primary" id="caffAdd">Add now</button></div>'
     +'<div class="hint" id="hint"></div>'
     +rows+'</section>';
 }
 function headerHtml(){ return '<header class="header"><h1 class="title">Peak</h1><p class="subtitle">energy · caffeine · circadian</p></header>'; }
-function render(){ $('app').innerHTML=headerHtml()+summaryHtml()+rhythmHtml()+caffeineHtml(); }
+function render(){ $('app').innerHTML=headerHtml()+summaryHtml()+rhythmHtml()+caffeineHtml()+historyHtml(); }
 
 /* ---- interactions ---- */
 function addDose(mg,label){
