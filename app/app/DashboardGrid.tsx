@@ -11,6 +11,7 @@ import { syncEnabled, syncLoadTiles, syncSaveTile, syncSave, syncLoad } from '@/
 import type { DashboardChrome } from '@/lib/tiles/dashboardChrome'
 import { homeLayout, resolveOrder } from '@/lib/tiles/homeLayout'
 import { nextSize, SIZE_LABELS } from '@/lib/tiles/tileSkin'
+import CoachPanel from '@/components/CoachPanel'
 
 /**
  * The base dashboard grid. Every tile is an inert SLOT: the beautiful poster is
@@ -543,6 +544,15 @@ function Dock({ activeId, onSelect }: { activeId: string; onSelect: (id: string)
       label: CORE_TILES[id as keyof typeof CORE_TILES].label,
       icon: CORE_TILES[id as keyof typeof CORE_TILES].glyph,
     })),
+    {
+      id: 'coach', label: 'Coach',
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 11.3c0 4-4 7.2-9 7.2-.9 0-1.8-.1-2.6-.3L4 20l1.3-3.1C3.9 15.6 3 13.5 3 11.3c0-4 4-7.3 9-7.3s9 3.3 9 7.3Z" />
+          <path d="M8.5 11.3h.01M12 11.3h.01M15.5 11.3h.01" />
+        </svg>
+      ),
+    },
   ]
   return (
     <nav
@@ -598,6 +608,7 @@ export default function DashboardGrid({ userId, arranging = false }: DashboardGr
   const [openId, setOpenId] = useState<string | null>(null) // filled slot opened live
   const [connectId, setConnectId] = useState<string | null>(null) // empty slot connector
   const [newOpen, setNewOpen] = useState(false) // "+ New tile" creator
+  const [coachOpen, setCoachOpen] = useState(false) // the AI coach chat panel
   const [showWelcome, setShowWelcome] = useState(false) // transient "see the vision" home (non-destructive)
   const [loaded, setLoaded] = useState(false) // tile discovery finished — gates the blank "see the vision" state
   const [scratched, setScratched] = useState(false) // deliberate "start from scratch" → clean canvas, no onboarding text
@@ -931,9 +942,13 @@ export default function DashboardGrid({ userId, arranging = false }: DashboardGr
 
       {showWelcome && <EmptyCanvas onBack={() => setShowWelcome(false)} />}
 
+      {coachOpen && <CoachPanel onClose={() => setCoachOpen(false)} />}
+
       <Dock
-        activeId={openId ?? 'home'}
+        activeId={coachOpen ? 'coach' : openId ?? 'home'}
         onSelect={(id) => {
+          if (id === 'coach') { setCoachOpen(true); return } // overlays whatever is open
+          setCoachOpen(false)
           if (id === 'home') { setOpenId(null); setConnectId(null); return }
           setConnectId(null)
           if (filled[id]) setOpenId(id)
