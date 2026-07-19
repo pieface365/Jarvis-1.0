@@ -100,6 +100,27 @@
   .empty{color:var(--muted);font-size:13px;padding:12px 0}
   .hint{color:var(--neg);font-size:12px;font-family:var(--font-mono);min-height:14px;margin-top:4px}
   .hint.ok{color:var(--muted)}
+  /* protein target bar under the calorie bar */
+  .bar.slim{height:7px;margin-top:9px}
+  .barFill.protein{background:#a7f3d0}
+  .barFill.protein.hit{background:var(--brand)}
+  .pNote{font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:6px}
+  .pNote b{color:var(--fg)}
+  .pNote .hit{color:var(--brand)}
+  /* history chart */
+  .chart{width:100%;height:130px;display:block;overflow:visible;margin-top:6px}
+  .legend{display:flex;gap:14px;margin-top:8px;flex-wrap:wrap}
+  .legItem{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .legDot{width:12px;height:3px;border-radius:2px}
+  .histDetail{margin-top:12px;border-top:1px solid var(--border);padding-top:12px}
+  .histDetail .meta{line-height:1.7}
+  #chartTip{position:fixed;z-index:99;display:none;pointer-events:none;background:#101014;border:1px solid rgba(255,255,255,.16);border-radius:8px;padding:6px 10px;font-family:var(--font-mono);font-size:11px;color:var(--fg);white-space:nowrap;box-shadow:0 10px 30px rgba(0,0,0,.55)}
+  .tipHit{cursor:pointer}
+  /* inline gram editing in the log */
+  .gInline{width:52px;background:transparent;border:none;outline:none;border-bottom:1px solid transparent;color:var(--muted);font-family:var(--font-mono);font-size:11px;text-align:right;padding:0 1px;-moz-appearance:textfield;appearance:textfield}
+  .gInline::-webkit-outer-spin-button,.gInline::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  .gInline:hover{border-bottom-color:var(--brand-line)}
+  .gInline:focus{color:var(--brand);border-bottom-color:var(--brand)}
   /* barcode scanner */
   .scanRow{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
   .scanRow .fieldInput{flex:1;min-width:130px}
@@ -235,8 +256,12 @@ function summaryHtml(){
   const head='<div class="calHead"><div class="calMath">'+cell('',goal,'goal')+'<span class="calOp">−</span>'+cell('',t.cal,'food')+'<span class="calOp">=</span>'+cell('remain'+(over?' over':''),Math.abs(remaining),over?'over':'remaining')+'</div>'
     +'<div class="goalEdit"><span class="calCell"><span class="l">daily goal</span></span><input class="fieldInput" id="goal" type="number" min="0" step="50" value="'+goal+'" /></div></div>';
   const bar='<div class="bar"><div class="barFill'+(over?' over':'')+'" style="width:'+pct+'%"></div></div>';
+  /* the protein line the on-plan ring judges you by, made visible */
+  const pHit=t.p>=PLAN_TARGET.p, pPct=Math.min(100,(t.p/PLAN_TARGET.p)*100);
+  const pBar='<div class="bar slim"><div class="barFill protein'+(pHit?' hit':'')+'" style="width:'+pPct+'%"></div></div>'
+    +'<div class="pNote">protein <b>'+round(t.p)+'</b> / '+PLAN_TARGET.p+'g'+(pHit?' <span class="hit">✓ target hit</span>':' — '+round(PLAN_TARGET.p-t.p)+'g to go')+'</div>';
   const box=(a,v,u,l)=>'<div class="macroBox" data-accent="'+a+'"><span class="macroVal">'+round(v)+(u||'')+'</span><span class="macroLabel">'+l+'</span></div>';
-  return '<section class="card"><span class="cardName">Today</span>'+head+bar+'<div class="macroGrid">'+box('p',t.p,'g','protein')+box('c',t.c,'g','carbs')+box('f',t.f,'g','fat')+box('cal',t.cal,'','calories')+'</div></section>';
+  return '<section class="card"><span class="cardName">Today</span>'+head+bar+pBar+'<div class="macroGrid">'+box('p',t.p,'g','protein')+box('c',t.c,'g','carbs')+box('f',t.f,'g','fat')+box('cal',t.cal,'','calories')+'</div></section>';
 }
 function resultsInner(){
   const q=query.trim().toLowerCase();
@@ -249,8 +274,8 @@ function searchHtml(){return '<h2 class="sectionTitle">Add food</h2><div class="
 function logHtml(){
   const log=todaysLog();
   if(!log.length)return '<h2 class="sectionTitle">Logged today</h2><p class="empty">Nothing logged yet.</p>';
-  const rows=log.map((e,i)=>'<div class="logRow"><div><div class="foodName">'+esc(e.name)+' <span class="meta">'+e.grams+'g</span></div><div class="nums">'+round(e.cal)+' kcal · '+round(e.p)+'P / '+round(e.c)+'C / '+round(e.f)+'F</div></div><button class="xBtn" data-del="'+i+'" title="Remove">×</button></div>').join('');
-  return '<h2 class="sectionTitle">Logged today</h2><div class="logList">'+rows+'</div>';
+  const rows=log.map((e,i)=>'<div class="logRow"><div><div class="foodName">'+esc(e.name)+' <span class="meta"><input class="gInline" data-editg="'+i+'" type="number" min="1" inputmode="numeric" value="'+e.grams+'" title="Edit grams — macros rescale">g</span></div><div class="nums">'+round(e.cal)+' kcal · '+round(e.p)+'P / '+round(e.c)+'C / '+round(e.f)+'F</div></div><button class="xBtn" data-del="'+i+'" title="Remove">×</button></div>').join('');
+  return '<h2 class="sectionTitle">Logged today</h2><div class="logList">'+rows+'</div><p class="empty" style="padding:6px 0 0;font-size:11.5px">tap the grams on any entry to correct it — the macros rescale</p>';
 }
 function planHtml(){
   const k=planDay||todayDayKey();
@@ -467,20 +492,83 @@ async function decodeBarcodePhoto(file){
   }
 }
 
+/* ---- history: the last 14 days, judged by the same on-plan rule ------ */
+let histSel=null;
+function dayEntries(k){ const l=store[k]; return Array.isArray(l)?l:null; }
+function dayTotalsOf(k){ return (dayEntries(k)||[]).reduce((t,e)=>{t.cal+=e.cal;t.p+=e.p;t.c+=e.c;t.f+=e.f;return t;},{cal:0,p:0,c:0,f:0}); }
+function lastNDates(n){
+  return Array.from({length:n},(_,i)=>{ const d=new Date(); d.setDate(d.getDate()-(n-1-i));
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); });
+}
+function fmtDay(k){ const [y,m,d]=k.split('-').map(Number); return new Date(y,m-1,d).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}); }
+function historyHtml(){
+  const days=lastNDates(14);
+  const data=days.map(k=>({k, n:(dayEntries(k)||[]).length, t:dayTotalsOf(k)}));
+  const logged=data.filter(d=>d.n>0);
+  if(logged.length<2) return '<section class="card"><span class="cardName">History — last 14 days</span><p class="empty">Log food on a couple of days and the last two weeks chart here.</p></section>';
+  const goal=goalCal();
+  const W=320,H=120,padX=6,top=12,base=H-14;
+  const maxC=Math.max(goal*1.15,...data.map(d=>d.t.cal));
+  const slot=(W-padX*2)/14, bw=slot*0.6;
+  const Y=v=>base-(v/maxC)*(base-top);
+  let bars='';
+  data.forEach((d,i)=>{
+    if(!d.n) return;
+    const onplan=d.t.p>=PLAN_TARGET.p&&d.t.cal<=goal+50;
+    const over=d.t.cal>goal+50;
+    const fill=onplan?'var(--brand)':over?'var(--neg)':'#84848c';
+    const x=padX+i*slot+(slot-bw)/2, y=Y(d.t.cal);
+    const tip=fmtDay(d.k)+' · '+round(d.t.cal)+' kcal · '+round(d.t.p)+'g protein'+(onplan?' · on plan ✓':over?' · over goal':'');
+    bars+='<rect class="tipHit" data-histday="'+d.k+'" data-tip="'+esc(tip)+'" x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+(base-y).toFixed(1)+'" rx="2.5" fill="'+fill+'"'+(onplan?'':' opacity=".6"')+(d.k===histSel?' stroke="var(--fg)" stroke-width="1"':'')+'/>';
+  });
+  const gy=Y(goal);
+  const goalLine='<line x1="'+padX+'" y1="'+gy.toFixed(1)+'" x2="'+(W-padX)+'" y2="'+gy.toFixed(1)+'" stroke="rgba(255,255,255,.35)" stroke-width="1" stroke-dasharray="5 4"/>'
+    +'<text x="'+(W-padX)+'" y="'+(gy-4).toFixed(1)+'" text-anchor="end" fill="var(--muted)" font-size="8" font-family="ui-monospace,Menlo,monospace" letter-spacing=".08em">GOAL '+goal+'</text>';
+  /* 7-day recap under the chart */
+  const w7=data.slice(-7).filter(d=>d.n>0);
+  const avg=f=>w7.length?round(w7.reduce((s,d)=>s+f(d),0)/w7.length):0;
+  const onplan7=data.slice(-7).filter(d=>d.n>0&&d.t.p>=PLAN_TARGET.p&&d.t.cal<=goal+50).length;
+  const recap='<div class="pNote" style="margin-top:10px">7-day: <b>'+avg(d=>d.t.cal)+'</b> kcal · <b>'+avg(d=>d.t.p)+'g</b> protein avg · <b>'+onplan7+'</b>/7 on plan</div>';
+  /* tapped day: what was eaten */
+  let detail='';
+  if(histSel && dayEntries(histSel)){
+    const l=dayEntries(histSel), t=dayTotalsOf(histSel);
+    detail='<div class="histDetail"><div class="foodName" style="margin-bottom:4px">'+fmtDay(histSel)+' <span class="meta">'+round(t.cal)+' kcal · '+round(t.p)+'P / '+round(t.c)+'C / '+round(t.f)+'F</span></div>'
+      +'<div class="meta">'+l.map(e=>esc(e.name)+' '+round(e.grams)+'g ('+round(e.cal)+' kcal)').join(' · ')+'</div></div>';
+  }
+  return '<section class="card"><span class="cardName">History — last 14 days</span>'
+    +'<svg class="chart" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" aria-hidden="true">'+goalLine+bars+'</svg>'
+    +'<div class="legend"><span class="legItem"><span class="legDot" style="background:var(--brand)"></span>On plan</span>'
+    +'<span class="legItem"><span class="legDot" style="background:#84848c"></span>Off plan</span>'
+    +'<span class="legItem"><span class="legDot" style="background:var(--neg)"></span>Over goal</span>'
+    +'<span class="legItem" style="color:var(--muted)">tap a bar to see the day</span></div>'
+    +recap+detail+'</section>';
+}
+
+/* chart tooltips (hover / tap a bar) — same pattern as the Vitals tile */
+function tipEl(){ let t=$('chartTip'); if(!t){ t=document.createElement('div'); t.id='chartTip'; document.body.appendChild(t); } return t; }
+function moveTip(e){ const t=tipEl(); let x=e.clientX+12,y=e.clientY-34; const w=t.offsetWidth||120;
+  if(x+w>window.innerWidth-8)x=e.clientX-w-12; if(y<8)y=e.clientY+18; t.style.left=x+'px'; t.style.top=y+'px'; }
+document.addEventListener('pointerover',e=>{ const h=e.target.closest&&e.target.closest('.tipHit'); if(!h)return; const t=tipEl(); t.textContent=h.getAttribute('data-tip'); t.style.display='block'; moveTip(e); });
+document.addEventListener('pointermove',e=>{ const t=$('chartTip'); if(!t||t.style.display!=='block')return; if(e.target.closest&&e.target.closest('.tipHit')) moveTip(e); else t.style.display='none'; });
+document.addEventListener('pointerout',e=>{ if(e.target.closest&&e.target.closest('.tipHit')){ const rel=e.relatedTarget; if(!(rel&&rel.closest&&rel.closest('.tipHit'))){ const t=$('chartTip'); if(t)t.style.display='none'; } } });
+
 /* ---- draggable card layout (same system as the Vitals tile) -------- */
-const CARD_KEYS=['today','scan','plan','add','log'];
+const CARD_KEYS=['today','scan','plan','add','log','hist'];
 function cardHtml(k){
   if(k==='today') return summaryHtml();
   if(k==='scan') return '<section class="card">'+scanHtml()+'</section>';
   if(k==='plan') return planHtml();
   if(k==='add') return searchHtml();
+  if(k==='hist') return historyHtml();
   return logHtml();
 }
 function cardOrder(){
   const saved=Array.isArray(store._cardOrder)?store._cardOrder:[];
   const out=[]; const seen={};
   saved.forEach(k=>{ if(CARD_KEYS.includes(k)&&!seen[k]){ out.push(k); seen[k]=1; } });
-  CARD_KEYS.forEach(k=>{ if(!seen[k]) out.push(k); });
+  /* cards added after an order was saved slot in at their canonical spot */
+  CARD_KEYS.forEach(k=>{ if(!seen[k]) out.splice(Math.min(CARD_KEYS.indexOf(k),out.length),0,k); });
   return out;
 }
 function render(){
@@ -575,6 +663,17 @@ document.addEventListener('keydown',e=>{
   if(e.target.id==='scanCode' && e.key==='Enter'){ e.preventDefault(); lookupBarcode(scanCode); }
 });
 document.addEventListener('change',e=>{
+  if(e.target.matches&&e.target.matches('[data-editg]')){
+    const i=Number(e.target.getAttribute('data-editg'));
+    const log=todaysLog(); const en=log[i];
+    const g=Number(e.target.value);
+    if(en&&isFinite(g)&&g>0&&en.grams>0){
+      const k=g/en.grams;
+      en.grams=g; en.cal*=k; en.p*=k; en.c*=k; en.f*=k;
+      setTodaysLog(log);
+    }
+    render(); return;
+  }
   if(e.target.id==='scanFile'){
     const f=e.target.files&&e.target.files[0];
     e.target.value='';
@@ -631,6 +730,8 @@ document.addEventListener('click',e=>{
   }
   const del=e.target.closest('[data-del]');
   if(del){const log=todaysLog();log.splice(Number(del.getAttribute('data-del')),1);setTodaysLog(log);render();return;}
+  const hb=e.target.closest('[data-histday]');
+  if(hb){const k=hb.getAttribute('data-histday');histSel=histSel===k?null:k;render();return;}
   const pp=e.target.closest('[data-planprot]');
   if(pp){store.planProtein=pp.getAttribute('data-planprot');persist();render();return;}
   const pd=e.target.closest('[data-planday]');
