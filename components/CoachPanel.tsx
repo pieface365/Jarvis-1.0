@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 
 /**
  * CoachPanel — the dashboard's AI coach chat, opened from the dock, the grid
@@ -228,6 +229,17 @@ export default function CoachPanel({
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
+  // Freeze the dashboard underneath while the sheet is open. On a phone the
+  // grid behind is taller than the screen, and a touch-drag that starts on the
+  // panel can still end up scrolling that page instead of the transcript.
+  useEffect(() => {
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [])
+
   // keep the newest message in view while the answer streams in
   useEffect(() => {
     const el = scrollRef.current
@@ -374,7 +386,14 @@ export default function CoachPanel({
     }
   }
 
-  return (
+  /* Portalled to <body>. DashboardGrid renders inside .shell, which sets
+     z-index:5 — that's a stacking context, so the panel's z-index:120 only ever
+     competed with .shell's own children. Page chrome mounted at the root above
+     z 5 (the ✎ Customize pill, fixed at bottom-left, z 50) painted straight
+     over the transcript and swallowed touches there: on a phone that's a
+     114×38 dead zone in the middle of the message list, so a drag that started
+     on it scrolled nothing. Escaping to the root puts 120 back in charge. */
+  const sheet = (
     <>
       {/* backdrop: click anywhere off the panel to close */}
       <div
@@ -386,7 +405,12 @@ export default function CoachPanel({
         aria-modal="true"
         aria-label="Coach"
         style={{
-          position: 'fixed', top: 0, right: 0, bottom: 0, zIndex: 120,
+          /* 100dvh, not top:0/bottom:0. iOS anchors fixed elements to the LARGE
+             viewport, so a top/bottom-pinned panel runs underneath Safari's
+             address bar and bottom toolbar — the composer and the last inch of
+             the transcript end up in a strip you can't touch. dvh tracks the
+             viewport that's actually on screen. */
+          position: 'fixed', top: 0, right: 0, zIndex: 120, height: '100dvh',
           width: 'min(480px, 100vw)', display: 'flex', flexDirection: 'column',
           background: 'var(--bg, #0a0b0a)', borderLeft: '1px solid var(--border, #1d1d22)',
           boxShadow: '-18px 0 60px rgba(0,0,0,.55)',
@@ -447,7 +471,21 @@ export default function CoachPanel({
           </button>
         </header>
 
-        <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '18px 16px 8px' }}>
+        <div
+          ref={scrollRef}
+          style={{
+            flex: 1,
+            // a flex child defaults to min-height:auto, i.e. "never shrink below
+            // my content" — without this the list grows instead of scrolling
+            minHeight: 0,
+            overflowY: 'auto',
+            // keep a drag inside the panel: without it, hitting either end hands
+            // the gesture to the dashboard behind, which reads as "stuck"
+            overscrollBehavior: 'contain',
+            WebkitOverflowScrolling: 'touch',
+            padding: '18px 16px 8px',
+          }}
+        >
           {messages.length === 0 && (
             <div style={{ color: 'var(--muted, #84848c)', fontSize: 14, lineHeight: 1.65, padding: '18px 6px' }}>
               <p style={{ margin: '0 0 12px', color: 'var(--fg, #ededf0)', fontSize: 15 }}>
@@ -557,4 +595,8 @@ export default function CoachPanel({
       </aside>
     </>
   )
+
+  // the panel only ever mounts from a click, so document is always there — the
+  // guard is just so a server render can never touch it
+  return typeof document === 'undefined' ? null : createPortal(sheet, document.body)
 }
