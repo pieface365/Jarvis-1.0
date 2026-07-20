@@ -170,14 +170,14 @@ export default function VoiceBadge({
     }
   }
 
-  function stop() {
+  /** Let go of the mic without touching the saved preference. Teardown only:
+   *  unmounting is not the user saying "turn voice off", so it must never
+   *  persist a disarm — doing so meant an armed listener never survived a
+   *  reload (React remounts the effect, the cleanup wrote '0', and the next
+   *  mount read '0' and stayed silent). */
+  function releaseMic() {
     enabledRef.current = false
     clearAwait()
-    try {
-      window.localStorage.setItem(STORE_KEY, '0')
-    } catch {
-      /* ignore */
-    }
     const rec = recRef.current
     recRef.current = null
     if (rec) {
@@ -187,6 +187,16 @@ export default function VoiceBadge({
       } catch {
         /* ignore */
       }
+    }
+  }
+
+  /** The user deliberately turning voice off: release the mic AND remember it. */
+  function stop() {
+    releaseMic()
+    try {
+      window.localStorage.setItem(STORE_KEY, '0')
+    } catch {
+      /* ignore */
     }
     setState((s) => (s === 'unsupported' ? s : 'off'))
   }
@@ -230,7 +240,7 @@ export default function VoiceBadge({
       /* ignore */
     }
     if (wasOn) start()
-    return () => stop()
+    return () => releaseMic() // teardown, NOT a user disarm — see releaseMic
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

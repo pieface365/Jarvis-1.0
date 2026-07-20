@@ -135,7 +135,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: 'bad_request' }, { status: 400 })
   }
   const raw = Array.isArray(body?.messages) ? (body.messages as unknown[]) : []
-  const messages: ChatMsg[] = raw
+  const cleaned: ChatMsg[] = raw
     .filter(
       (m): m is ChatMsg =>
         !!m &&
@@ -146,6 +146,20 @@ export async function POST(req: Request) {
     )
     .slice(-24)
     .map((m) => ({ role: m.role, text: m.text.slice(0, 8000) }))
+
+  /* Collapse consecutive same-role turns into one. A client whose transcript
+     lost a reply (panel closed mid-answer, a storage write that failed) would
+     otherwise send e.g. [user, user], which is not a well-formed conversation.
+     Merging keeps every question intact instead of rejecting the request. */
+  const messages: ChatMsg[] = []
+  for (const m of cleaned) {
+    const prev = messages[messages.length - 1]
+    if (prev && prev.role === m.role) prev.text += '\n\n' + m.text
+    else messages.push({ ...m })
+  }
+  // a conversation must begin with the user's turn
+  while (messages.length && messages[0].role !== 'user') messages.shift()
+
   if (messages.length === 0 || messages[messages.length - 1].role !== 'user') {
     return NextResponse.json({ ok: false, error: 'bad_request' }, { status: 400 })
   }

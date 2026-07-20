@@ -148,6 +148,11 @@ export default function CoachPanel({
   const lastVoiceNonce = useRef<number | null>(null)
   const onSpeakingChangeRef = useRef(onSpeakingChange)
   onSpeakingChangeRef.current = onSpeakingChange
+  const speakRef = useRef(speak)
+  speakRef.current = speak
+  // A wake phrase spoken while Coach is still answering: held here rather than
+  // dropped, and asked as soon as the current answer lands.
+  const pendingVoiceRef = useRef<string | null>(null)
   // Guards state updates from a send() that outlives the component, WITHOUT
   // network-aborting it on unmount: React 18 Strict Mode's dev-only mount →
   // cleanup → mount cycle runs on this SAME instance (refs persist across it),
@@ -181,7 +186,10 @@ export default function CoachPanel({
   /** Read an answer aloud, plain-text, reporting start/end so the wake-word
    *  listener can mute itself for the duration. */
   const speakText = (text: string) => {
-    if (!speakSupported || !speak) return
+    // speakRef, not `speak`: an answer is spoken once streaming finishes, so a
+    // mute pressed WHILE it was generating must still win — the render closure
+    // captured at send() time would happily read the stale pre-mute value.
+    if (!speakSupported || !speakRef.current) return
     const plain = stripMd(text).trim()
     if (!plain) return
     try {
@@ -255,6 +263,7 @@ export default function CoachPanel({
     abortRef.current = ac
     let failed: string | null = null
     let full = '' // accumulated for text-to-speech once streaming finishes
+    let fullSources: Source[] | null = null
     try {
       const res = await fetch('/api/coach', {
         method: 'POST',
@@ -295,6 +304,7 @@ export default function CoachPanel({
               setStatus('searching the web…')
             } else if (ev.t === 'sources' && Array.isArray(ev.v)) {
               const srcs = ev.v as Source[]
+              fullSources = srcs
               patchLast((m) => ({ ...m, sources: srcs }))
             } else if (ev.t === 'error') {
               failed = typeof ev.v === 'string' ? ev.v : 'api_error'
@@ -313,17 +323,47 @@ export default function CoachPanel({
     if (aliveRef.current) {
       setStatus(null)
       setBusy(false)
+    } else if (full) {
+      // Closed mid-answer: patchLast no-oped, so the reply never reached the
+      // saved transcript — leaving a dangling user turn that made the NEXT
+      // question send two consecutive user messages. Append it to storage
+      // directly so the conversation stays well-formed and the answer the user
+      // waited for is still there when they reopen.
+      try {
+        const saved = loadChat()
+        if (saved.length && saved[saved.length - 1].role === 'user') {
+          const reply: Msg = { role: 'assistant', text: full }
+          if (fullSources) reply.sources = fullSources
+          if (failed) reply.error = true
+          saveChat([...saved, reply])
+        }
+      } catch {
+        /* storage unavailable — nothing more we can do */
+      }
     }
     if (full) speakText(full) // speaks even just after a real close, so a hands-free answer is never silently dropped
   }
 
-  // "Hey Coach, <question>" landed via VoiceBadge — ask it, once per capture
+  // "Hey Coach, <question>" landed via VoiceBadge — ask it, once per capture.
+  // Mid-answer captures are held (send() would early-return on `busy`, and the
+  // nonce is already consumed, so the question would vanish with no feedback —
+  // invisible in a hands-free flow where the user can't see the panel).
   useEffect(() => {
     if (!voiceQuery || voiceQuery.nonce === lastVoiceNonce.current) return
     lastVoiceNonce.current = voiceQuery.nonce
-    void send(voiceQuery.text)
+    if (busy) pendingVoiceRef.current = voiceQuery.text
+    else void send(voiceQuery.text)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [voiceQuery])
+
+  // …and asked the moment the current answer finishes
+  useEffect(() => {
+    if (busy || !pendingVoiceRef.current) return
+    const q = pendingVoiceRef.current
+    pendingVoiceRef.current = null
+    void send(q)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [busy])
 
   const clear = () => {
     setMessages([])
