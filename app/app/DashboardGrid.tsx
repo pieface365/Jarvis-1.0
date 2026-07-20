@@ -12,6 +12,7 @@ import type { DashboardChrome } from '@/lib/tiles/dashboardChrome'
 import { homeLayout, resolveOrder } from '@/lib/tiles/homeLayout'
 import { nextSize, SIZE_LABELS } from '@/lib/tiles/tileSkin'
 import CoachPanel from '@/components/CoachPanel'
+import VoiceBadge from '@/components/VoiceBadge'
 
 /**
  * The base dashboard grid. Every tile is an inert SLOT: the beautiful poster is
@@ -635,6 +636,8 @@ export default function DashboardGrid({ userId, arranging = false }: DashboardGr
   const [connectId, setConnectId] = useState<string | null>(null) // empty slot connector
   const [newOpen, setNewOpen] = useState(false) // "+ New tile" creator
   const [coachOpen, setCoachOpen] = useState(false) // the AI coach chat panel
+  const [voiceQuery, setVoiceQuery] = useState<{ text: string; nonce: number } | null>(null) // captured by "Hey Coach"
+  const [coachSpeaking, setCoachSpeaking] = useState(false) // mutes the wake-word mic while Coach talks
   const [showWelcome, setShowWelcome] = useState(false) // transient "see the vision" home (non-destructive)
   const [loaded, setLoaded] = useState(false) // tile discovery finished — gates the blank "see the vision" state
   const [scratched, setScratched] = useState(false) // deliberate "start from scratch" → clean canvas, no onboarding text
@@ -981,7 +984,23 @@ export default function DashboardGrid({ userId, arranging = false }: DashboardGr
 
       {showWelcome && <EmptyCanvas onBack={() => setShowWelcome(false)} />}
 
-      {coachOpen && <CoachPanel onClose={() => setCoachOpen(false)} />}
+      {coachOpen && (
+        <CoachPanel
+          onClose={() => setCoachOpen(false)}
+          voiceQuery={voiceQuery}
+          onSpeakingChange={setCoachSpeaking}
+        />
+      )}
+
+      {/* Always mounted (not gated on coachOpen) so "Hey Coach" keeps working
+          no matter what's on screen — another tile, the coach panel, or home. */}
+      <VoiceBadge
+        suspended={coachSpeaking}
+        onWake={(text) => {
+          setCoachOpen(true)
+          setVoiceQuery({ text, nonce: Date.now() })
+        }}
+      />
 
       <Dock
         activeId={coachOpen ? 'coach' : openId ?? 'home'}

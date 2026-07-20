@@ -3,18 +3,23 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 /**
- * CoachPanel — the dashboard's AI coach chat, opened from the dock.
+ * CoachPanel — the dashboard's AI coach chat, opened from the dock, the grid
+ * tile, or by saying "Hey Coach" (VoiceBadge, mounted in DashboardGrid).
  *
  * Lives at host level (not a sealed tile) because the coach spans every tile's
  * data: the host page is same-origin, so the gate cookie rides along to
  * /api/coach and the server reads the tile data itself. The transcript
  * persists in localStorage so a conversation survives reloads.
+ *
+ * Also speaks its answers aloud (browser text-to-speech) when the speaker
+ * toggle is on, so the coach is usable fully hands-free with VoiceBadge.
  */
 
 type Source = { url: string; title: string | null }
 type Msg = { role: 'user' | 'assistant'; text: string; sources?: Source[]; error?: boolean }
 
 const STORE_KEY = 'vitality:coach:chat'
+const SPEAK_KEY = 'vitality:coach:speak'
 const MAX_KEPT = 60 // transcript cap in storage
 const SENT_WINDOW = 20 // how much history each question carries to the server
 
@@ -108,20 +113,104 @@ function MdText({ text }: { text: string }) {
   return <>{blocks}</>
 }
 
+/** Plain-text version of an answer for text-to-speech: drop markdown syntax
+ *  rather than reading asterisks and brackets aloud. */
+function stripMd(s: string): string {
+  return s
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\[([^\]]+)\]\(https?:\/\/[^\s)]+\)/g, '$1')
+    .replace(/^\s*[-*]\s+/gm, '')
+}
+
 /* ── the panel ──────────────────────────────────────────────────────────── */
 
-export default function CoachPanel({ onClose }: { onClose: () => void }) {
+export default function CoachPanel({
+  onClose,
+  voiceQuery,
+  onSpeakingChange,
+}: {
+  onClose: () => void
+  /** A question captured by the "Hey Coach" wake phrase — auto-asked on arrival. */
+  voiceQuery?: { text: string; nonce: number } | null
+  /** Reported true while an answer is being read aloud, so the wake-word
+   *  listener can mute itself and never hear (and react to) the coach's own voice. */
+  onSpeakingChange?: (speaking: boolean) => void
+}) {
   const [messages, setMessages] = useState<Msg[]>([])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
+  const [speakSupported] = useState(() => typeof window !== 'undefined' && 'speechSynthesis' in window)
+  const [speak, setSpeak] = useState(true)
   const scrollRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
+  const lastVoiceNonce = useRef<number | null>(null)
+  const onSpeakingChangeRef = useRef(onSpeakingChange)
+  onSpeakingChangeRef.current = onSpeakingChange
+  // Guards state updates from a send() that outlives the component, WITHOUT
+  // network-aborting it on unmount: React 18 Strict Mode's dev-only mount →
+  // cleanup → mount cycle runs on this SAME instance (refs persist across it),
+  // so aborting the in-flight fetch in that cleanup would kill the very first
+  // request a voice-triggered auto-ask makes, with nothing left to retry it.
+  // Flipping this back to true on the (possible) second mount instead means a
+  // dev-only remount is harmless, while a REAL close still stops touching state.
+  const aliveRef = useRef(true)
 
   useEffect(() => {
-    setMessages(loadChat())
-    return () => abortRef.current?.abort()
+    aliveRef.current = true
+    // Functional form so this initial load can never clobber a message that
+    // send() already queued (e.g. a voice-triggered auto-ask fired from this
+    // very mount) — it only adopts the saved transcript while state is still
+    // the untouched initial []; on a real mount that's always true anyway.
+    setMessages((cur) => (cur.length ? cur : loadChat()))
+    try {
+      const saved = window.localStorage.getItem(SPEAK_KEY)
+      if (saved != null) setSpeak(saved === '1')
+    } catch {
+      /* default stays on */
+    }
+    return () => {
+      aliveRef.current = false
+      if (speakSupported) window.speechSynthesis.cancel()
+      onSpeakingChangeRef.current?.(false)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  /** Read an answer aloud, plain-text, reporting start/end so the wake-word
+   *  listener can mute itself for the duration. */
+  const speakText = (text: string) => {
+    if (!speakSupported || !speak) return
+    const plain = stripMd(text).trim()
+    if (!plain) return
+    try {
+      window.speechSynthesis.cancel() // never overlap a previous answer
+      const u = new SpeechSynthesisUtterance(plain)
+      u.onstart = () => onSpeakingChangeRef.current?.(true)
+      u.onend = () => onSpeakingChangeRef.current?.(false)
+      u.onerror = () => onSpeakingChangeRef.current?.(false)
+      window.speechSynthesis.speak(u)
+    } catch {
+      /* no voices installed or similar — fail quiet, the text answer still shows */
+    }
+  }
+
+  const toggleSpeak = () => {
+    setSpeak((cur) => {
+      const next = !cur
+      try {
+        window.localStorage.setItem(SPEAK_KEY, next ? '1' : '0')
+      } catch {
+        /* ignore */
+      }
+      if (!next && speakSupported) {
+        window.speechSynthesis.cancel()
+        onSpeakingChangeRef.current?.(false)
+      }
+      return next
+    })
+  }
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -137,28 +226,35 @@ export default function CoachPanel({ onClose }: { onClose: () => void }) {
     if (el) el.scrollTop = el.scrollHeight
   }, [messages, status])
 
-  /** Mutate the trailing assistant message (the one being streamed). */
-  const patchLast = (fn: (m: Msg) => Msg) =>
+  /** Mutate the trailing assistant message (the one being streamed). No-ops
+   *  once the component has genuinely unmounted (aliveRef), so a response that
+   *  finishes after a real close doesn't touch a gone instance's state. */
+  const patchLast = (fn: (m: Msg) => Msg) => {
+    if (!aliveRef.current) return
     setMessages((cur) => {
       const next = [...cur]
       next[next.length - 1] = fn(next[next.length - 1])
       saveChat(next)
       return next
     })
+  }
 
-  const send = async () => {
-    const q = input.trim()
+  const send = async (override?: string) => {
+    const q = (override ?? input).trim()
     if (!q || busy) return
-    setInput('')
+    if (override == null) setInput('')
     setBusy(true)
     setStatus('thinking…')
     const history = [...messages, { role: 'user' as const, text: q }]
     setMessages([...history, { role: 'assistant', text: '' }])
     saveChat(history)
 
+    // kept for a future "stop generating" control; nothing aborts it today —
+    // see aliveRef above for why unmount must not auto-abort this fetch
     const ac = new AbortController()
     abortRef.current = ac
     let failed: string | null = null
+    let full = '' // accumulated for text-to-speech once streaming finishes
     try {
       const res = await fetch('/api/coach', {
         method: 'POST',
@@ -193,6 +289,7 @@ export default function CoachPanel({ onClose }: { onClose: () => void }) {
             if (ev.t === 'text' && typeof ev.v === 'string') {
               setStatus(null)
               const chunk = ev.v
+              full += chunk
               patchLast((m) => ({ ...m, text: m.text + chunk }))
             } else if (ev.t === 'status') {
               setStatus('searching the web…')
@@ -208,15 +305,25 @@ export default function CoachPanel({ onClose }: { onClose: () => void }) {
     } catch {
       if (!ac.signal.aborted) failed = 'network'
     }
-    if (!ac.signal.aborted) {
-      if (failed) {
-        const msg = ERROR_TEXT[failed] ?? ERROR_TEXT.api_error
-        patchLast((m) => (m.text ? m : { ...m, text: msg, error: true }))
-      }
+    if (failed) {
+      const msg = ERROR_TEXT[failed] ?? ERROR_TEXT.api_error
+      full = full || msg
+      patchLast((m) => (m.text ? m : { ...m, text: msg, error: true }))
+    }
+    if (aliveRef.current) {
       setStatus(null)
       setBusy(false)
     }
+    if (full) speakText(full) // speaks even just after a real close, so a hands-free answer is never silently dropped
   }
+
+  // "Hey Coach, <question>" landed via VoiceBadge — ask it, once per capture
+  useEffect(() => {
+    if (!voiceQuery || voiceQuery.nonce === lastVoiceNonce.current) return
+    lastVoiceNonce.current = voiceQuery.nonce
+    void send(voiceQuery.text)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voiceQuery])
 
   const clear = () => {
     setMessages([])
@@ -258,6 +365,22 @@ export default function CoachPanel({ onClose }: { onClose: () => void }) {
             knows your dashboard
           </span>
           <span style={{ flex: 1 }} />
+          {speakSupported && (
+            <button
+              type="button"
+              onClick={toggleSpeak}
+              aria-label={speak ? 'Mute spoken answers' : 'Read answers aloud'}
+              title={speak ? 'Answers are read aloud — tap to mute' : 'Tap to have answers read aloud'}
+              style={{
+                background: 'transparent', border: '1px solid var(--border, #2a2a31)',
+                color: speak ? 'var(--mint, #6EE7B7)' : 'var(--muted, #84848c)',
+                borderRadius: 999, width: 28, height: 28, display: 'grid', placeItems: 'center',
+                fontSize: 14, cursor: 'pointer', flexShrink: 0,
+              }}
+            >
+              {speak ? '🔊' : '🔇'}
+            </button>
+          )}
           {messages.length > 0 && (
             <button
               type="button"
@@ -289,6 +412,7 @@ export default function CoachPanel({ onClose }: { onClose: () => void }) {
             <div style={{ color: 'var(--muted, #84848c)', fontSize: 14, lineHeight: 1.65, padding: '18px 6px' }}>
               <p style={{ margin: '0 0 12px', color: 'var(--fg, #ededf0)', fontSize: 15 }}>
                 Ask anything — I can see your training, food, vitals and caffeine logs, and I can search the web.
+                Or just say <strong style={{ color: 'var(--mint, #6EE7B7)' }}>&ldquo;Hey Coach&rdquo;</strong> from anywhere on the dashboard.
               </p>
               {['How recovered am I — should tomorrow be a hard session?',
                 'What should I eat tonight to hit my protein target?',
