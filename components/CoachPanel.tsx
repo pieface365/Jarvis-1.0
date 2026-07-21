@@ -240,10 +240,15 @@ export default function CoachPanel({
     }
   }, [])
 
-  // keep the newest message in view while the answer streams in
+  // Follow the newest message as it streams — but only while the user is
+  // parked at the bottom. Without this guard, every streamed chunk yanked them
+  // back down, so you couldn't scroll up to re-read an earlier answer while a
+  // new one was still generating. onScroll below keeps stickRef in sync; send()
+  // re-pins it (you always want to see your own brand-new question).
+  const stickRef = useRef(true)
   useEffect(() => {
     const el = scrollRef.current
-    if (el) el.scrollTop = el.scrollHeight
+    if (el && stickRef.current) el.scrollTop = el.scrollHeight
   }, [messages, status])
 
   /** Mutate the trailing assistant message (the one being streamed). No-ops
@@ -263,6 +268,7 @@ export default function CoachPanel({
     const q = (override ?? input).trim()
     if (!q || busy) return
     if (override == null) setInput('')
+    stickRef.current = true // a brand-new question always scrolls into view
     setBusy(true)
     setStatus('thinking…')
     const history = [...messages, { role: 'user' as const, text: q }]
@@ -418,7 +424,10 @@ export default function CoachPanel({
       >
         <header
           style={{
-            display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px',
+            display: 'flex', alignItems: 'center', gap: 10,
+            // viewportFit:'cover' paints under the notch, so pad the header down
+            // past the status bar / dynamic island or the title + close hide there
+            padding: 'calc(14px + env(safe-area-inset-top)) 16px 14px',
             borderBottom: '1px solid var(--border, #1d1d22)',
           }}
         >
@@ -473,6 +482,12 @@ export default function CoachPanel({
 
         <div
           ref={scrollRef}
+          onScroll={(e) => {
+            // re-pin only when the user returns to the bottom; scrolling up
+            // unpins so streamed chunks stop yanking them back down
+            const el = e.currentTarget
+            stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40
+          }}
           style={{
             flex: 1,
             // a flex child defaults to min-height:auto, i.e. "never shrink below
@@ -561,7 +576,13 @@ export default function CoachPanel({
             e.preventDefault()
             void send()
           }}
-          style={{ display: 'flex', gap: 8, padding: '10px 12px 12px', borderTop: '1px solid var(--border, #1d1d22)' }}
+          style={{
+            display: 'flex', gap: 8,
+            // pad the composer up past the home indicator (viewportFit:'cover'),
+            // else the input + Ask button sit under it at the base of the sheet
+            padding: '10px 12px calc(12px + env(safe-area-inset-bottom))',
+            borderTop: '1px solid var(--border, #1d1d22)',
+          }}
         >
           <textarea
             value={input}
