@@ -894,40 +894,27 @@ function exLastWeek(e){
   (e.hist||[]).forEach(h=>{ if(h&&h.date&&!h.off&&h.date>latest) latest=h.date; });
   return latest ? weekKeyOf(latest) : '';
 }
-/* New week: clear every day's live logged sets (the mint "done" pills) and
-   unlock the finish button. hist is dated and untouched, so the record — and
-   every chart, PR and progression built on it — survives intact. */
-function rolloverWeek(){
-  ORDER.forEach(k=>{ const d=STATE.days&&STATE.days[k]; if(!d||!d.ex) return;
-    d.ex.forEach(clearLog); });
-  STATE.submitted=false;
-}
-/* One-time migration for states saved before logWeek existed: decide PER
-   EXERCISE, since a global "latest logged" would keep every exercise green the
-   moment ANY one was logged this week. Clear an exercise whose newest logged
-   week isn't this one (or that has stale pills with no history at all). */
-function migrateStaleLogs(cur){
+/* Run at boot: clear any exercise whose live "done" pills are stale — decided
+   PURELY from that exercise's own dated history, NOT from STATE.logWeek.
+   Logging a real set writes hist[today], so an exercise done this week has a
+   current-week hist entry; one whose newest logged week is earlier is showing
+   last week's pills and gets wiped. Evidence-based on purpose: an earlier build
+   could stamp logWeek to the current week WITHOUT clearing, and branching on
+   that stamp then skipped the wipe forever — reading each exercise's history
+   instead can't be fooled that way. hist is dated and untouched, so every
+   chart, PR and progression survives. Exercises with pills but no history at
+   all are left alone (could be an all-failed set logged today, no seed pills
+   exist), so nothing logged this week is ever lost. */
+function rolloverIfNewWeek(){
+  const cur=weekKeyOf(today);
   let changed=false;
   ORDER.forEach(k=>{ const d=STATE.days&&STATE.days[k]; if(!d||!d.ex) return;
     d.ex.forEach(e=>{
       const hasLive=(e.log||[]).some(s=>s);
-      if(hasLive && exLastWeek(e)!==cur){ clearLog(e); changed=true; }
+      const lw=exLastWeek(e); // '' when never logged
+      if(hasLive && lw && lw!==cur){ clearLog(e); changed=true; }
     }); });
   if(changed) STATE.submitted=false;
-  return changed;
-}
-/* Run once at boot: wipe last week's live logs so the new week is a clean
-   slate. Going forward logWeek is a single stamp and the whole week clears at
-   once (no mid-week surprise); only legacy states without it need the
-   per-exercise pass. */
-function rolloverIfNewWeek(){
-  const cur=weekKeyOf(today);
-  let changed=false;
-  if(STATE.logWeek){
-    if(STATE.logWeek!==cur){ rolloverWeek(); changed=true; }
-  } else {
-    changed = migrateStaleLogs(cur);
-  }
   STATE.logWeek=cur;
   // persist the clean slate now, so it holds even if the user opens and closes
   // without logging anything this week
