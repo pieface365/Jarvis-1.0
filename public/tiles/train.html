@@ -820,7 +820,11 @@ function buildState(){
   /* v bumps when the program's day structure changes, so stale saves rebuild */
   /* weekLog: 'YYYY-MM-DD' -> true for each date every exercise got fully
      logged — feeds the consistency ring (7/7 fills the circle). */
-  return { v:6, active:(SEED&&SEED.active)||'mon', unit:'lb', submitted:false, weekLog:{}, autoAdjust:true, autoAdjustDate:null, physique:{photos:{}}, climbLog:{sessions:{}}, liftsView:{sel:null,range:90}, days };
+  /* logWeek: the Monday key of the week the live per-exercise logs belong to.
+     On load, a different current week clears those logs (see rolloverWeek) so a
+     new week starts fresh instead of showing last week's sets still marked done.
+     hist keeps the dated record, so nothing is lost. */
+  return { v:6, active:(SEED&&SEED.active)||'mon', unit:'lb', submitted:false, weekLog:{}, logWeek:weekKeyOf(today), autoAdjust:true, autoAdjustDate:null, physique:{photos:{}}, climbLog:{sessions:{}}, liftsView:{sel:null,range:90}, days };
 }
 /* STATE is filled by the async boot below once the dashboard bridge resolves. */
 let STATE = null;
@@ -881,6 +885,36 @@ function gripIcon(){ return '<svg viewBox="0 0 24 24"><circle cx="9" cy="6" r="1
 function weekDates(){
   const now = new Date(); const dow = (now.getDay()+6)%7; // Mon=0
   return Array.from({length:7}, (_,i)=>{ const d=new Date(now); d.setDate(now.getDate()-dow+i); return ymd(d); });
+}
+/* The most recent week (Monday key) any exercise was actually logged, inferred
+   from hist. Used to roll over saved states from before logWeek existed, so a
+   stale week clears on the very first load after this shipped rather than
+   waiting a further week. '' when nothing has ever been logged. */
+function lastLoggedWeek(){
+  let latest='';
+  ORDER.forEach(k=>{ const d=STATE.days&&STATE.days[k]; if(!d||!d.ex) return;
+    d.ex.forEach(e=>{ (e.hist||[]).forEach(h=>{ if(h&&h.date&&!h.off&&h.date>latest) latest=h.date; }); }); });
+  return latest ? weekKeyOf(latest) : '';
+}
+/* New week: clear every day's live logged sets (the mint "done" pills) and
+   unlock the finish button. hist is dated and untouched, so the record — and
+   every chart, PR and progression built on it — survives intact. */
+function rolloverWeek(){
+  ORDER.forEach(k=>{ const d=STATE.days&&STATE.days[k]; if(!d||!d.ex) return;
+    d.ex.forEach(e=>{ e.log = Array(e.log.length||e.sets||0).fill(null); }); });
+  STATE.submitted=false;
+}
+/* Run once at boot: if the live logs belong to an earlier week than today's,
+   wipe them so the new week is a clean slate. */
+function rolloverIfNewWeek(){
+  const cur=weekKeyOf(today);
+  const belongs=STATE.logWeek || lastLoggedWeek();
+  const rolled = belongs && belongs!==cur;
+  if(rolled) rolloverWeek();
+  STATE.logWeek=cur;
+  // persist the clean slate now, so it holds even if the user opens and closes
+  // without logging anything this week
+  if(rolled) saveState();
 }
 /* A date earns its mark when every set of the day being worked is logged.
    Marks are sticky — undoing a set later doesn't take the day away. */
@@ -1742,6 +1776,8 @@ function doLog(e, idx, kg, reps, fail){
   if(!fail) startRest(e);
 }
 function rollupToday(e){
+  // stamp the live logs with this week, so a later week knows to clear them
+  STATE.logWeek = weekKeyOf(today);
   const done = e.log.filter(s=>s&&!s.fail);
   e.hist = e.hist.filter(h=>h.date!==today);
   if(done.length){ const top=done.reduce((a,b)=>b.kg>a.kg?b:a); const sets=e.log.filter(s=>s).map(s=>s.fail?{r:s.reps,fail:true}:{r:s.reps}); e.hist.push({date:today, kg:top.kg, sets}); e.hist.sort((a,b)=>a.date.localeCompare(b.date)); e.lastKg=top.kg; }
@@ -2144,6 +2180,7 @@ function patchProgramEdits(d){
   physPhotos(); /* normalizes STATE.physique.photos into place */
   thinPhotos();
   climbSessions(); /* normalizes STATE.climbLog.sessions into place */
+  rolloverIfNewWeek(); /* clear last week's logged sets when a new week has begun */
   render(); applyBlockOrder(); wireFresh();
   spawnParticles(document.querySelector('#vt-backdrop .wb-particles'));
 })();
