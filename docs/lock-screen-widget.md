@@ -54,8 +54,9 @@ const tz = (() => {
 })()
 
 async function getData() {
-  const req = new Request(`${BASE_URL}/api/widget?tz=${encodeURIComponent(tz)}`)
-  req.headers = { Authorization: `Bearer ${TOKEN}` }
+  // Token in the URL (not a header): survives redirects and Scriptable header quirks.
+  const url = `${BASE_URL}/api/widget?tz=${encodeURIComponent(tz)}&token=${encodeURIComponent(TOKEN)}`
+  const req = new Request(url)
   req.timeoutInterval = 15
   return await req.loadJSON()
 }
