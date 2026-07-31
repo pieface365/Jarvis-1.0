@@ -1,26 +1,27 @@
-import Anthropic from '@anthropic-ai/sdk'
+import { GoogleGenAI, ApiError } from '@google/genai'
 import { NextResponse } from 'next/server'
 import { supa } from '@/lib/tiles/tileSupabase'
 
 /**
- * POST /api/coach — the dashboard's AI coach.
+ * POST /api/coach — the dashboard's AI coach, powered by Google Gemini.
  *
  * Body: { messages: [{ role: 'user'|'assistant', text }], tz?: 'America/…' }
  * Reply: an NDJSON stream, one JSON object per line:
- *   { t:'status', v:'searching' }   Claude is running a web search
- *   { t:'text',   v:'…' }           a chunk of the answer
- *   { t:'sources', v:[{url,title}] } web citations, once, before done
+ *   { t:'text',  v:'…' }            a chunk of the answer
  *   { t:'done' }                    the answer finished cleanly
  *   { t:'error', v:'no_key'|'api_error'|'rate_limited' }
  *
- * Before calling Claude it reads the owner's tile data (train / fuel / vitals /
- * peak) straight from Supabase — the same rows the tiles sync to — prunes it to
- * the recent window, and hands it to the model as context, with the web-search
- * server tool enabled for anything the dashboard can't answer. Sits behind the
- * middleware gate like every other API route. Requires ANTHROPIC_API_KEY.
+ * Before calling the model it reads the owner's tile data (train / fuel /
+ * vitals / peak) straight from Supabase — the same rows the tiles sync to —
+ * prunes it to the recent window, and hands it over as context. Dashboard-only:
+ * it answers from that data plus the model's own knowledge, no live web search
+ * (Gemini's free tier keeps this fully free). Sits behind the middleware gate
+ * like every other API route. Requires GEMINI_API_KEY (a free Google AI Studio
+ * key — the { t:'status' } and { t:'sources' } stream events the client still
+ * understands simply never fire without web search).
  */
 
-export const maxDuration = 60 // streamed answer + a few web searches
+export const maxDuration = 60 // streamed answer over the free-tier rate limit
 
 const SLOTS = ['train', 'fuel', 'vitals', 'peak'] as const
 
@@ -121,11 +122,11 @@ Below is the owner's actual dashboard data, as saved by their tiles (recent wind
 ${context}
 </dashboard_data>
 
-Ground every answer in this data when it is relevant — quote their real numbers and dates rather than speaking generically. If the data doesn't cover something, say so plainly. Use web search when a question needs outside or current information (research, technique, products, weather, events); cite what you find. Answer directly and concisely, like a sharp coach who has read the training log — lead with the recommendation, then the reasoning. Use plain prose with occasional short "- " bullet lists; **bold** for key numbers or the headline recommendation; no headers or tables. You are not a doctor — for red-flag symptoms, say to see a professional, briefly and without lecturing.`
+Ground every answer in this data when it is relevant — quote their real numbers and dates rather than speaking generically. If the data doesn't cover something, say so plainly. You can't browse the web, so for outside facts rely on your own training knowledge and say when you're unsure rather than inventing specifics. Answer directly and concisely, like a sharp coach who has read the training log — lead with the recommendation, then the reasoning. Use plain prose with occasional short "- " bullet lists; **bold** for key numbers or the headline recommendation; no headers or tables. You are not a doctor — for red-flag symptoms, say to see a professional, briefly and without lecturing.`
 }
 
 export async function POST(req: Request) {
-  const key = process.env.ANTHROPIC_API_KEY
+  const key = process.env.GEMINI_API_KEY
   if (!key) return NextResponse.json({ ok: false, error: 'no_key' }, { status: 503 })
 
   let body: { messages?: unknown; tz?: unknown }
@@ -166,45 +167,42 @@ export async function POST(req: Request) {
   const tz = typeof body.tz === 'string' ? body.tz : undefined
 
   const context = await dashboardContext()
-  const client = new Anthropic({ apiKey: key })
-  const stream = client.messages.stream({
-    model: 'claude-opus-4-8',
-    max_tokens: 8000,
-    thinking: { type: 'adaptive' },
-    system: systemPrompt(tz, context),
-    tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 5 }],
-    messages: messages.map((m) => ({ role: m.role, content: m.text })),
-  })
+  const ai = new GoogleGenAI({ apiKey: key })
+  // let the client's ReadableStream.cancel() abort the upstream call
+  const ac = new AbortController()
 
   const enc = new TextEncoder()
   const rs = new ReadableStream<Uint8Array>({
     async start(controller) {
       const push = (o: object) => controller.enqueue(enc.encode(JSON.stringify(o) + '\n'))
-      const sources: Array<{ url: string; title: string | null }> = []
       try {
-        for await (const ev of stream) {
-          if (ev.type === 'content_block_start' && ev.content_block.type === 'server_tool_use') {
-            push({ t: 'status', v: 'searching' })
-          } else if (ev.type === 'content_block_delta') {
-            const d = ev.delta
-            if (d.type === 'text_delta') push({ t: 'text', v: d.text })
-            else if (d.type === 'citations_delta') {
-              const c = d.citation
-              if (c.type === 'web_search_result_location' && !sources.some((s) => s.url === c.url)) {
-                sources.push({ url: c.url, title: c.title })
-              }
-            }
-          }
+        const stream = await ai.models.generateContentStream({
+          model: 'gemini-2.5-flash',
+          // Gemini's roles are 'user' / 'model'; our transcript uses 'assistant'
+          contents: messages.map((m) => ({
+            role: m.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: m.text }],
+          })),
+          config: {
+            systemInstruction: systemPrompt(tz, context),
+            maxOutputTokens: 2048,
+            abortSignal: ac.signal,
+          },
+        })
+        for await (const chunk of stream) {
+          const text = chunk.text
+          if (text) push({ t: 'text', v: text })
         }
-        if (sources.length) push({ t: 'sources', v: sources.slice(0, 8) })
         push({ t: 'done' })
       } catch (err) {
-        push({ t: 'error', v: err instanceof Anthropic.RateLimitError ? 'rate_limited' : 'api_error' })
+        // 429 = free-tier rate/quota limit; everything else is a generic failure
+        const rate = err instanceof ApiError && err.status === 429
+        push({ t: 'error', v: rate ? 'rate_limited' : 'api_error' })
       }
       controller.close()
     },
     cancel() {
-      stream.abort()
+      ac.abort()
     },
   })
   return new Response(rs, {

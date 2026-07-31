@@ -26,7 +26,7 @@ const SENT_WINDOW = 20 // how much history each question carries to the server
 
 const ERROR_TEXT: Record<string, string> = {
   no_key:
-    'The coach needs an Anthropic API key. Add ANTHROPIC_API_KEY in Vercel → Settings → Environment Variables (and .env.local for local dev), then redeploy.',
+    'The coach needs a Gemini API key. Add GEMINI_API_KEY in Vercel → Settings → Environment Variables (a free key from aistudio.google.com), then redeploy.',
   rate_limited: 'The AI service is rate-limiting right now — give it a minute and ask again.',
   api_error: 'The AI service returned an error. Try again in a moment.',
   locked: 'The dashboard is locked — reload the page and enter the password.',
@@ -504,7 +504,7 @@ export default function CoachPanel({
           {messages.length === 0 && (
             <div style={{ color: 'var(--muted, #84848c)', fontSize: 14, lineHeight: 1.65, padding: '18px 6px' }}>
               <p style={{ margin: '0 0 12px', color: 'var(--fg, #ededf0)', fontSize: 15 }}>
-                Ask anything — I can see your training, food, vitals and caffeine logs, and I can search the web.
+                Ask anything — I can see your training, food, vitals and caffeine logs.
                 Or just say <strong style={{ color: 'var(--mint, #6EE7B7)' }}>&ldquo;Hey Coach&rdquo;</strong> from anywhere on the dashboard.
               </p>
               {['How recovered am I — should tomorrow be a hard session?',
