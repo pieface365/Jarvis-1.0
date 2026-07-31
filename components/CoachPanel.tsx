@@ -511,7 +511,7 @@ export default function CoachPanel({
             <div style={{ color: 'var(--muted, #84848c)', fontSize: 14, lineHeight: 1.65, padding: '18px 6px' }}>
               <p style={{ margin: '0 0 12px', color: 'var(--fg, #ededf0)', fontSize: 15 }}>
                 Ask anything — I can see your training, food, vitals and caffeine logs.
-                Or just say <strong style={{ color: 'var(--mint, #6EE7B7)' }}>&ldquo;Hey Coach&rdquo;</strong> from anywhere on the dashboard.
+                Or tap <strong style={{ color: 'var(--mint, #6EE7B7)' }}>Hey Coach</strong> below, speak, and tap again to ask by voice.
               </p>
               {['How recovered am I — should tomorrow be a hard session?',
                 'What should I eat tonight to hit my protein target?',
