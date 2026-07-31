@@ -280,6 +280,7 @@ export default function CoachPanel({
     const ac = new AbortController()
     abortRef.current = ac
     let failed: string | null = null
+    let failDetail: string | null = null // the raw server/API reason, if any
     let full = '' // accumulated for text-to-speech once streaming finishes
     let fullSources: Source[] | null = null
     try {
@@ -293,8 +294,9 @@ export default function CoachPanel({
         }),
       })
       if (!res.ok || !res.body) {
-        const err = (await res.json().catch(() => null)) as { error?: string } | null
+        const err = (await res.json().catch(() => null)) as { error?: string; detail?: string } | null
         failed = err?.error ?? (res.status === 401 ? 'locked' : 'api_error')
+        failDetail = err?.detail ?? null
       } else {
         const reader = res.body.getReader()
         const dec = new TextDecoder()
@@ -307,7 +309,7 @@ export default function CoachPanel({
           buf = lines.pop() ?? ''
           for (const line of lines) {
             if (!line.trim()) continue
-            let ev: { t: string; v?: unknown }
+            let ev: { t: string; v?: unknown; d?: unknown }
             try {
               ev = JSON.parse(line)
             } catch {
@@ -326,6 +328,7 @@ export default function CoachPanel({
               patchLast((m) => ({ ...m, sources: srcs }))
             } else if (ev.t === 'error') {
               failed = typeof ev.v === 'string' ? ev.v : 'api_error'
+              if (typeof ev.d === 'string') failDetail = ev.d
             }
           }
         }
@@ -334,7 +337,10 @@ export default function CoachPanel({
       if (!ac.signal.aborted) failed = 'network'
     }
     if (failed) {
-      const msg = ERROR_TEXT[failed] ?? ERROR_TEXT.api_error
+      const base = ERROR_TEXT[failed] ?? ERROR_TEXT.api_error
+      // append the raw reason (bad key / model not found / API not enabled) so
+      // a failure says what to fix instead of just "try again"
+      const msg = failDetail ? `${base}\n\n\`${failDetail}\`` : base
       full = full || msg
       patchLast((m) => (m.text ? m : { ...m, text: msg, error: true }))
     }

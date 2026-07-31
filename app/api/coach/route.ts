@@ -125,6 +125,28 @@ ${context}
 Ground every answer in this data when it is relevant — quote their real numbers and dates rather than speaking generically. If the data doesn't cover something, say so plainly. You can't browse the web, so for outside facts rely on your own training knowledge and say when you're unsure rather than inventing specifics. Answer directly and concisely, like a sharp coach who has read the training log — lead with the recommendation, then the reasoning. Use plain prose with occasional short "- " bullet lists; **bold** for key numbers or the headline recommendation; no headers or tables. You are not a doctor — for red-flag symptoms, say to see a professional, briefly and without lecturing.`
 }
 
+/** Dig the human-readable message out of a Gemini SDK error. The SDK stuffs the
+ *  raw API response — often JSON nested one or two levels deep — into
+ *  err.message; pull out the innermost `.error.message` so the owner sees
+ *  "API key not valid" rather than a wall of escaped JSON. */
+function geminiMessage(err: unknown): string {
+  let s = err instanceof Error ? err.message : String(err)
+  for (let i = 0; i < 3; i++) {
+    try {
+      const o = JSON.parse(s) as { error?: { message?: string }; message?: string }
+      const inner = o?.error?.message ?? o?.message
+      if (typeof inner === 'string' && inner !== s) {
+        s = inner
+        continue
+      }
+    } catch {
+      /* not JSON — s is already the plain message */
+    }
+    break
+  }
+  return s.slice(0, 300)
+}
+
 export async function POST(req: Request) {
   const key = process.env.GEMINI_API_KEY
   if (!key) return NextResponse.json({ ok: false, error: 'no_key' }, { status: 503 })
@@ -197,7 +219,13 @@ export async function POST(req: Request) {
       } catch (err) {
         // 429 = free-tier rate/quota limit; everything else is a generic failure
         const rate = err instanceof ApiError && err.status === 429
-        push({ t: 'error', v: rate ? 'rate_limited' : 'api_error' })
+        // Surface the real reason: Gemini's errors are specific (bad key, model
+        // not found, API not enabled, key restricted) and the generic line hides
+        // exactly what to fix. `d` is shown to the owner and logged server-side.
+        const status = err instanceof ApiError ? err.status : undefined
+        const detail = geminiMessage(err)
+        console.error('[coach] gemini error', status, err instanceof Error ? err.message : err)
+        push({ t: 'error', v: rate ? 'rate_limited' : 'api_error', d: (status ? status + ' · ' : '') + detail })
       }
       controller.close()
     },
