@@ -644,6 +644,21 @@ export default function DashboardGrid({ userId, arranging = false }: DashboardGr
 
   const { register, unregister } = useTileHost(userId, undefined, () => {})
 
+  // Native bridge: the iOS wrapper app can't use the web mic, so its own
+  // wake-word listener calls window.jarvisNativeAsk("…") to open Jarvis and ask a
+  // question hands-free — the same path a spoken "Hey Jarvis" takes on desktop.
+  useEffect(() => {
+    const w = window as unknown as { jarvisNativeAsk?: (text: string) => void }
+    w.jarvisNativeAsk = (text: string) => {
+      if (typeof text !== 'string' || !text.trim()) return
+      setCoachOpen(true)
+      setVoiceQuery({ text: text.trim(), nonce: Date.now() })
+    }
+    return () => {
+      delete w.jarvisNativeAsk
+    }
+  }, [])
+
   // The user's arrangement (order + per-tile sizes), persisted per user.
   const [order, setOrder] = useState<string[]>(GRID_ORDER)
   const [sizes, setSizes] = useState<Record<string, TileSize>>({})
