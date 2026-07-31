@@ -278,6 +278,9 @@ export default function CoachPanel({
       // so a spoken answer is never lost. The `pending || speaking` check lets a
       // slow-to-start network voice through instead of talking over it.
       window.setTimeout(() => {
+        // respect a mute pressed during the wait — toggleSpeak cancelled the
+        // (silent) chosen voice, and the fallback must not speak over that choice
+        if (!speakRef.current) return
         if (started || synth.speaking || synth.pending) return
         try {
           synth.cancel()
