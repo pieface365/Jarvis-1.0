@@ -21,6 +21,8 @@ import { useEffect, useRef, useState } from 'react'
  * plays, so it can never hear itself.
  */
 
+const SILENCE_SEND_MS = 3000 // auto-send this long after the last word heard
+
 type VState = 'unsupported' | 'off' | 'listening' | 'error'
 
 interface SRResult {
@@ -62,8 +64,16 @@ export default function VoiceBadge({
   const listeningRef = useRef(false) // true between the two taps
   const capturedRef = useRef('') // finalized text, accumulated across restarts
   const interimRef = useRef('') // the current not-yet-final words
+  const silenceRef = useRef<ReturnType<typeof setTimeout> | null>(null) // auto-send timer
   const onWakeRef = useRef(onWake)
   onWakeRef.current = onWake
+
+  function clearSilence() {
+    if (silenceRef.current) {
+      clearTimeout(silenceRef.current)
+      silenceRef.current = null
+    }
+  }
 
   /** Begin a capture session (from a user tap — required for the mic on iOS). */
   function start() {
@@ -86,6 +96,15 @@ export default function VoiceBadge({
         else interim += r[0].transcript
       }
       interimRef.current = interim
+      // Restart the silence countdown on every word; once it's been quiet for
+      // SILENCE_SEND_MS we auto-send, exactly like the finishing tap. Only armed
+      // here (inside onresult) so it never fires before anything is said.
+      if (capturedRef.current.trim() || interim.trim()) {
+        clearSilence()
+        silenceRef.current = setTimeout(() => {
+          if (listeningRef.current) finish()
+        }, SILENCE_SEND_MS)
+      }
     }
     rec.onerror = (e) => {
       if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
@@ -121,9 +140,10 @@ export default function VoiceBadge({
     }
   }
 
-  /** Second tap: stop the mic, and send whatever was said to the coach. */
+  /** Second tap (or the silence timer): stop the mic, send whatever was said. */
   function finish() {
     listeningRef.current = false
+    clearSilence()
     const rec = recRef.current
     recRef.current = null
     if (rec) {
@@ -149,6 +169,7 @@ export default function VoiceBadge({
   /** Drop the mic without submitting (unmount / teardown). */
   function release() {
     listeningRef.current = false
+    clearSilence()
     const rec = recRef.current
     recRef.current = null
     if (rec) {
