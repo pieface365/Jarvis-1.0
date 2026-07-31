@@ -24,29 +24,54 @@ const SPEAK_KEY = 'vitality:coach:speak'
 const MAX_KEPT = 60 // transcript cap in storage
 const SENT_WINDOW = 20 // how much history each question carries to the server
 
-// Jarvis speaks with a male voice. Which voices exist depends entirely on the
-// browser/OS: Apple (iOS/macOS Safari) ships named male voices like
-// "Aaron"/"Alex"/"Fred"; desktop Chrome typically exposes only Google's network
-// voices, whose default US-English voice is FEMALE — there the male one to grab
-// is literally labelled "…Male" ("Google UK English Male"). So we try, in order:
-//   1. known male voices by name (Apple local + Microsoft desktop)
-//   2. any voice explicitly labelled male (catches the Google/Chrome case)
-//   3. any US-English voice, then any English voice, then the OS default
+// Jarvis speaks with a British male voice. Which voices exist depends entirely
+// on the browser/OS, so we target the good ones by name and steer clear of the
+// junk. Order of preference:
+//   1. a named British male voice — Apple's "Daniel" (the classic UK Siri
+//      male), newer en-GB males (Arthur/Oliver), Google/Microsoft UK male
+//   2. any en-GB voice explicitly labelled "…Male"
+//   3. other decent male voices by name (Alex/Aaron/Tom…) for platforms with
+//      no British male at all
+//   4. any voice labelled "…Male", then a GB → US → any English voice
+// AVOID blocks the old low-fi/novelty macOS voices (Fred is the robotic
+// "Stephen Hawking" one) so a fallback can never land on them. Among matches for
+// one name we take the highest quality (Premium > Enhanced > compact).
 // \bmale\b never matches "female" (no word boundary before "male" there), and we
-// belt-and-suspenders exclude /female/ anyway.
-const MALE_NAMES = ['aaron', 'alex', 'fred', 'reed', 'tom', 'nathan', 'daniel', 'arthur', 'oliver', 'gordon', 'david', 'mark', 'guy', 'rishi', 'eddy', 'rocko']
+// exclude /female/ as a belt-and-suspenders check anyway.
+const BRITISH_MALE = ['daniel', 'arthur', 'oliver', 'google uk english male', 'george', 'ryan']
+const OTHER_MALE = ['alex', 'aaron', 'tom', 'nathan', 'david', 'mark', 'guy', 'rishi']
+const AVOID = /\b(fred|albert|bad ?news|bahh|bells|boing|bubbles|cellos|deranged|good ?news|hysterical|jester|organ|pipe ?organ|superstar|trinoids|whisper|wobble|zarvox|junior|ralph|kathy|bruce|agnes|vicki|victoria|grandma|grandpa|flo)\b/i
 const notFemale = (name: string) => !/female/i.test(name)
+const qualityRank = (name: string) => (/premium/i.test(name) ? 3 : /enhanced/i.test(name) ? 2 : 1)
+
+function bestByName(list: SpeechSynthesisVoice[], want: string): SpeechSynthesisVoice | null {
+  const matches = list.filter((x) => x.name.toLowerCase().includes(want) && notFemale(x.name))
+  if (!matches.length) return null
+  return matches.sort((a, b) => qualityRank(b.name) - qualityRank(a.name))[0]
+}
+
 function pickVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
   if (!voices.length) return null
-  const en = voices.filter((v) => /^en/i.test(v.lang))
-  const pool = en.length ? en : voices
-  for (const want of MALE_NAMES) {
-    const v = pool.find((x) => x.name.toLowerCase().includes(want) && notFemale(x.name))
+  const en = voices.filter((v) => /^en/i.test(v.lang) && !AVOID.test(v.name))
+  const src = en.length ? en : voices.filter((v) => /^en/i.test(v.lang))
+  const pool = src.length ? src : voices
+  // 1) British male by name (best quality variant)
+  for (const want of BRITISH_MALE) {
+    const v = bestByName(pool, want)
     if (v) return v
   }
-  const labelledMale = pool.find((x) => /\bmale\b/i.test(x.name) && notFemale(x.name))
-  if (labelledMale) return labelledMale
-  return pool.find((x) => /^en[-_]us/i.test(x.lang)) ?? pool[0] ?? null
+  // 2) a GB voice explicitly labelled male
+  const gbMale = pool.find((x) => /^en[-_]gb/i.test(x.lang) && /\bmale\b/i.test(x.name) && notFemale(x.name))
+  if (gbMale) return gbMale
+  // 3) other known male voices by name
+  for (const want of OTHER_MALE) {
+    const v = bestByName(pool, want)
+    if (v) return v
+  }
+  // 4) any voice labelled male, then GB → US → any English → default
+  const anyMale = pool.find((x) => /\bmale\b/i.test(x.name) && notFemale(x.name))
+  if (anyMale) return anyMale
+  return pool.find((x) => /^en[-_]gb/i.test(x.lang)) ?? pool.find((x) => /^en[-_]us/i.test(x.lang)) ?? pool[0] ?? null
 }
 
 const ERROR_TEXT: Record<string, string> = {
