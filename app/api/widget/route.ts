@@ -134,13 +134,21 @@ function workoutToday(tz: string) {
 /* ── handler ────────────────────────────────────────────────────────────── */
 
 export async function GET(req: Request) {
-  const expected = process.env.WIDGET_TOKEN
+  // Trim so a stray space/newline pasted into the Vercel env value (a common
+  // copy-paste slip) doesn't cause a length-mismatch "unauthorized".
+  const expected = process.env.WIDGET_TOKEN?.trim()
   if (!expected) {
     return NextResponse.json({ ok: false, error: 'not_configured', hint: 'Set WIDGET_TOKEN in the environment.' }, { status: 503 })
   }
   const provided = bearer(req)
-  if (!provided || !constantTimeEquals(provided, expected)) {
-    return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
+  // Distinct errors so a failing widget says which side is wrong: 'no_token'
+  // means the script never sent one (a Scriptable header slip); 'bad_token'
+  // means it sent a value that doesn't match WIDGET_TOKEN.
+  if (!provided) {
+    return NextResponse.json({ ok: false, error: 'no_token' }, { status: 401 })
+  }
+  if (!constantTimeEquals(provided, expected)) {
+    return NextResponse.json({ ok: false, error: 'bad_token' }, { status: 401 })
   }
 
   const tz = new URL(req.url).searchParams.get('tz') || 'America/New_York'

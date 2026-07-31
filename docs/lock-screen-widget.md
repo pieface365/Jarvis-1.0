@@ -26,8 +26,11 @@ a script host like Scriptable can. The script calls a tiny read-only endpoint,
    - `BASE_URL` — your dashboard's stable URL (e.g. `https://jarvis-1-0.vercel.app`).
    - `TOKEN` — the exact `WIDGET_TOKEN` you set in Vercel.
 4. Tap ▶︎ to run it once inside Scriptable — you should see a preview with your
-   numbers. (If it says `unauthorized`, the token doesn't match; `not_configured`
-   means the Vercel env var isn't set yet.)
+   numbers. If instead you see a small error word, it tells you what's wrong:
+   - `not_configured` — `WIDGET_TOKEN` isn't set in Vercel yet (or not redeployed).
+   - `bad_token` — the script's `TOKEN` doesn't match Vercel's `WIDGET_TOKEN`.
+   - `no_token` — the script isn't sending the token (check the `TOKEN` line).
+   - `unreachable` — wrong `BASE_URL`, or no network.
 5. Name the script (e.g. "Vitality") and close.
 6. Lock your phone → long-press the Lock Screen → **Customize** → tap the widget
    area under the clock → add a **Scriptable** widget → tap it → choose **Script:
