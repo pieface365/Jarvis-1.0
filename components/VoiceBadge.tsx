@@ -253,15 +253,18 @@ export default function VoiceBadge({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [suspended])
 
+  // Nothing to offer if the browser has no speech recognition (e.g. an iOS
+  // web-view, where the NATIVE app handles the wake word instead) — hide the
+  // badge rather than show a dead "voice unsupported" pill.
+  if (state === 'unsupported') return null
+
   const capturing = state === 'capturing'
   const label =
-    state === 'unsupported'
-      ? 'voice unsupported'
-      : state === 'error'
-        ? 'voice error'
-        : capturing
-          ? 'listening — tap to send'
-          : 'Hey Jarvis'
+    state === 'error'
+      ? 'voice error'
+      : capturing
+        ? 'listening — tap to send'
+        : 'Hey Jarvis'
 
   const dotColor = capturing ? '#6EE7B7' : state === 'error' ? '#f5c451' : state === 'idle' ? 'rgba(110,231,183,.45)' : 'rgba(255,255,255,.35)'
 
@@ -269,19 +272,15 @@ export default function VoiceBadge({
     <button
       type="button"
       onClick={() => {
-        if (state === 'unsupported') return
         if (capturing) finish()
         else beginCaptureFresh() // idle or error → start capturing now
       }}
-      disabled={state === 'unsupported'}
       title={
-        state === 'unsupported'
-          ? "This browser doesn't support voice recognition"
-          : state === 'error'
-            ? (reason ?? 'voice error') + ' — tap to try again'
-            : capturing
-              ? 'Tap when you finish speaking (or just pause)'
-              : 'Say "Hey Jarvis", or tap and speak'
+        state === 'error'
+          ? (reason ?? 'voice error') + ' — tap to try again'
+          : capturing
+            ? 'Tap when you finish speaking (or just pause)'
+            : 'Say "Hey Jarvis", or tap and speak'
       }
       style={{
         position: 'fixed',
@@ -298,11 +297,11 @@ export default function VoiceBadge({
         border: capturing ? '1px solid rgba(110,231,183,.5)' : '1px solid rgba(255,255,255,.09)',
         borderRadius: 999,
         padding: '7px 14px 7px 11px',
-        color: state === 'unsupported' ? 'rgba(255,255,255,.25)' : 'rgba(255,255,255,.75)',
+        color: 'rgba(255,255,255,.75)',
         fontSize: 12,
         fontFamily: 'ui-monospace, Menlo, monospace',
         letterSpacing: '.03em',
-        cursor: state === 'unsupported' ? 'default' : 'pointer',
+        cursor: 'pointer',
         boxShadow: '0 8px 24px rgba(0,0,0,.4)',
       }}
     >
