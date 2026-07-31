@@ -1,29 +1,31 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { parseWake } from '@/lib/tiles/wakePhrase'
 
 /**
- * VoiceBadge — a tap-to-talk mic for the coach.
+ * VoiceBadge — start the coach by voice OR by tap.
  *
- * Tap once to start listening, speak your question, tap again to finish: it
- * stops the mic, opens the coach with what you said, and gets the answer. No
- * wake phrase and no guessing when your sentence ended — you bracket it with
- * two taps, which is the only thing that works reliably across browsers (Safari
- * and iOS especially never mark speech "final" dependably in continuous mode).
+ * Two ways in, one capture flow:
+ *  - Say "Hey Coach" (hands-free): a background listener scans for the phrase
+ *    and then captures whatever you ask. "Hey Coach, how did I sleep" in one
+ *    breath works; so does "Hey Coach" then a pause then the question.
+ *  - Tap the badge: starts capturing immediately, no phrase needed.
+ * Either way it ends the same: a tap, or ~3s of silence, sends what you said —
+ * it opens the coach with your words and answers.
  *
  * Built on the browser's SpeechRecognition (Web Speech API): audio goes only to
- * the browser's own recognition service, there's no server component, and the
- * mic is live *only* between the two taps — never on page load, never in the
- * background.
- *
- * The `suspended` prop is accepted for compatibility (the coach reads answers
- * aloud); it's a no-op here because the mic is already off by the time an answer
- * plays, so it can never hear itself.
+ * the browser's own recognition service, no server component, nothing stored.
+ * The wake word needs the mic listening in the background, which is reliable on
+ * desktop Chrome but flaky on iOS Safari (it needs a tap to (re)start the mic
+ * and suspends it in the background) — there, tap-to-talk is the dependable
+ * path. `suspended` pauses the mic while the coach reads an answer aloud so it
+ * never hears itself.
  */
 
 const SILENCE_SEND_MS = 3000 // auto-send this long after the last word heard
 
-type VState = 'unsupported' | 'off' | 'listening' | 'error'
+type VState = 'unsupported' | 'idle' | 'capturing' | 'error'
 
 interface SRResult {
   isFinal: boolean
@@ -51,20 +53,27 @@ function getCtor(): (new () => SRLike) | null {
   return w.SpeechRecognition || w.webkitSpeechRecognition || null
 }
 
+const collapse = (s: string) => s.replace(/\s+/g, ' ').trim()
+
 export default function VoiceBadge({
   onWake,
+  suspended = false,
 }: {
   onWake: (query: string) => void
-  /** Accepted so the parent can keep passing it; unused (see file header). */
   suspended?: boolean
 }) {
-  const [state, setState] = useState<VState>('off')
+  const [state, setState] = useState<VState>('idle')
   const [reason, setReason] = useState<string | null>(null)
   const recRef = useRef<SRLike | null>(null)
-  const listeningRef = useRef(false) // true between the two taps
-  const capturedRef = useRef('') // finalized text, accumulated across restarts
-  const interimRef = useRef('') // the current not-yet-final words
-  const silenceRef = useRef<ReturnType<typeof setTimeout> | null>(null) // auto-send timer
+  const runningRef = useRef(false) // we intend the mic to be on
+  const modeRef = useRef<'wake' | 'capture'>('wake')
+  // captured question = baseRef + (current session transcript after cutRef)
+  const baseRef = useRef('') // text carried in (wake remainder / folded restarts)
+  const cutRef = useRef(0) // chars of THIS session to drop (the wake phrase)
+  const sessionRef = useRef('') // latest full transcript of the current session
+  const silenceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const suspendedRef = useRef(suspended)
+  suspendedRef.current = suspended
   const onWakeRef = useRef(onWake)
   onWakeRef.current = onWake
 
@@ -74,139 +83,186 @@ export default function VoiceBadge({
       silenceRef.current = null
     }
   }
+  function armSilence() {
+    clearSilence()
+    silenceRef.current = setTimeout(() => {
+      if (modeRef.current === 'capture') finish()
+    }, SILENCE_SEND_MS)
+  }
 
-  /** Begin a capture session (from a user tap — required for the mic on iOS). */
-  function start() {
+  /** The question so far: carried-in text + this session's words past the wake phrase. */
+  function liveCaptured(): string {
+    return collapse(baseRef.current + ' ' + sessionRef.current.slice(cutRef.current))
+  }
+
+  function buildRec(): SRLike | null {
     const Ctor = getCtor()
-    if (!Ctor) {
-      setState('unsupported')
-      return
-    }
-    capturedRef.current = ''
-    interimRef.current = ''
+    if (!Ctor) return null
     const rec = new Ctor()
     rec.continuous = true
     rec.interimResults = true
     rec.lang = 'en-US'
     rec.onresult = (e) => {
-      let interim = ''
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const r = e.results[i]
-        if (r.isFinal) capturedRef.current += r[0].transcript + ' '
-        else interim += r[0].transcript
+      let full = ''
+      for (let i = 0; i < e.results.length; i++) full += e.results[i][0].transcript
+      sessionRef.current = full
+      if (modeRef.current === 'capture') {
+        if (liveCaptured()) armSilence() // every word resets the 3s auto-send
+        return
       }
-      interimRef.current = interim
-      // Restart the silence countdown on every word; once it's been quiet for
-      // SILENCE_SEND_MS we auto-send, exactly like the finishing tap. Only armed
-      // here (inside onresult) so it never fires before anything is said.
-      if (capturedRef.current.trim() || interim.trim()) {
-        clearSilence()
-        silenceRef.current = setTimeout(() => {
-          if (listeningRef.current) finish()
-        }, SILENCE_SEND_MS)
+      // wake mode: watch for "hey coach", then capture what follows
+      const hit = parseWake(full)
+      if (hit) {
+        modeRef.current = 'capture'
+        baseRef.current = hit.rest || '' // words said after "hey coach" this breath
+        cutRef.current = full.length // continuation in this same session is captured
+        setState('capturing')
+        if (baseRef.current.trim()) armSilence()
       }
     }
-    rec.onerror = (e) => {
-      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
-        listeningRef.current = false
+    rec.onerror = (ev) => {
+      if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') {
+        runningRef.current = false
         setReason('microphone blocked — allow it in your browser/site settings')
         setState('error')
         return
       }
-      // no-speech / aborted / network are transient; onend restarts the session
+      // no-speech / aborted / network are transient — onend restarts the session
     }
     rec.onend = () => {
-      // Browsers end a session on a pause or a time cap. While the user still
-      // has the mic open (hasn't tapped to finish), restart so a multi-sentence
-      // question keeps recording. iOS may refuse a non-gesture restart; if so we
-      // simply keep whatever was captured and submit it on the finishing tap.
-      if (listeningRef.current) {
-        try {
-          rec.start()
-        } catch {
-          /* couldn't resume — captured text is preserved for the finishing tap */
-        }
+      if (!runningRef.current || suspendedRef.current) return
+      // fold any in-progress capture across the restart so nothing is lost
+      if (modeRef.current === 'capture') {
+        baseRef.current = collapse(baseRef.current + ' ' + sessionRef.current.slice(cutRef.current))
+        cutRef.current = 0
+      }
+      sessionRef.current = ''
+      try {
+        rec.start()
+      } catch {
+        /* iOS may refuse a non-gesture restart — a tap will resume it */
       }
     }
+    return rec
+  }
+
+  /** (Re)start the mic in a given mode with a clean session. */
+  function startRec(mode: 'wake' | 'capture'): boolean {
+    stopRec()
+    const rec = buildRec()
+    if (!rec) {
+      setState('unsupported')
+      return false
+    }
+    modeRef.current = mode
+    sessionRef.current = ''
     recRef.current = rec
+    runningRef.current = true
     try {
       rec.start()
-      listeningRef.current = true
       setReason(null)
-      setState('listening')
+      return true
     } catch {
+      runningRef.current = false
+      return false
+    }
+  }
+
+  function stopRec() {
+    const rec = recRef.current
+    recRef.current = null
+    runningRef.current = false
+    if (rec) {
+      rec.onend = null
+      try {
+        rec.abort()
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  /** Tap when idle: start capturing immediately (no wake phrase). */
+  function beginCaptureFresh() {
+    clearSilence()
+    baseRef.current = ''
+    cutRef.current = 0
+    if (startRec('capture')) setState('capturing')
+    else {
       setReason('could not start the microphone — try again')
       setState('error')
     }
   }
 
-  /** Second tap (or the silence timer): stop the mic, send whatever was said. */
+  /** Tap while capturing, or 3s of silence: send what was said, resume wake-listening. */
   function finish() {
-    listeningRef.current = false
     clearSilence()
-    const rec = recRef.current
-    recRef.current = null
-    if (rec) {
-      rec.onend = null
-      try {
-        rec.stop()
-      } catch {
-        /* ignore */
-      }
-      try {
-        rec.abort()
-      } catch {
-        /* ignore */
-      }
-    }
-    const full = (capturedRef.current + ' ' + interimRef.current).replace(/\s+/g, ' ').trim()
-    capturedRef.current = ''
-    interimRef.current = ''
-    setState('off')
-    if (full) onWakeRef.current(full) // opens the coach, shows the text, answers
+    const q = liveCaptured()
+    baseRef.current = ''
+    cutRef.current = 0
+    startRec('wake') // back to passively listening for "Hey Coach"
+    setState('idle')
+    if (q) onWakeRef.current(q) // opens the coach, shows the text, answers
   }
 
-  /** Drop the mic without submitting (unmount / teardown). */
-  function release() {
-    listeningRef.current = false
-    clearSilence()
-    const rec = recRef.current
-    recRef.current = null
-    if (rec) {
-      rec.onend = null
-      try {
-        rec.abort()
-      } catch {
-        /* ignore */
-      }
-    }
-  }
-
+  // start passively listening for the wake word on mount (desktop). iOS may
+  // refuse until the first tap; after that it resumes between captures.
   useEffect(() => {
-    if (!getCtor()) setState('unsupported')
-    return () => release()
+    if (!getCtor()) {
+      setState('unsupported')
+      return
+    }
+    startRec('wake')
+    return () => {
+      clearSilence()
+      stopRec()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const listening = state === 'listening'
+  // pause the mic while the coach speaks its answer, so it can't hear itself
+  useEffect(() => {
+    if (suspended) {
+      clearSilence()
+      try {
+        recRef.current?.stop()
+      } catch {
+        /* ignore */
+      }
+    } else if (state !== 'capturing' && state !== 'unsupported' && state !== 'error') {
+      // resume wake-listening once the answer finishes
+      if (recRef.current) {
+        try {
+          recRef.current.start()
+        } catch {
+          startRec('wake')
+        }
+      } else {
+        startRec('wake')
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [suspended])
+
+  const capturing = state === 'capturing'
   const label =
     state === 'unsupported'
       ? 'voice unsupported'
       : state === 'error'
         ? 'voice error'
-        : listening
+        : capturing
           ? 'listening — tap to send'
           : 'Hey Coach'
 
-  const dotColor = listening ? '#6EE7B7' : state === 'error' ? '#f5c451' : 'rgba(255,255,255,.35)'
+  const dotColor = capturing ? '#6EE7B7' : state === 'error' ? '#f5c451' : state === 'idle' ? 'rgba(110,231,183,.45)' : 'rgba(255,255,255,.35)'
 
   return (
     <button
       type="button"
       onClick={() => {
         if (state === 'unsupported') return
-        if (listening) finish()
-        else start()
+        if (capturing) finish()
+        else beginCaptureFresh() // idle or error → start capturing now
       }}
       disabled={state === 'unsupported'}
       title={
@@ -214,9 +270,9 @@ export default function VoiceBadge({
           ? "This browser doesn't support voice recognition"
           : state === 'error'
             ? (reason ?? 'voice error') + ' — tap to try again'
-            : listening
-              ? 'Tap when you finish speaking'
-              : 'Tap, speak your question, then tap again'
+            : capturing
+              ? 'Tap when you finish speaking (or just pause)'
+              : 'Say "Hey Coach", or tap and speak'
       }
       style={{
         position: 'fixed',
@@ -227,10 +283,10 @@ export default function VoiceBadge({
         display: 'flex',
         alignItems: 'center',
         gap: 7,
-        background: listening ? 'rgba(16,32,24,.92)' : 'rgba(10,12,11,.82)',
+        background: capturing ? 'rgba(16,32,24,.92)' : 'rgba(10,12,11,.82)',
         backdropFilter: 'blur(14px) saturate(1.2)',
         WebkitBackdropFilter: 'blur(14px) saturate(1.2)',
-        border: listening ? '1px solid rgba(110,231,183,.5)' : '1px solid rgba(255,255,255,.09)',
+        border: capturing ? '1px solid rgba(110,231,183,.5)' : '1px solid rgba(255,255,255,.09)',
         borderRadius: 999,
         padding: '7px 14px 7px 11px',
         color: state === 'unsupported' ? 'rgba(255,255,255,.25)' : 'rgba(255,255,255,.75)',
@@ -247,8 +303,8 @@ export default function VoiceBadge({
           height: 8,
           borderRadius: '50%',
           background: dotColor,
-          boxShadow: listening ? `0 0 0 4px ${dotColor}22` : 'none',
-          animation: listening ? 'voiceBadgePulse 0.9s ease-in-out infinite' : undefined,
+          boxShadow: capturing ? `0 0 0 4px ${dotColor}22` : 'none',
+          animation: capturing ? 'voiceBadgePulse 0.9s ease-in-out infinite' : undefined,
           flexShrink: 0,
         }}
       />
