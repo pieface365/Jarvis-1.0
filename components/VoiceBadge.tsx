@@ -123,8 +123,17 @@ export default function VoiceBadge({
     rec.onerror = (ev) => {
       if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') {
         runningRef.current = false
-        setReason('microphone blocked — allow it in your browser/site settings')
-        setState('error')
+        // In capture mode the user just tapped — a block here is a real, worth-
+        // surfacing error. In wake mode this is the browser refusing to start the
+        // background mic without a user gesture (iOS Safari always does this on
+        // load) — NOT a real failure, so sit idle as "Hey Jarvis" and let a tap
+        // start it with the gesture iOS wants, instead of showing "voice error".
+        if (modeRef.current === 'capture') {
+          setReason('microphone blocked — allow it in your browser/site settings')
+          setState('error')
+        } else {
+          setState('idle')
+        }
         return
       }
       // no-speech / aborted / network are transient — onend restarts the session
