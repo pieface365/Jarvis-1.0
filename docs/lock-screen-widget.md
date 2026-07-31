@@ -78,6 +78,7 @@ function addLine(stack, text, size, bold) {
 async function build() {
   const w = new ListWidget()
   w.setPadding(4, 6, 4, 6)
+  w.url = BASE_URL // tapping the widget opens the dashboard, not the Scriptable app
 
   let d = null
   try { d = await getData() } catch (e) { d = null }
