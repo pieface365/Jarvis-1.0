@@ -193,30 +193,50 @@ export async function POST(req: Request) {
   // let the client's ReadableStream.cancel() abort the upstream call
   const ac = new AbortController()
 
+  // Gemini's roles are 'user' / 'model'; our transcript uses 'assistant'.
+  const contents = messages.map((m) => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: m.text }],
+  }))
+  const config = {
+    systemInstruction: systemPrompt(tz, context),
+    maxOutputTokens: 2048,
+    abortSignal: ac.signal,
+  }
+
   const enc = new TextEncoder()
   const rs = new ReadableStream<Uint8Array>({
     async start(controller) {
       const push = (o: object) => controller.enqueue(enc.encode(JSON.stringify(o) + '\n'))
-      try {
-        const stream = await ai.models.generateContentStream({
-          model: 'gemini-2.5-flash',
-          // Gemini's roles are 'user' / 'model'; our transcript uses 'assistant'
-          contents: messages.map((m) => ({
-            role: m.role === 'assistant' ? 'model' : 'user',
-            parts: [{ text: m.text }],
-          })),
-          config: {
-            systemInstruction: systemPrompt(tz, context),
-            maxOutputTokens: 2048,
-            abortSignal: ac.signal,
-          },
-        })
-        for await (const chunk of stream) {
-          const text = chunk.text
-          if (text) push({ t: 'text', v: text })
+      let emitted = false // once any text has streamed we're committed to that model
+      let err: unknown = null
+      // Try current models in order and use whichever this account can reach —
+      // Google retires model IDs for new users over time (a hardcoded one 404s),
+      // so `-latest` first (auto-current), then concrete fallbacks. Only hop to
+      // the next on a clean 404 before any text; other errors (bad key, rate
+      // limit) are real and reported as-is.
+      const MODELS = ['gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-3.5-flash', 'gemini-3.5-flash-lite']
+      for (const model of MODELS) {
+        try {
+          const stream = await ai.models.generateContentStream({ model, contents, config })
+          for await (const chunk of stream) {
+            const text = chunk.text
+            if (text) {
+              emitted = true
+              push({ t: 'text', v: text })
+            }
+          }
+          err = null
+          break
+        } catch (e) {
+          err = e
+          const notFound = e instanceof ApiError && e.status === 404
+          if (emitted || !notFound) break // real failure, or already mid-answer
         }
+      }
+      if (!err) {
         push({ t: 'done' })
-      } catch (err) {
+      } else {
         // 429 = free-tier rate/quota limit; everything else is a generic failure
         const rate = err instanceof ApiError && err.status === 429
         // Surface the real reason: Gemini's errors are specific (bad key, model
