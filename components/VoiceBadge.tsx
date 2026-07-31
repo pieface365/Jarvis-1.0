@@ -252,7 +252,7 @@ export default function VoiceBadge({
         ? 'voice error'
         : capturing
           ? 'listening — tap to send'
-          : 'Hey Coach'
+          : 'Hey Jarvis'
 
   const dotColor = capturing ? '#6EE7B7' : state === 'error' ? '#f5c451' : state === 'idle' ? 'rgba(110,231,183,.45)' : 'rgba(255,255,255,.35)'
 
@@ -272,7 +272,7 @@ export default function VoiceBadge({
             ? (reason ?? 'voice error') + ' — tap to try again'
             : capturing
               ? 'Tap when you finish speaking (or just pause)'
-              : 'Say "Hey Coach", or tap and speak'
+              : 'Say "Hey Jarvis", or tap and speak'
       }
       style={{
         position: 'fixed',

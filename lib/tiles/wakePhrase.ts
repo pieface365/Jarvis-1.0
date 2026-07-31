@@ -1,14 +1,14 @@
 /**
- * Pure "Hey Coach" wake-phrase parsing — no DOM, no SpeechRecognition, so it's
+ * Pure "Hey Jarvis" wake-phrase parsing — no DOM, no SpeechRecognition, so it's
  * trivial to unit-test. Used by components/VoiceBadge.tsx.
  */
 
-const WAKE_RE = /\b(?:hey|ok|okay)[, ]+coach\b/i
+const WAKE_RE = /\b(?:hey|ok|okay)[, ]+jarvis\b/i
 
 /**
  * Does `transcript` contain the wake phrase, and if so what (if anything)
  * follows it in the same utterance? Returns null when the phrase isn't present.
- * `rest` is '' when the speaker said only the wake phrase (e.g. "Hey Coach"),
+ * `rest` is '' when the speaker said only the wake phrase (e.g. "Hey Jarvis"),
  * meaning the caller should open a short follow-up listening window.
  */
 export function parseWake(transcript: string): { rest: string } | null {

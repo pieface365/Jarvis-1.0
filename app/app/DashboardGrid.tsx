@@ -37,7 +37,7 @@ const GRID_ORDER = [...SLOT_ORDER, 'coach']
 
 const COACH_TILE = {
   index: '08',
-  label: 'Coach',
+  label: 'Jarvis',
   variant: undefined as string | undefined,
   orb: { mode: 'wander' },
   glyph: (
@@ -572,7 +572,7 @@ function Dock({ activeId, onSelect }: { activeId: string; onSelect: (id: string)
       icon: CORE_TILES[id as keyof typeof CORE_TILES].glyph,
     })),
     {
-      id: 'coach', label: 'Coach',
+      id: 'coach', label: 'Jarvis',
       icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
           <path d="M21 11.3c0 4-4 7.2-9 7.2-.9 0-1.8-.1-2.6-.3L4 20l1.3-3.1C3.9 15.6 3 13.5 3 11.3c0-4 4-7.3 9-7.3s9 3.3 9 7.3Z" />

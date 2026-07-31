@@ -26,7 +26,7 @@ const SENT_WINDOW = 20 // how much history each question carries to the server
 
 const ERROR_TEXT: Record<string, string> = {
   no_key:
-    'The coach needs a Gemini API key. Add GEMINI_API_KEY in Vercel → Settings → Environment Variables (a free key from aistudio.google.com), then redeploy.',
+    'Jarvis needs a Gemini API key. Add GEMINI_API_KEY in Vercel → Settings → Environment Variables (a free key from aistudio.google.com), then redeploy.',
   rate_limited: 'The AI service is rate-limiting right now — give it a minute and ask again.',
   api_error: 'The AI service returned an error. Try again in a moment.',
   locked: 'The dashboard is locked — reload the page and enter the password.',
@@ -415,7 +415,7 @@ export default function CoachPanel({
       <aside
         role="dialog"
         aria-modal="true"
-        aria-label="Coach"
+        aria-label="Jarvis"
         style={{
           /* 100dvh, not top:0/bottom:0. iOS anchors fixed elements to the LARGE
              viewport, so a top/bottom-pinned panel runs underneath Safari's
@@ -438,7 +438,7 @@ export default function CoachPanel({
           }}
         >
           <span style={{ fontFamily: 'var(--serif, Georgia)', fontStyle: 'italic', fontSize: 20, color: 'var(--fg, #ededf0)' }}>
-            Coach
+            Jarvis
           </span>
           <span style={{ fontFamily: 'var(--mono, monospace)', fontSize: 10, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted, #84848c)' }}>
             knows your dashboard
@@ -476,7 +476,7 @@ export default function CoachPanel({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close coach"
+            aria-label="Close Jarvis"
             style={{
               background: 'transparent', border: 'none', color: 'var(--muted, #84848c)',
               fontSize: 22, lineHeight: 1, cursor: 'pointer', padding: '2px 6px',
@@ -511,7 +511,7 @@ export default function CoachPanel({
             <div style={{ color: 'var(--muted, #84848c)', fontSize: 14, lineHeight: 1.65, padding: '18px 6px' }}>
               <p style={{ margin: '0 0 12px', color: 'var(--fg, #ededf0)', fontSize: 15 }}>
                 Ask anything — I can see your training, food, vitals and caffeine logs.
-                Or say <strong style={{ color: 'var(--mint, #6EE7B7)' }}>&ldquo;Hey Coach&rdquo;</strong> — or tap the badge — then speak, and pause when you&rsquo;re done.
+                Or say <strong style={{ color: 'var(--mint, #6EE7B7)' }}>&ldquo;Hey Jarvis&rdquo;</strong> — or tap the badge — then speak, and pause when you&rsquo;re done.
               </p>
               {['How recovered am I — should tomorrow be a hard session?',
                 'What should I eat tonight to hit my protein target?',

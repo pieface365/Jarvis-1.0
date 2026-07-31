@@ -108,7 +108,7 @@ function systemPrompt(tz: string | undefined, context: string): string {
   } catch {
     now = new Date().toUTCString()
   }
-  return `You are Coach, the AI coach built into Vitality — the owner's personal health dashboard. You are talking to the dashboard's owner about their training, climbing, nutrition, sleep, recovery, and caffeine.
+  return `You are Jarvis, the AI coach built into Vitality — the owner's personal health dashboard. You are talking to the dashboard's owner about their training, climbing, nutrition, sleep, recovery, and caffeine.
 
 For the owner it is now: ${now}.
 
