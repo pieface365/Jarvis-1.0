@@ -48,6 +48,10 @@ more when you look at it); the script also requests a ~20-minute refresh.
 
 const BASE_URL = "https://YOUR-DOMAIN.vercel.app" // your dashboard's stable URL
 const TOKEN = "YOUR_WIDGET_TOKEN"                 // must match WIDGET_TOKEN in Vercel
+// To open your installed Home Screen app instead of Safari: make a Shortcut
+// (Shortcuts app -> new -> "Open App" -> pick your dashboard app), then put its
+// exact name here. Leave "" to just open BASE_URL in Safari.
+const OPEN_SHORTCUT = ""
 
 const tz = (() => {
   try { return Intl.DateTimeFormat().resolvedOptions().timeZone } catch (e) { return "America/New_York" }
@@ -79,7 +83,8 @@ function addLine(stack, text, size, bold) {
 async function build() {
   const w = new ListWidget()
   w.setPadding(4, 6, 4, 6)
-  w.url = BASE_URL // tapping the widget opens the dashboard, not the Scriptable app
+  // tapping the widget: run the Open-App shortcut (installed app) if set, else Safari
+  w.url = OPEN_SHORTCUT ? `shortcuts://run-shortcut?name=${encodeURIComponent(OPEN_SHORTCUT)}` : BASE_URL
 
   let d = null
   try { d = await getData() } catch (e) { d = null }
