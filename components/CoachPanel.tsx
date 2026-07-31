@@ -382,6 +382,7 @@ export default function CoachPanel({
     let failDetail: string | null = null // the raw server/API reason, if any
     let full = '' // accumulated for text-to-speech once streaming finishes
     let fullSources: Source[] | null = null
+    let speakOverride: string | null = null // read this aloud instead of `full` when they differ
     try {
       const res = await fetch('/api/coach', {
         method: 'POST',
@@ -440,6 +441,10 @@ export default function CoachPanel({
       // append the raw reason (bad key / model not found / API not enabled) so
       // a failure says what to fix instead of just "try again"
       const msg = failDetail ? `${base}\n\n\`${failDetail}\`` : base
+      // hands-free: read only the friendly line aloud, never the raw technical
+      // detail ("404 · model not found"). If a partial answer already streamed,
+      // `full` holds it and we speak that instead as normal.
+      if (!full) speakOverride = base
       full = full || msg
       patchLast((m) => (m.text ? m : { ...m, text: msg, error: true }))
     }
@@ -464,7 +469,8 @@ export default function CoachPanel({
         /* storage unavailable — nothing more we can do */
       }
     }
-    if (full) speakText(full) // speaks even just after a real close, so a hands-free answer is never silently dropped
+    const toSpeak = speakOverride ?? full
+    if (toSpeak) speakText(toSpeak) // speaks even just after a real close, so a hands-free answer is never silently dropped
   }
 
   // "Hey Coach, <question>" landed via VoiceBadge — ask it, once per capture.
