@@ -45,14 +45,14 @@ const notFemale = (name: string) => !/female/i.test(name)
 const qualityRank = (name: string) => (/premium/i.test(name) ? 3 : /enhanced/i.test(name) ? 2 : 1)
 
 function bestByName(list: SpeechSynthesisVoice[], want: string): SpeechSynthesisVoice | null {
-  const matches = list.filter((x) => x.name.toLowerCase().includes(want) && notFemale(x.name))
+  const matches = list.filter((x) => (x.name || '').toLowerCase().includes(want) && notFemale(x.name || ''))
   if (!matches.length) return null
-  return matches.sort((a, b) => qualityRank(b.name) - qualityRank(a.name))[0]
+  return matches.sort((a, b) => qualityRank(b.name || '') - qualityRank(a.name || ''))[0]
 }
 
 function pickVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
   if (!voices.length) return null
-  const en = voices.filter((v) => /^en/i.test(v.lang) && !AVOID.test(v.name))
+  const en = voices.filter((v) => /^en/i.test(v.lang) && !AVOID.test(v.name || ''))
   const src = en.length ? en : voices.filter((v) => /^en/i.test(v.lang))
   const pool = src.length ? src : voices
   // 1) British male by name (best quality variant)
@@ -61,7 +61,7 @@ function pickVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null 
     if (v) return v
   }
   // 2) a GB voice explicitly labelled male
-  const gbMale = pool.find((x) => /^en[-_]gb/i.test(x.lang) && /\bmale\b/i.test(x.name) && notFemale(x.name))
+  const gbMale = pool.find((x) => /^en[-_]gb/i.test(x.lang) && /\bmale\b/i.test(x.name || '') && notFemale(x.name || ''))
   if (gbMale) return gbMale
   // 3) other known male voices by name
   for (const want of OTHER_MALE) {
@@ -69,7 +69,7 @@ function pickVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null 
     if (v) return v
   }
   // 4) any voice labelled male, then GB → US → any English → default
-  const anyMale = pool.find((x) => /\bmale\b/i.test(x.name) && notFemale(x.name))
+  const anyMale = pool.find((x) => /\bmale\b/i.test(x.name || '') && notFemale(x.name || ''))
   if (anyMale) return anyMale
   return pool.find((x) => /^en[-_]gb/i.test(x.lang)) ?? pool.find((x) => /^en[-_]us/i.test(x.lang)) ?? pool[0] ?? null
 }
@@ -246,19 +246,46 @@ export default function CoachPanel({
     if (!speakSupported || !speakRef.current) return
     const plain = stripMd(text).trim()
     if (!plain) return
-    try {
-      window.speechSynthesis.cancel() // never overlap a previous answer
+    const synth = window.speechSynthesis
+    let started = false
+
+    const buildUtterance = (useChosenVoice: boolean) => {
       const u = new SpeechSynthesisUtterance(plain)
-      // voices may only have loaded since mount — re-resolve if we still have none
-      if (!voiceRef.current) voiceRef.current = pickVoice(window.speechSynthesis.getVoices())
-      if (voiceRef.current) {
-        u.voice = voiceRef.current
-        u.lang = voiceRef.current.lang // keep lang consistent with the picked voice
+      if (useChosenVoice) {
+        // voices may only have loaded since mount — re-resolve if we still have none
+        if (!voiceRef.current) voiceRef.current = pickVoice(synth.getVoices())
+        if (voiceRef.current) {
+          u.voice = voiceRef.current
+          u.lang = voiceRef.current.lang // keep lang consistent with the picked voice
+        }
       }
-      u.onstart = () => onSpeakingChangeRef.current?.(true)
+      u.onstart = () => {
+        started = true
+        onSpeakingChangeRef.current?.(true)
+      }
       u.onend = () => onSpeakingChangeRef.current?.(false)
       u.onerror = () => onSpeakingChangeRef.current?.(false)
-      window.speechSynthesis.speak(u)
+      return u
+    }
+
+    try {
+      synth.cancel() // never overlap a previous answer
+      synth.speak(buildUtterance(true))
+      // Some browsers silently drop speak() when a specific voice is assigned —
+      // a network voice that never loads, or one that isn't truly playable — so
+      // the answer would go out unspoken. If nothing has begun (and nothing is
+      // even queued) a beat later, retry once with the browser's DEFAULT voice
+      // so a spoken answer is never lost. The `pending || speaking` check lets a
+      // slow-to-start network voice through instead of talking over it.
+      window.setTimeout(() => {
+        if (started || synth.speaking || synth.pending) return
+        try {
+          synth.cancel()
+          synth.speak(buildUtterance(false))
+        } catch {
+          /* ignore — the text answer is still on screen */
+        }
+      }, 1200)
     } catch {
       /* no voices installed or similar — fail quiet, the text answer still shows */
     }
