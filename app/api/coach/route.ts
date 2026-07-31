@@ -198,11 +198,16 @@ export async function POST(req: Request) {
     role: m.role === 'assistant' ? 'model' : 'user',
     parts: [{ text: m.text }],
   }))
-  const config = {
+  const baseConfig = {
     systemInstruction: systemPrompt(tz, context),
     maxOutputTokens: 2048,
     abortSignal: ac.signal,
   }
+  // thinkingBudget:0 disables the model's internal "thinking" pass — the bulk of
+  // the wait before an answer starts. Coaching Q&A doesn't need it, so answers
+  // come back much faster. Allowed ranges are model-dependent, so if a model
+  // rejects 0 we retry it without the cap (baseConfig) rather than failing.
+  const fastConfig = { ...baseConfig, thinkingConfig: { thinkingBudget: 0 } }
 
   const enc = new TextEncoder()
   const rs = new ReadableStream<Uint8Array>({
@@ -212,26 +217,35 @@ export async function POST(req: Request) {
       let err: unknown = null
       // Try current models in order and use whichever this account can reach —
       // Google retires model IDs for new users over time (a hardcoded one 404s),
-      // so `-latest` first (auto-current), then concrete fallbacks. Only hop to
-      // the next on a clean 404 before any text; other errors (bad key, rate
-      // limit) are real and reported as-is.
-      const MODELS = ['gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-3.5-flash', 'gemini-3.5-flash-lite']
-      for (const model of MODELS) {
-        try {
-          const stream = await ai.models.generateContentStream({ model, contents, config })
-          for await (const chunk of stream) {
-            const text = chunk.text
-            if (text) {
-              emitted = true
-              push({ t: 'text', v: text })
+      // so lite-latest first (lowest latency), then the -latest aliases, then
+      // concrete fallbacks. Per model: try no-thinking first, then with the
+      // model's default thinking if it rejected a 0 budget. Hop to the next model
+      // on a 404; other errors (bad key, rate limit) are reported as-is.
+      const MODELS = ['gemini-flash-lite-latest', 'gemini-flash-latest', 'gemini-2.5-flash-lite', 'gemini-3.5-flash']
+      outer: for (const model of MODELS) {
+        for (const config of [fastConfig, baseConfig]) {
+          try {
+            const stream = await ai.models.generateContentStream({ model, contents, config })
+            for await (const chunk of stream) {
+              const text = chunk.text
+              if (text) {
+                emitted = true
+                push({ t: 'text', v: text })
+              }
             }
+            err = null
+            break outer
+          } catch (e) {
+            err = e
+            if (emitted) break outer // already mid-answer — can't restart
+            const status = e instanceof ApiError ? e.status : 0
+            const msg = e instanceof Error ? e.message : ''
+            // account-wide problems won't change per model/config — stop now
+            if (status === 401 || status === 403 || status === 429 || /api[_ ]?key/i.test(msg)) break outer
+            if (status === 404) continue outer // this model is gone → next model
+            // otherwise (e.g. a 0 thinking budget this model won't accept) fall
+            // through to baseConfig for the same model
           }
-          err = null
-          break
-        } catch (e) {
-          err = e
-          const notFound = e instanceof ApiError && e.status === 404
-          if (emitted || !notFound) break // real failure, or already mid-answer
         }
       }
       if (!err) {
