@@ -47,6 +47,7 @@ interface SRLike {
 
 const STORE_KEY = 'vitality:coach:voice'
 const AWAIT_MS = 8000
+const SILENCE_MS = 1300 // pause after speech that counts as "sentence finished"
 
 function getCtor(): (new () => SRLike) | null {
   if (typeof window === 'undefined') return null
@@ -69,6 +70,15 @@ export default function VoiceBadge({
   const awaitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const onWakeRef = useRef(onWake)
   onWakeRef.current = onWake
+  // End-of-utterance by silence, not by isFinal: browsers (mobile especially)
+  // often never mark a continuous-mode result final — they just end the session
+  // on the pause — so the last words stay "interim" and get dropped. We hold the
+  // latest interim text and flush it after a brief silence.
+  const interimRef = useRef('')
+  const silenceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // dedupe: the same utterance can arrive twice (a silence-flush, then a late
+  // isFinal) — don't fire the coach for it twice.
+  const lastFiredRef = useRef<{ text: string; at: number }>({ text: '', at: 0 })
 
   function clearAwait() {
     awaitingRef.current = false
@@ -78,18 +88,37 @@ export default function VoiceBadge({
     }
   }
 
+  function clearSilence() {
+    if (silenceRef.current) {
+      clearTimeout(silenceRef.current)
+      silenceRef.current = null
+    }
+    interimRef.current = ''
+  }
+
+  /** Fire the coach once per utterance — dedupe an utterance that arrives both
+   *  as a silence-flush and, moments later, as a real isFinal. */
+  function fire(q: string) {
+    const now = Date.now()
+    const last = lastFiredRef.current
+    if (q === last.text && now - last.at < 4000) return
+    lastFiredRef.current = { text: q, at: now }
+    onWakeRef.current(q)
+  }
+
   function handleFinal(text: string) {
+    clearSilence()
     if (awaitingRef.current) {
       clearAwait()
       const q = text.trim()
-      if (q) onWakeRef.current(q)
+      if (q) fire(q)
       setState('listening')
       return
     }
     const hit = parseWake(text)
     if (!hit) return
     if (hit.rest) {
-      onWakeRef.current(hit.rest)
+      fire(hit.rest)
       setState('listening')
     } else {
       awaitingRef.current = true
@@ -118,9 +147,29 @@ export default function VoiceBadge({
     rec.interimResults = true
     rec.lang = 'en-US'
     rec.onresult = (e) => {
+      let finalTx = ''
+      let interimTx = ''
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const r = e.results[i]
-        if (r.isFinal) handleFinal(r[0].transcript)
+        if (r.isFinal) finalTx += r[0].transcript
+        else interimTx += r[0].transcript
+      }
+      if (finalTx) {
+        handleFinal(finalTx) // clears the silence timer itself
+        return
+      }
+      // No final yet — remember the interim and (re)arm a short silence timer.
+      // If the user keeps talking, each result pushes the deadline out; when they
+      // stop, it fires and we treat the interim as the finished sentence.
+      if (interimTx.trim()) {
+        interimRef.current = interimTx
+        if (silenceRef.current) clearTimeout(silenceRef.current)
+        silenceRef.current = setTimeout(() => {
+          const t = interimRef.current
+          interimRef.current = ''
+          silenceRef.current = null
+          if (t.trim()) handleFinal(t)
+        }, SILENCE_MS)
       }
     }
     rec.onerror = (e) => {
@@ -178,6 +227,7 @@ export default function VoiceBadge({
   function releaseMic() {
     enabledRef.current = false
     clearAwait()
+    clearSilence()
     const rec = recRef.current
     recRef.current = null
     if (rec) {
@@ -213,6 +263,7 @@ export default function VoiceBadge({
     const rec = recRef.current
     if (!rec) return
     if (suspended) {
+      clearSilence() // don't let a pending flush fire while Coach is speaking
       try {
         rec.stop()
       } catch {
