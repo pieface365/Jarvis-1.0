@@ -24,13 +24,38 @@ const SPEAK_KEY = 'vitality:coach:speak'
 const MAX_KEPT = 60 // transcript cap in storage
 const SENT_WINDOW = 20 // how much history each question carries to the server
 
+// Jarvis speaks with a male voice. Which voices exist depends entirely on the
+// browser/OS: Apple (iOS/macOS Safari) ships named male voices like
+// "Aaron"/"Alex"/"Fred"; desktop Chrome typically exposes only Google's network
+// voices, whose default US-English voice is FEMALE — there the male one to grab
+// is literally labelled "…Male" ("Google UK English Male"). So we try, in order:
+//   1. known male voices by name (Apple local + Microsoft desktop)
+//   2. any voice explicitly labelled male (catches the Google/Chrome case)
+//   3. any US-English voice, then any English voice, then the OS default
+// \bmale\b never matches "female" (no word boundary before "male" there), and we
+// belt-and-suspenders exclude /female/ anyway.
+const MALE_NAMES = ['aaron', 'alex', 'fred', 'reed', 'tom', 'nathan', 'daniel', 'arthur', 'oliver', 'gordon', 'david', 'mark', 'guy', 'rishi', 'eddy', 'rocko']
+const notFemale = (name: string) => !/female/i.test(name)
+function pickVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
+  if (!voices.length) return null
+  const en = voices.filter((v) => /^en/i.test(v.lang))
+  const pool = en.length ? en : voices
+  for (const want of MALE_NAMES) {
+    const v = pool.find((x) => x.name.toLowerCase().includes(want) && notFemale(x.name))
+    if (v) return v
+  }
+  const labelledMale = pool.find((x) => /\bmale\b/i.test(x.name) && notFemale(x.name))
+  if (labelledMale) return labelledMale
+  return pool.find((x) => /^en[-_]us/i.test(x.lang)) ?? pool[0] ?? null
+}
+
 const ERROR_TEXT: Record<string, string> = {
   no_key:
     'Jarvis needs a Gemini API key. Add GEMINI_API_KEY in Vercel → Settings → Environment Variables (a free key from aistudio.google.com), then redeploy.',
   rate_limited: 'The AI service is rate-limiting right now — give it a minute and ask again.',
   api_error: 'The AI service returned an error. Try again in a moment.',
   locked: 'The dashboard is locked — reload the page and enter the password.',
-  network: 'Could not reach the coach — check your connection and try again.',
+  network: 'Could not reach Jarvis — check your connection and try again.',
 }
 
 function loadChat(): Msg[] {
@@ -151,6 +176,9 @@ export default function CoachPanel({
   onSpeakingChangeRef.current = onSpeakingChange
   const speakRef = useRef(speak)
   speakRef.current = speak
+  // The chosen TTS voice. getVoices() is often empty on first call and fills in
+  // later, firing 'voiceschanged' — resolve then, and again lazily at speak time.
+  const voiceRef = useRef<SpeechSynthesisVoice | null>(null)
   // A wake phrase spoken while Coach is still answering: held here rather than
   // dropped, and asked as soon as the current answer lands.
   const pendingVoiceRef = useRef<string | null>(null)
@@ -196,6 +224,12 @@ export default function CoachPanel({
     try {
       window.speechSynthesis.cancel() // never overlap a previous answer
       const u = new SpeechSynthesisUtterance(plain)
+      // voices may only have loaded since mount — re-resolve if we still have none
+      if (!voiceRef.current) voiceRef.current = pickVoice(window.speechSynthesis.getVoices())
+      if (voiceRef.current) {
+        u.voice = voiceRef.current
+        u.lang = voiceRef.current.lang // keep lang consistent with the picked voice
+      }
       u.onstart = () => onSpeakingChangeRef.current?.(true)
       u.onend = () => onSpeakingChangeRef.current?.(false)
       u.onerror = () => onSpeakingChangeRef.current?.(false)
@@ -220,6 +254,16 @@ export default function CoachPanel({
       return next
     })
   }
+
+  useEffect(() => {
+    if (!speakSupported) return
+    const load = () => {
+      voiceRef.current = pickVoice(window.speechSynthesis.getVoices())
+    }
+    load()
+    window.speechSynthesis.addEventListener?.('voiceschanged', load)
+    return () => window.speechSynthesis.removeEventListener?.('voiceschanged', load)
+  }, [speakSupported])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -599,7 +643,7 @@ export default function CoachPanel({
                 void send()
               }
             }}
-            placeholder="Ask your coach…"
+            placeholder="Ask Jarvis…"
             rows={input.includes('\n') ? 3 : 1}
             style={{
               flex: 1, resize: 'none', background: 'rgba(255,255,255,.04)',

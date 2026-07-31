@@ -882,7 +882,7 @@ export default function DashboardGrid({ userId, arranging = false }: DashboardGr
                 core={isVee ? null : isCoach ? COACH_TILE : CORE_TILES[id as keyof typeof CORE_TILES]}
                 pos={positions.get(id)}
                 size={sizeFor(id)}
-                onOpen={() => (isCoach ? setCoachOpen(true) : openSlot(id))}
+                onOpen={() => (isCoach ? (setVoiceQuery(null), setCoachOpen(true)) : openSlot(id))}
                 arranging={arranging}
                 dragging={dragId === id}
                 onDragStart={startDrag(id)}
@@ -1005,7 +1005,8 @@ export default function DashboardGrid({ userId, arranging = false }: DashboardGr
       <Dock
         activeId={coachOpen ? 'coach' : openId ?? 'home'}
         onSelect={(id) => {
-          if (id === 'coach') { setCoachOpen(true); return } // overlays whatever is open
+          // clear any stale voice question so reopening by hand doesn't re-ask it
+          if (id === 'coach') { setVoiceQuery(null); setCoachOpen(true); return } // overlays whatever is open
           setCoachOpen(false)
           if (id === 'home') { setOpenId(null); setConnectId(null); return }
           setConnectId(null)
