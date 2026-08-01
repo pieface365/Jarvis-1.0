@@ -46,8 +46,13 @@ export async function middleware(req: NextRequest) {
   if (pathname.startsWith('/api/')) {
     return NextResponse.json({ error: 'locked', hint: 'unlock the dashboard first' }, { status: 401 })
   }
+  // 200, not 401: the iOS WKWebView (the native wrapper app) refuses to render a
+  // main-frame response with an error status — it fails the load with "the URL
+  // can't be shown" and shows a blank page instead of the login form. Browsers
+  // render either way; the API branch above still returns 401 for programmatic
+  // callers, so nothing that keys off the status for /api is affected.
   return new NextResponse(LOGIN_HTML, {
-    status: 401,
+    status: 200,
     headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' },
   })
 }
