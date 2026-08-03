@@ -34,7 +34,9 @@
   <h1>My Closet</h1>
   <p class="sub">Wardrobe · <span id="count">0 items</span></p>
 
-  <form class="add" id="addForm">
+  <!-- NOT a <form>: tiles run sandboxed with allow-scripts only (no allow-forms),
+       so a real form submit is silently blocked. Add via a button click + Enter. -->
+  <div class="add" id="addForm">
     <input id="name" placeholder="Add an item — e.g. Black denim jacket" autocomplete="off" />
     <select id="cat">
       <option>Tops</option>
@@ -43,8 +45,8 @@
       <option>Shoes</option>
       <option>Accessories</option>
     </select>
-    <button class="add-btn" type="submit">Add</button>
-  </form>
+    <button class="add-btn" type="button" id="addBtn">Add</button>
+  </div>
 
   <div id="list"></div>
 
@@ -79,15 +81,16 @@
     $('list').innerHTML = html;
   }
 
-  $('addForm').addEventListener('submit', function(e){
-    e.preventDefault();
+  function add(){
     var name = $('name').value.trim();
     if(!name) return;
     items.push({ id: Date.now() + '' + Math.random().toString(36).slice(2,6), name: name, cat: $('cat').value });
     $('name').value = '';
     persist(); render();
     $('name').focus();
-  });
+  }
+  $('addBtn').addEventListener('click', add);
+  $('name').addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); add(); } });
 
   $('list').addEventListener('click', function(e){
     var b = e.target.closest ? e.target.closest('.x') : null;
