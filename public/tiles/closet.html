@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>My Closet</title>
+<style>
+  :root{
+    --bg:#0a0b0a; --card:#0e0e11; --fg:#ededf0; --muted:#84848c; --mint:#6EE7B7;
+    --border:#1d1d22; --hair:#2a2a31; --neg:#e06a6c;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;
+    --serif:Georgia,"Times New Roman",serif; --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans)}
+  body{padding:18px calc(16px + env(safe-area-inset-right)) calc(18px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));min-height:100dvh}
+  h1{font-family:var(--serif);font-style:italic;font-weight:500;font-size:26px;margin:0 0 2px}
+  .sub{color:var(--muted);font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;margin:0 0 16px}
+  form.add{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+  input,select{background:rgba(255,255,255,.04);border:1px solid var(--hair);color:var(--fg);border-radius:10px;padding:11px 12px;font:inherit;font-size:14px;outline:none}
+  input:focus,select:focus{border-color:var(--mint)}
+  #name{flex:1;min-width:130px}
+  button.add-btn{background:var(--mint);color:#04140d;border:none;border-radius:10px;padding:0 16px;font-weight:600;font-size:14px;cursor:pointer}
+  .cat{margin-top:18px}
+  .cat-h{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:8px}
+  .item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:10px;margin-bottom:6px;font-size:14px;line-height:1.35}
+  .item .x{background:transparent;border:none;color:var(--muted);font-size:19px;line-height:1;cursor:pointer;padding:0 4px;flex-shrink:0}
+  .item .x:hover{color:var(--neg)}
+  .empty{color:var(--muted);font-size:13.5px;line-height:1.65;padding:16px 4px}
+  .empty strong{color:var(--mint);font-weight:600}
+</style>
+</head>
+<body>
+  <h1>My Closet</h1>
+  <p class="sub">Wardrobe · <span id="count">0 items</span></p>
+
+  <form class="add" id="addForm">
+    <input id="name" placeholder="Add an item — e.g. Black denim jacket" autocomplete="off" />
+    <select id="cat">
+      <option>Tops</option>
+      <option>Bottoms</option>
+      <option>Outerwear</option>
+      <option>Shoes</option>
+      <option>Accessories</option>
+    </select>
+    <button class="add-btn" type="submit">Add</button>
+  </form>
+
+  <div id="list"></div>
+
+<script>
+  var CATS = ['Tops','Bottoms','Outerwear','Shoes','Accessories'];
+  var items = []; // { id, name, cat }
+  var $ = function(id){ return document.getElementById(id); };
+
+  function persist(){ if(window.Vitality) window.Vitality.save({ items: items }).catch(function(){}); }
+  function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  function render(){
+    $('count').textContent = items.length + (items.length===1 ? ' item' : ' items');
+    var byCat = {};
+    CATS.forEach(function(c){ byCat[c] = []; });
+    items.forEach(function(it){ (byCat[it.cat] || (byCat[it.cat] = [])).push(it); });
+
+    var html = '', any = false;
+    CATS.forEach(function(cat){
+      var list = byCat[cat] || [];
+      if(!list.length) return;
+      any = true;
+      html += '<div class="cat"><div class="cat-h"><span>' + cat + '</span><span>' + list.length + '</span></div>';
+      list.forEach(function(it){
+        html += '<div class="item"><span>' + esc(it.name) + '</span><button class="x" data-id="' + it.id + '" aria-label="Remove">×</button></div>';
+      });
+      html += '</div>';
+    });
+    if(!any){
+      html = '<div class="empty">Your closet is empty. Add clothes above to build your wardrobe — then ask <strong>Jarvis</strong> what to wear.</div>';
+    }
+    $('list').innerHTML = html;
+  }
+
+  $('addForm').addEventListener('submit', function(e){
+    e.preventDefault();
+    var name = $('name').value.trim();
+    if(!name) return;
+    items.push({ id: Date.now() + '' + Math.random().toString(36).slice(2,6), name: name, cat: $('cat').value });
+    $('name').value = '';
+    persist(); render();
+    $('name').focus();
+  });
+
+  $('list').addEventListener('click', function(e){
+    var b = e.target.closest ? e.target.closest('.x') : null;
+    if(!b) return;
+    items = items.filter(function(it){ return it.id !== b.getAttribute('data-id'); });
+    persist(); render();
+  });
+
+  (function(){
+    if(!window.Vitality){ render(); return; }
+    window.Vitality.load().then(function(d){
+      items = (d && Array.isArray(d.items)) ? d.items : [];
+      render();
+    }, function(){ render(); });
+  })();
+</script>
+</body>
+</html>

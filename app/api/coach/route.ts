@@ -23,7 +23,7 @@ import { supa } from '@/lib/tiles/tileSupabase'
 
 export const maxDuration = 60 // streamed answer over the free-tier rate limit
 
-const SLOTS = ['train', 'fuel', 'vitals', 'peak'] as const
+const SLOTS = ['train', 'fuel', 'vitals', 'peak', 'closet'] as const
 
 type ChatMsg = { role: 'user' | 'assistant'; text: string }
 
@@ -117,6 +117,7 @@ Below is the owner's actual dashboard data, as saved by their tiles (recent wind
 - "fuel": food log per day (name, grams, calories, protein/carbs/fat) and the nutrition plan
 - "vitals": daily HRV, resting HR, sleep hours, recovery %, subjective feel, weight
 - "peak": wake/bed schedule and the caffeine log (dose mg at time t, hours as decimals)
+- "closet": the owner's wardrobe — clothing items they own, grouped by category (Tops, Bottoms, Outerwear, Shoes, Accessories); use it to suggest outfits from what they actually own
 
 <dashboard_data>
 ${context}

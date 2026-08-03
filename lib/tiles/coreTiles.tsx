@@ -27,6 +27,7 @@ export type CoreTileId =
   | 'peak'
   | 'brand'
   | 'finance'
+  | 'closet'
 
 /** A single live metric to surface on a tile (Train day, Fuel kcal). */
 export interface CoreStat {
@@ -191,6 +192,30 @@ export const CORE_TILES: Record<CoreTileId, CoreTile> = {
       </svg>
     ),
   },
+  closet: {
+    id: 'closet',
+    href: '/app/starter',
+    index: '09',
+    label: 'My Closet',
+    orb: { mode: 'wander' },
+    defaultSize: 'm',
+    glyph: (
+      <svg viewBox="-12 -12 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="0" cy="-7" r="2" />
+        <path d="M0 -5 L0 -2 L-9 4 L9 4 L0 -2" />
+      </svg>
+    ),
+    art: (
+      <svg className="art" viewBox="0 0 210 118">
+        <path className="mot" d="M40 46 H170" />
+        <path className="motd" d="M58 46 V70" />
+        <path className="motd" d="M86 46 V76" />
+        <path className="motd" d="M114 46 V72" />
+        <path className="motd" d="M142 46 V78" />
+        <g className="orb"><circle className="glow" r="9" /><circle className="node" r="3.4" /></g>
+      </svg>
+    ),
+  },
 }
 
 /**
@@ -261,6 +286,7 @@ export const DEFAULT_HOME_ORDER: HomeTileId[] = [
   'brand',
   'peak',
   'finance',
+  'closet',
 ]
 
 /** Is this id one of the pre-installed core tiles (incl. Vee)? */
