@@ -373,7 +373,7 @@ const DEFAULT_STATE = { version: 1, currency: 'USD', activeTab: 'net', accounts:
 let state = Object.assign({}, DEFAULT_STATE);
 let rates = Object.assign({}, DEFAULT_RATES);
 
-function save() { window.Vitality.save(state); }
+function save() { window.Vitality.save(state).catch(() => {}); } /* host may reject (quota); tile state stays live */
 
 /* Inline toast — replaces alert()/confirm()/prompt(). */
 let toastTimer = null;

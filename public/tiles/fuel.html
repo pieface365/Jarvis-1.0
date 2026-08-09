@@ -398,7 +398,7 @@ function scanHtml(){
     +'<div class="hint'+(scanOk?' ok':'')+'" id="scanStatus">'+esc(scanStatus)+'</div>'
     +prodRow+aiRow+chips;
 }
-function renderScan(){ const w=document.querySelector('[data-card="scan"] .cardBody'); if(w) w.innerHTML=scanHtml(); }
+function renderScan(){ const w=document.querySelector('[data-card="scan"] .cardBody'); if(w) w.innerHTML=cardHtml('scan'); }
 function noteScan(msg,ok){ scanStatus=msg; scanOk=!!ok; renderScan(); }
 function rememberScan(prod){
   store._products=store._products||{}; store._products[prod.code]=prod;
