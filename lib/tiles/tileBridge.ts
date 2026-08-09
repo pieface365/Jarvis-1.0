@@ -20,6 +20,7 @@ const SHIM = `<script>
     if (m.type === 'load:result') p.resolve(m.data);
     else if (m.type === 'estimate:result') p.resolve(m.data);
     else if (m.type === 'identify:result') p.resolve(m.data);
+    else if (m.type === 'upload:result') p.resolve(m.data);
     else if (m.type === 'save:ok') p.resolve(true);
     else if (m.type === 'save:error') p.reject(new Error(m.reason || 'save_failed'));
   });
@@ -35,7 +36,7 @@ const SHIM = `<script>
         if (!pending[id]) return;
         delete pending[id];
         if (type === 'load') resolve([]);
-        else if (type === 'estimate' || type === 'identify') resolve({ ok: false, error: 'timeout' });
+        else if (type === 'estimate' || type === 'identify' || type === 'uploadPhoto') resolve({ ok: false, error: 'timeout' });
         else reject(new Error('vitality_timeout'));
       }, timeoutMs || 8000);
     });
@@ -51,6 +52,11 @@ const SHIM = `<script>
        item photo to the server's Claude vision route (opaque-origin tiles can't
        carry the gate cookie). Long timeout: a vision call can take tens of seconds. */
     identifyClothing: function (image) { return call('identify', { image: image }, 90000); },
+    /* Upload a photo to the owner's cloud storage; resolves { ok, url } or an
+       error so the tile can fall back to storing the image inline. */
+    uploadPhoto: function (image) { return call('uploadPhoto', { image: image }, 90000); },
+    /* Best-effort cleanup of a previously uploaded photo (fire-and-forget). */
+    deletePhoto: function (url) { parent.postMessage({ source: 'vitality-tile', type: 'deletePhoto', url: url }, '*'); },
     report: function (stream) {
       parent.postMessage({ source: 'vitality-tile', type: 'report', stream: stream }, '*');
     }

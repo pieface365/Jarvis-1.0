@@ -40,8 +40,11 @@
   .pending-txt{flex:1;font-size:12.5px;color:var(--muted);line-height:1.4}
   .pending-x{background:transparent;border:none;color:var(--muted);font-size:20px;line-height:1;cursor:pointer;padding:0 4px;flex-shrink:0}
   .pending-x:hover{color:var(--neg)}
-  .item .thumb{width:40px;height:40px;border-radius:8px;object-fit:cover;flex-shrink:0;background:#000}
+  .item .thumb{width:40px;height:40px;border-radius:8px;object-fit:cover;flex-shrink:0;background:#000;cursor:zoom-in}
   .item .iname{flex:1;min-width:0}
+  /* lightbox: tap a thumbnail to view the photo enlarged, tap anywhere to close */
+  .lightbox{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(0,0,0,.86);cursor:zoom-out;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
+  .lightbox img{max-width:100%;max-height:100%;border-radius:12px;box-shadow:0 24px 70px rgba(0,0,0,.7)}
 </style>
 </head>
 <body>
@@ -72,12 +75,18 @@
 
   <div id="list"></div>
 
+  <!-- tap any item thumbnail to view the photo enlarged -->
+  <div class="lightbox" id="lightbox" hidden></div>
+
 <script>
   var CATS = ['Tops','Bottoms','Outerwear','Shoes','Accessories'];
   var items = []; // { id, name, cat }
   var $ = function(id){ return document.getElementById(id); };
 
-  var pendingImg = null; /* thumbnail data URL waiting to attach to the next Add */
+  /* a snapped photo waiting to attach to the next Add: pendingFull is the
+     upload candidate (cloud storage removes the closet size cap); pendingThumb
+     is the inline fallback used when cloud storage isn't configured. */
+  var pendingFull = null, pendingThumb = null, addBusy = false;
   function persist(){
     if(!window.Vitality) return Promise.resolve();
     return window.Vitality.save({ items: items }).catch(function(){
@@ -111,14 +120,28 @@
     $('list').innerHTML = html;
   }
 
-  function add(){
+  async function add(){
+    if(addBusy) return;
     var name = $('name').value.trim();
     if(!name) return;
+    var img = null;
+    if(pendingFull){
+      /* prefer cloud storage (no size cap); fall back to the inline thumbnail */
+      if(window.Vitality && typeof window.Vitality.uploadPhoto === 'function'){
+        addBusy = true; $('addBtn').disabled = true; note('Saving photo…');
+        var up = null;
+        try{ up = await window.Vitality.uploadPhoto(pendingFull); }catch(e){ up = null; }
+        addBusy = false; $('addBtn').disabled = false;
+        img = (up && up.ok && up.url) ? up.url : pendingThumb;
+      } else {
+        img = pendingThumb;
+      }
+    }
     var it = { id: Date.now() + '' + Math.random().toString(36).slice(2,6), name: name, cat: $('cat').value };
-    if(pendingImg) it.img = pendingImg;
+    if(img) it.img = img;
     items.push(it);
     $('name').value = '';
-    pendingImg = null; showPending(); note('');
+    pendingFull = null; pendingThumb = null; showPending(); note('');
     persist(); render();
     $('name').focus();
   }
@@ -128,9 +151,9 @@
   /* ---- snap a photo → downscale locally → Claude names + categorises it ---- */
   function showPending(){
     var p = $('pending'); if(!p) return;
-    if(pendingImg){
+    if(pendingThumb){
       p.hidden = false;
-      p.innerHTML = '<img src="' + pendingImg + '" alt="" /><span class="pending-txt">Photo attached — edit the name or category, then Add.</span><button type="button" class="pending-x" id="pendingX" aria-label="Discard photo">×</button>';
+      p.innerHTML = '<img src="' + pendingThumb + '" alt="" /><span class="pending-txt">Photo attached — edit the name or category, then Add.</span><button type="button" class="pending-x" id="pendingX" aria-label="Discard photo">×</button>';
     } else { p.hidden = true; p.innerHTML = ''; }
   }
   function fileToImage(file){
@@ -154,8 +177,9 @@
     }
     var img;
     try{ img = await fileToImage(file); }catch(e){ note('Couldn’t read that photo — try again.', true); return; }
-    pendingImg = imgToUrl(img, 256, 0.7);   /* small thumbnail we store with the item */
-    var big = imgToUrl(img, 768, 0.8);       /* larger frame for recognition (not stored) */
+    pendingFull = imgToUrl(img, 1024, 0.82);  /* uploaded to cloud storage on Add */
+    pendingThumb = imgToUrl(img, 256, 0.7);   /* inline fallback + preview */
+    var big = imgToUrl(img, 768, 0.8);        /* larger frame for recognition (not stored) */
     showPending();
     note('Identifying…');
     $('snapBtn').disabled = true;
@@ -183,13 +207,31 @@
     if(f) snap(f);
   });
   $('pending').addEventListener('click', function(e){
-    if(e.target && e.target.id === 'pendingX'){ pendingImg = null; showPending(); note(''); }
+    if(e.target && e.target.id === 'pendingX'){ pendingFull = null; pendingThumb = null; showPending(); note(''); }
   });
 
+  /* ---- item list: tap a thumbnail to view it larger; × to remove ---- */
+  function openLightbox(src){
+    var lb = $('lightbox'); if(!lb) return;
+    lb.innerHTML = '<img src="' + src + '" alt="" />';
+    lb.hidden = false;
+  }
+  function closeLightbox(){ var lb = $('lightbox'); if(lb){ lb.hidden = true; lb.innerHTML = ''; } }
+  $('lightbox').addEventListener('click', closeLightbox);
+  document.addEventListener('keydown', function(e){ if(e.key === 'Escape') closeLightbox(); });
+
   $('list').addEventListener('click', function(e){
+    var thumb = e.target.closest ? e.target.closest('.thumb') : null;
+    if(thumb){ openLightbox(thumb.getAttribute('src')); return; }
     var b = e.target.closest ? e.target.closest('.x') : null;
     if(!b) return;
-    items = items.filter(function(it){ return it.id !== b.getAttribute('data-id'); });
+    var id = b.getAttribute('data-id');
+    var gone = items.filter(function(it){ return it.id === id; })[0];
+    /* clean up the cloud copy if this item's photo lives in storage (a URL) */
+    if(gone && gone.img && /^https?:/.test(gone.img) && window.Vitality && typeof window.Vitality.deletePhoto === 'function'){
+      window.Vitality.deletePhoto(gone.img);
+    }
+    items = items.filter(function(it){ return it.id !== id; });
     persist(); render();
   });
 

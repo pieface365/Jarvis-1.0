@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef } from 'react'
 import { tileStore } from './tileStore'
-import { syncEnabled, syncSave, syncLoad } from '@/lib/sync'
+import { syncEnabled, syncSave, syncLoad, uploadPhoto, deletePhoto } from '@/lib/sync'
 
 /**
  * useTileHost is the host side of the Vitality bridge, fixed for MANY tiles.
@@ -151,6 +151,27 @@ export function useTileHost(
         }
         src.postMessage({ source: 'vitality-host', type: 'identify:result', id: msg.id, data }, '*')
         activity.current?.({ tileId, type: 'load', count: 0 })
+        return
+      }
+
+      if (msg.type === 'uploadPhoto') {
+        // Store a tile's photo in the owner's Supabase Storage (same client the
+        // sync layer uses). The sealed tile can't reach Supabase itself; the host
+        // relays and hands back a public URL. Always settle so the tile can fall
+        // back to an inline thumbnail if this fails / is unconfigured.
+        let data: unknown = { ok: false, error: 'unconfigured' }
+        try {
+          data = await uploadPhoto(typeof msg.image === 'string' ? msg.image : '')
+        } catch {
+          data = { ok: false, error: 'upload_failed' }
+        }
+        src.postMessage({ source: 'vitality-host', type: 'upload:result', id: msg.id, data }, '*')
+        return
+      }
+
+      if (msg.type === 'deletePhoto') {
+        // Best-effort cleanup of an orphaned photo when its item is removed.
+        void deletePhoto(typeof msg.url === 'string' ? msg.url : '')
         return
       }
 

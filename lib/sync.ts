@@ -56,6 +56,52 @@ export async function syncLoad(tileId: string): Promise<unknown | null> {
   }
 }
 
+/* ── Closet photo storage ─────────────────────────────────────────────────
+   Item photos are too big to keep inline in the tile_data blob at scale, so
+   when Supabase is configured they go to a public Storage bucket ('closet')
+   and the tile stores only the returned URL. Needs supabase/closet-storage.sql
+   run once (bucket + open anon policies, same personal-instance model as the
+   tile_data table). If unconfigured or it fails, the tile falls back to an
+   inline base64 thumbnail — the feature degrades, never breaks. */
+const CLOSET_BUCKET = 'closet'
+
+/** Upload a data-URL image to the closet bucket; returns its public URL or null. */
+export async function uploadPhoto(dataUrl: string): Promise<{ ok: boolean; url?: string; error?: string }> {
+  const c = syncClient()
+  if (!c) return { ok: false, error: 'unconfigured' }
+  const m = /^data:image\/(jpeg|png|webp);base64,(.+)$/.exec(dataUrl || '')
+  if (!m) return { ok: false, error: 'bad_image' }
+  try {
+    const bin = atob(m[2])
+    const bytes = new Uint8Array(bin.length)
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+    const ext = m[1] === 'jpeg' ? 'jpg' : m[1]
+    const path = `items/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+    const { error } = await c.storage.from(CLOSET_BUCKET).upload(path, bytes, { contentType: `image/${m[1]}`, upsert: false })
+    if (error) return { ok: false, error: 'upload_failed' }
+    const { data } = c.storage.from(CLOSET_BUCKET).getPublicUrl(path)
+    return data?.publicUrl ? { ok: true, url: data.publicUrl } : { ok: false, error: 'upload_failed' }
+  } catch {
+    return { ok: false, error: 'upload_failed' }
+  }
+}
+
+/** Best-effort delete of a previously uploaded closet photo by its public URL. */
+export async function deletePhoto(url: string): Promise<void> {
+  const c = syncClient()
+  if (!c || typeof url !== 'string') return
+  const marker = `/${CLOSET_BUCKET}/`
+  const i = url.indexOf(marker)
+  if (i < 0) return
+  const path = url.slice(i + marker.length)
+  if (!path) return
+  try {
+    await c.storage.from(CLOSET_BUCKET).remove([path])
+  } catch {
+    /* best-effort */
+  }
+}
+
 /** A tile document stored in the owner's Supabase (built from Claude via the MCP connector). */
 export interface RemoteTile {
   html: string
