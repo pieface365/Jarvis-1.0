@@ -28,11 +28,33 @@
   .item .x:hover{color:var(--neg)}
   .empty{color:var(--muted);font-size:13.5px;line-height:1.65;padding:16px 4px}
   .empty strong{color:var(--mint);font-weight:600}
+  /* snap-a-photo → Claude identifies the item */
+  .snap{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+  .snap-btn{background:rgba(110,231,183,.10);border:1px solid var(--mint);color:var(--mint);border-radius:10px;padding:11px 14px;font:inherit;font-size:14px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:7px}
+  .snap-btn:hover{background:rgba(110,231,183,.18)}
+  .snap-btn:disabled{opacity:.5;cursor:default}
+  .snap-hint{font-size:12.5px;color:var(--muted);line-height:1.4;flex:1;min-width:120px}
+  .snap-hint.err{color:var(--neg)}
+  .pending{display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:8px;background:var(--card);border:1px solid var(--hair);border-radius:10px}
+  .pending img{width:46px;height:46px;border-radius:8px;object-fit:cover;flex-shrink:0;background:#000}
+  .pending-txt{flex:1;font-size:12.5px;color:var(--muted);line-height:1.4}
+  .pending-x{background:transparent;border:none;color:var(--muted);font-size:20px;line-height:1;cursor:pointer;padding:0 4px;flex-shrink:0}
+  .pending-x:hover{color:var(--neg)}
+  .item .thumb{width:40px;height:40px;border-radius:8px;object-fit:cover;flex-shrink:0;background:#000}
+  .item .iname{flex:1;min-width:0}
 </style>
 </head>
 <body>
   <h1>My Closet</h1>
   <p class="sub">Wardrobe · <span id="count">0 items</span></p>
+
+  <!-- snap a photo → Claude names + categorises it, then it's added with a thumbnail -->
+  <div class="snap">
+    <button class="snap-btn" type="button" id="snapBtn">&#128247; Snap an item</button>
+    <span class="snap-hint" id="hint"></span>
+  </div>
+  <input id="photoFile" type="file" accept="image/*" capture="environment" hidden />
+  <div class="pending" id="pending" hidden></div>
 
   <!-- NOT a <form>: tiles run sandboxed with allow-scripts only (no allow-forms),
        so a real form submit is silently blocked. Add via a button click + Enter. -->
@@ -55,8 +77,15 @@
   var items = []; // { id, name, cat }
   var $ = function(id){ return document.getElementById(id); };
 
-  function persist(){ if(window.Vitality) window.Vitality.save({ items: items }).catch(function(){}); }
+  var pendingImg = null; /* thumbnail data URL waiting to attach to the next Add */
+  function persist(){
+    if(!window.Vitality) return Promise.resolve();
+    return window.Vitality.save({ items: items }).catch(function(){
+      note('Couldn’t save — your closet may be too large. Remove a few photos.', true);
+    });
+  }
   function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function note(msg, isErr){ var h=$('hint'); if(!h) return; h.textContent=msg||''; h.className='snap-hint'+(isErr?' err':''); }
 
   function render(){
     $('count').textContent = items.length + (items.length===1 ? ' item' : ' items');
@@ -71,7 +100,8 @@
       any = true;
       html += '<div class="cat"><div class="cat-h"><span>' + cat + '</span><span>' + list.length + '</span></div>';
       list.forEach(function(it){
-        html += '<div class="item"><span>' + esc(it.name) + '</span><button class="x" data-id="' + it.id + '" aria-label="Remove">×</button></div>';
+        var thumb = it.img ? '<img class="thumb" src="' + it.img + '" alt="" />' : '';
+        html += '<div class="item">' + thumb + '<span class="iname">' + esc(it.name) + '</span><button class="x" data-id="' + it.id + '" aria-label="Remove">×</button></div>';
       });
       html += '</div>';
     });
@@ -84,13 +114,77 @@
   function add(){
     var name = $('name').value.trim();
     if(!name) return;
-    items.push({ id: Date.now() + '' + Math.random().toString(36).slice(2,6), name: name, cat: $('cat').value });
+    var it = { id: Date.now() + '' + Math.random().toString(36).slice(2,6), name: name, cat: $('cat').value };
+    if(pendingImg) it.img = pendingImg;
+    items.push(it);
     $('name').value = '';
+    pendingImg = null; showPending(); note('');
     persist(); render();
     $('name').focus();
   }
   $('addBtn').addEventListener('click', add);
   $('name').addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); add(); } });
+
+  /* ---- snap a photo → downscale locally → Claude names + categorises it ---- */
+  function showPending(){
+    var p = $('pending'); if(!p) return;
+    if(pendingImg){
+      p.hidden = false;
+      p.innerHTML = '<img src="' + pendingImg + '" alt="" /><span class="pending-txt">Photo attached — edit the name or category, then Add.</span><button type="button" class="pending-x" id="pendingX" aria-label="Discard photo">×</button>';
+    } else { p.hidden = true; p.innerHTML = ''; }
+  }
+  function fileToImage(file){
+    return new Promise(function(res, rej){
+      var fr = new FileReader();
+      fr.onload = function(){ var img = new Image(); img.onload = function(){ res(img); }; img.onerror = function(){ rej(new Error('img')); }; img.src = fr.result; };
+      fr.onerror = function(){ rej(new Error('read')); };
+      fr.readAsDataURL(file);
+    });
+  }
+  function imgToUrl(img, max, q){
+    var sc = Math.min(1, max / Math.max(img.width, img.height));
+    var w = Math.max(1, Math.round(img.width * sc)), h = Math.max(1, Math.round(img.height * sc));
+    var c = document.createElement('canvas'); c.width = w; c.height = h;
+    c.getContext('2d').drawImage(img, 0, 0, w, h);
+    return c.toDataURL('image/jpeg', q);
+  }
+  async function snap(file){
+    if(!(window.Vitality && typeof window.Vitality.identifyClothing === 'function')){
+      note('AI identify loads with the dashboard — reload it, then try again.', true); return;
+    }
+    var img;
+    try{ img = await fileToImage(file); }catch(e){ note('Couldn’t read that photo — try again.', true); return; }
+    pendingImg = imgToUrl(img, 256, 0.7);   /* small thumbnail we store with the item */
+    var big = imgToUrl(img, 768, 0.8);       /* larger frame for recognition (not stored) */
+    showPending();
+    note('Identifying…');
+    $('snapBtn').disabled = true;
+    var r = null;
+    try{ r = await window.Vitality.identifyClothing(big); }catch(e){ r = null; }
+    $('snapBtn').disabled = false;
+    if(!r || !r.ok){
+      var code = r && r.error;
+      note(code === 'no_key' ? 'AI identify needs an ANTHROPIC_API_KEY on the server.'
+        : code === 'not_clothing' ? 'That didn’t look like a clothing item — name it yourself, then Add.'
+        : code === 'rate_limited' ? 'Claude is busy right now — try again in a minute.'
+        : code === 'timeout' ? 'That timed out — the photo is attached, name it and Add.'
+        : 'Couldn’t identify it — name it yourself, then Add.', true);
+      $('name').focus(); return; /* keep the photo attached so it can still be added manually */
+    }
+    $('name').value = r.item.name || '';
+    if(CATS.indexOf(r.item.category) >= 0) $('cat').value = r.item.category;
+    note('Identified — edit if needed, then Add.');
+    $('name').focus();
+  }
+  $('snapBtn').addEventListener('click', function(){ var f = $('photoFile'); if(f) f.click(); });
+  $('photoFile').addEventListener('change', function(e){
+    var f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if(f) snap(f);
+  });
+  $('pending').addEventListener('click', function(e){
+    if(e.target && e.target.id === 'pendingX'){ pendingImg = null; showPending(); note(''); }
+  });
 
   $('list').addEventListener('click', function(e){
     var b = e.target.closest ? e.target.closest('.x') : null;

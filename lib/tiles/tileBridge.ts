@@ -19,6 +19,7 @@ const SHIM = `<script>
     delete pending[m.id];
     if (m.type === 'load:result') p.resolve(m.data);
     else if (m.type === 'estimate:result') p.resolve(m.data);
+    else if (m.type === 'identify:result') p.resolve(m.data);
     else if (m.type === 'save:ok') p.resolve(true);
     else if (m.type === 'save:error') p.reject(new Error(m.reason || 'save_failed'));
   });
@@ -34,7 +35,7 @@ const SHIM = `<script>
         if (!pending[id]) return;
         delete pending[id];
         if (type === 'load') resolve([]);
-        else if (type === 'estimate') resolve({ ok: false, error: 'timeout' });
+        else if (type === 'estimate' || type === 'identify') resolve({ ok: false, error: 'timeout' });
         else reject(new Error('vitality_timeout'));
       }, timeoutMs || 8000);
     });
@@ -46,6 +47,10 @@ const SHIM = `<script>
        vision route (the tile's opaque origin can't carry the gate cookie
        itself). Long timeout — a vision call can take tens of seconds. */
     estimateFood: function (image) { return call('estimate', { image: image }, 90000); },
+    /* AI clothing identify: same relay as estimateFood — the host forwards the
+       item photo to the server's Claude vision route (opaque-origin tiles can't
+       carry the gate cookie). Long timeout: a vision call can take tens of seconds. */
+    identifyClothing: function (image) { return call('identify', { image: image }, 90000); },
     report: function (stream) {
       parent.postMessage({ source: 'vitality-tile', type: 'report', stream: stream }, '*');
     }

@@ -134,6 +134,26 @@ export function useTileHost(
         return
       }
 
+      if (msg.type === 'identify') {
+        // Relay a clothing photo to the server's Claude vision route — same
+        // reasoning as 'estimate' above (the host page carries the gate cookie
+        // the opaque-origin tile can't). Always settle; the tile shows the error.
+        let data: unknown = { ok: false, error: 'network' }
+        try {
+          const res = await fetch('/api/closet/identify', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ image: msg.image }),
+          })
+          data = await res.json()
+        } catch {
+          /* keep the network error payload */
+        }
+        src.postMessage({ source: 'vitality-host', type: 'identify:result', id: msg.id, data }, '*')
+        activity.current?.({ tileId, type: 'load', count: 0 })
+        return
+      }
+
       if (msg.type === 'report') {
         // One numeric life-stream into Vee. The host only forwards the raw stream
         // plus the SENDER's tileId (from our own registry, never the iframe's
