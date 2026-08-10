@@ -12,6 +12,9 @@
     --serif:Georgia,"Times New Roman",serif; --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  /* the [hidden] attribute must beat the display rules below (e.g. .lightbox/.pending
+     set display:flex, which would otherwise override hidden and show them always) */
+  [hidden]{display:none!important}
   html,body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans)}
   body{padding:18px calc(16px + env(safe-area-inset-right)) calc(18px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));min-height:100dvh}
   h1{font-family:var(--serif);font-style:italic;font-weight:500;font-size:26px;margin:0 0 2px}
