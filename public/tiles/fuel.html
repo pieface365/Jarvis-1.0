@@ -366,7 +366,7 @@ function renderSide(){
    everywhere. Found products cache in store._products, and adding one
    pushes into todaysLog like any other food — the Today ring, on-plan
    marks and macros all just see food. */
-let scanStatus='Snap the barcode, type its digits — or photo the whole plate and Claude estimates it.', scanOk=true, scanProd=null, scanBusy=false, scanCode='';
+let scanStatus='Snap the barcode, type its digits — or photo the whole plate and the AI estimates it.', scanOk=true, scanProd=null, scanBusy=false, scanCode='';
 let aiEst=null; /* {name, portion_grams, cal, protein_g, carbs_g, fat_g, confidence, notes} */
 function scanHtml(){
   const p=scanProd;
@@ -377,7 +377,7 @@ function scanHtml(){
     : '';
   const a=aiEst;
   const aiRow = a
-    ? '<div class="foodRow scanResult"><div><div class="foodName">'+esc(a.name)+' <span class="meta">· Claude estimate ('+esc(a.confidence)+' confidence)</span></div>'
+    ? '<div class="foodRow scanResult"><div><div class="foodName">'+esc(a.name)+' <span class="meta">· AI estimate ('+esc(a.confidence)+' confidence)</span></div>'
       +'<div class="meta">~'+round(a.portion_grams)+'g portion · '+round(a.cal)+' kcal · '+round(a.protein_g)+'P / '+round(a.carbs_g)+'C / '+round(a.fat_g)+'F</div>'
       +(a.notes?'<div class="meta">'+esc(a.notes)+'</div>':'')+'</div>'
       +'<div style="display:flex;align-items:center;gap:8px"><input class="fieldInput gramInput" id="aiMult" type="number" min="0" step="0.25" value="1" title="Portion multiplier — 0.5 if you ate half" /><button class="btn btn-primary" data-aiadd>Add</button></div></div>'
@@ -431,7 +431,7 @@ async function lookupBarcode(raw){
   }
   scanBusy=false; renderScan();
 }
-/* plate photo → downscale → the host relays it to the server's Claude vision
+/* plate photo → downscale → the host relays it to the server's Gemini vision
    route → macro estimate for the whole visible portion */
 function downscalePlate(file){
   return new Promise(res=>{
@@ -457,7 +457,7 @@ async function estimatePlate(file){
     noteScan('AI estimates load with the page — reload the dashboard, then try again.');
     return;
   }
-  scanBusy=true; aiEst=null; noteScan('Asking Claude to size up the plate… (can take ~15s)',true);
+  scanBusy=true; aiEst=null; noteScan('Asking the AI to size up the plate… (can take ~15s)',true);
   const url=await downscalePlate(file);
   if(!url){ scanBusy=false; noteScan('Couldn’t read that photo — try again.'); return; }
   let r=null;
@@ -465,14 +465,14 @@ async function estimatePlate(file){
   scanBusy=false;
   if(!r || !r.ok || !r.est){
     const code=r&&r.error;
-    noteScan(code==='no_key' ? 'AI estimates need an ANTHROPIC_API_KEY on the server — add it to .env.local and the Vercel env, then redeploy.'
-      : code==='rate_limited' ? 'Claude is rate-limited right now — try again in a minute.'
+    noteScan(code==='no_key' ? 'AI estimates need a GEMINI_API_KEY on the server — add it to the Vercel env, then redeploy.'
+      : code==='rate_limited' ? 'The AI is rate-limited right now — try again in a minute.'
       : code==='timeout' ? 'The estimate timed out — try again.'
       : 'Estimate failed — check the connection and try again.');
     renderScan(); return;
   }
   aiEst=r.est;
-  noteScan('Claude sized it up — it’s an estimate, so adjust the portion multiplier if you ate more or less.',true);
+  noteScan('The AI sized it up — it’s an estimate, so adjust the portion multiplier if you ate more or less.',true);
   renderScan();
 }
 async function decodeBarcodePhoto(file){
