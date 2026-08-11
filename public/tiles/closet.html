@@ -191,7 +191,7 @@
     $('snapBtn').disabled = false;
     if(!r || !r.ok){
       var code = r && r.error;
-      note(code === 'no_key' ? 'AI identify needs an ANTHROPIC_API_KEY on the server.'
+      note(code === 'no_key' ? 'AI identify needs a GEMINI_API_KEY on the server.'
         : code === 'not_clothing' ? 'That didn’t look like a clothing item — name it yourself, then Add.'
         : code === 'rate_limited' ? 'Claude is busy right now — try again in a minute.'
         : code === 'timeout' ? 'That timed out — the photo is attached, name it and Add.'
