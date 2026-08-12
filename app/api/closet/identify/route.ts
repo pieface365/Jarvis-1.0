@@ -12,8 +12,8 @@ import { NextResponse } from 'next/server'
  *        { ok: false, error: 'no_key' | 'bad_image' | 'too_large' |
  *          'not_clothing' | 'rate_limited' | 'api_error' }.
  *
- * The Closet tile can't call this directly (sealed tiles have an opaque origin,
- * so the gate cookie wouldn't ride along) — the dashboard host relays via the
+ * The Closet tile can't call this directly (sealed tiles have an opaque origin
+ * and can't reach same-origin API routes) — the dashboard host relays via the
  * tile bridge's `identifyClothing` channel.
  */
 

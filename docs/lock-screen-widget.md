@@ -6,8 +6,8 @@ which runs the JavaScript below and renders it as a widget.
 
 iOS doesn't let a website put a widget on the Lock Screen — only a native app or
 a script host like Scriptable can. The script calls a tiny read-only endpoint,
-[`/api/widget`](../app/api/widget/route.ts), authenticated with a bearer token
-(the browser password gate can't be used from a widget).
+[`/api/widget`](../app/api/widget/route.ts), authenticated with its own bearer
+token.
 
 ## One-time server setup
 

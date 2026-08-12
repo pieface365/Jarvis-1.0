@@ -114,9 +114,9 @@ export function useTileHost(
       }
 
       if (msg.type === 'estimate') {
-        // Relay a food photo to the server's Claude vision route. The host
-        // page is same-origin, so the gate cookie rides along — the sealed
-        // tile (opaque origin) could never send it itself. Always settle the
+        // Relay a food photo to the server's Gemini vision route. The host page
+        // is same-origin with /api, so it can make the call — the sealed tile
+        // (opaque origin) could never reach it itself. Always settle the
         // request; the tile shows the error code to the user.
         let data: unknown = { ok: false, error: 'network' }
         try {
@@ -135,9 +135,9 @@ export function useTileHost(
       }
 
       if (msg.type === 'identify') {
-        // Relay a clothing photo to the server's Claude vision route — same
-        // reasoning as 'estimate' above (the host page carries the gate cookie
-        // the opaque-origin tile can't). Always settle; the tile shows the error.
+        // Relay a clothing photo to the server's Gemini vision route — same
+        // reasoning as 'estimate' above (the host reaches /api; the opaque-origin
+        // tile can't). Always settle; the tile shows the error.
         let data: unknown = { ok: false, error: 'network' }
         try {
           const res = await fetch('/api/closet/identify', {

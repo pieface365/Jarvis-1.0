@@ -6,10 +6,9 @@ import { constantTimeEquals } from '@/app/api/mcp/oauth/crypto'
  * GET /api/widget — a tiny read-only summary for an iOS Lock Screen widget
  * (rendered by the Scriptable app; see docs/lock-screen-widget.md).
  *
- * Auth: a bearer token (`Authorization: Bearer <WIDGET_TOKEN>` or `?token=`),
- * NOT the browser gate cookie — a Lock Screen widget can't carry the cookie, so
- * middleware lets /api/widget through and this route does its own token check.
- * Returns 503 until WIDGET_TOKEN is set, exactly like the MCP connector.
+ * Auth: a bearer token (`Authorization: Bearer <WIDGET_TOKEN>` or `?token=`).
+ * The route does its own token check and returns 503 until WIDGET_TOKEN is set,
+ * exactly like the MCP connector.
  *
  * Reads the same Supabase `tile_data` rows the tiles sync to and distils them
  * into the few numbers a widget can show: recovery/HRV/RHR/sleep (latest vitals

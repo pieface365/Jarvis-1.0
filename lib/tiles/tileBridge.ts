@@ -44,13 +44,13 @@ const SHIM = `<script>
   window.Vitality = {
     save: function (data) { return call('save', { data: data }); },
     load: function () { return call('load', {}); },
-    /* AI food estimate: the host relays the photo to the server's Claude
-       vision route (the tile's opaque origin can't carry the gate cookie
-       itself). Long timeout — a vision call can take tens of seconds. */
+    /* AI food estimate: the host relays the photo to the server's Gemini
+       vision route (a sealed tile's opaque origin can't reach the API itself).
+       Long timeout — a vision call can take tens of seconds. */
     estimateFood: function (image) { return call('estimate', { image: image }, 90000); },
     /* AI clothing identify: same relay as estimateFood — the host forwards the
-       item photo to the server's Claude vision route (opaque-origin tiles can't
-       carry the gate cookie). Long timeout: a vision call can take tens of seconds. */
+       item photo to the server's Gemini vision route (opaque-origin tiles can't
+       reach the API themselves). Long timeout: a vision call can take tens of seconds. */
     identifyClothing: function (image) { return call('identify', { image: image }, 90000); },
     /* Upload a photo to the owner's cloud storage; resolves { ok, url } or an
        error so the tile can fall back to storing the image inline. */

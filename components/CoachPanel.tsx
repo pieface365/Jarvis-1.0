@@ -8,9 +8,9 @@ import { createPortal } from 'react-dom'
  * tile, or by saying "Hey Coach" (VoiceBadge, mounted in DashboardGrid).
  *
  * Lives at host level (not a sealed tile) because the coach spans every tile's
- * data: the host page is same-origin, so the gate cookie rides along to
- * /api/coach and the server reads the tile data itself. The transcript
- * persists in localStorage so a conversation survives reloads.
+ * data: the host page is same-origin with /api/coach, so it can call the route
+ * and the server reads the tile data itself. The transcript persists in
+ * localStorage so a conversation survives reloads.
  *
  * Also speaks its answers aloud (browser text-to-speech) when the speaker
  * toggle is on, so the coach is usable fully hands-free with VoiceBadge.

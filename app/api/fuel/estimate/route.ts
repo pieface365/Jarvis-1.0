@@ -13,8 +13,8 @@ import { NextResponse } from 'next/server'
  *          fat_g, confidence, notes } } for the WHOLE visible portion, or
  *        { ok: false, error: 'no_key' | 'bad_image' | 'too_large' | 'rate_limited' | 'api_error' }.
  *
- * The Fuel tile can't call this directly (sealed tiles have an opaque origin,
- * so the gate cookie wouldn't ride along) — the dashboard host relays via the
+ * The Fuel tile can't call this directly (sealed tiles have an opaque origin
+ * and can't reach same-origin API routes) — the dashboard host relays via the
  * tile bridge's `estimateFood` channel.
  */
 
