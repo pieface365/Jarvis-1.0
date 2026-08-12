@@ -154,6 +154,25 @@ export function useTileHost(
         return
       }
 
+      if (msg.type === 'style') {
+        // Relay the closet's owned items to the Gemini stylist route (grounded
+        // with live Google Search). Same origin reasoning as the vision relays.
+        let data: unknown = { ok: false, error: 'network' }
+        try {
+          const res = await fetch('/api/closet/style', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ items: msg.items, context: msg.context }),
+          })
+          data = await res.json()
+        } catch {
+          /* keep the network error payload */
+        }
+        src.postMessage({ source: 'vitality-host', type: 'style:result', id: msg.id, data }, '*')
+        activity.current?.({ tileId, type: 'load', count: 0 })
+        return
+      }
+
       if (msg.type === 'uploadPhoto') {
         // Store a tile's photo in the owner's Supabase Storage (same client the
         // sync layer uses). The sealed tile can't reach Supabase itself; the host
