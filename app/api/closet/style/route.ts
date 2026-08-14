@@ -7,8 +7,12 @@ import { NextResponse } from 'next/server'
  * owns and suggests "what to buy next" gaps, factoring in current fashion trends.
  * Uses the SAME free GEMINI_API_KEY as the other AI features.
  *
- * Body: { items: [{ name, cat }], context?: string }  (context = optional
- *        occasion/weather, e.g. "date night" or "cold and rainy")
+ * Body: { items: [{ name, cat }], context?: string, influencers?: string }
+ *        context = optional occasion/weather (e.g. "date night", "cold and rainy")
+ *        influencers = optional style icons / handles to emulate (e.g.
+ *        "@ethan_kieffer, @caficosta_") — the model searches for them and
+ *        channels their aesthetic. For niche accounts it leans on whatever is
+ *        publicly indexed, not their live feed (no IG/Pinterest API access).
  * Reply: { ok: true, style: { outfits: [{ title, occasion, items[], why }],
  *          gaps: [{ item, why }], note }, sources: [{ title, uri }] }
  *        or { ok: false, error: 'no_key' | 'empty_closet' | 'rate_limited' |
@@ -51,7 +55,7 @@ export async function POST(req: Request) {
   const key = process.env.GEMINI_API_KEY
   if (!key) return NextResponse.json({ ok: false, error: 'no_key' }, { status: 503 })
 
-  let body: { items?: unknown; context?: unknown }
+  let body: { items?: unknown; context?: unknown; influencers?: unknown }
   try {
     body = await req.json()
   } catch {
@@ -66,6 +70,7 @@ export async function POST(req: Request) {
     .slice(0, 200)
   if (items.length === 0) return NextResponse.json({ ok: false, error: 'empty_closet' }, { status: 200 })
   const context = asStr(body?.context).slice(0, 200).trim()
+  const influencers = asStr(body?.influencers).slice(0, 200).trim()
 
   const byCat: Record<string, string[]> = {}
   for (const it of items) (byCat[it.cat] || (byCat[it.cat] = [])).push(it.name)
@@ -75,16 +80,20 @@ export async function POST(req: Request) {
 
   const prompt = `You are a sharp personal fashion stylist. The user owns EXACTLY these wardrobe items, grouped by category:
 ${wardrobe}
-${context ? `\nStyling context to honour: ${context}\n` : ''}
-First, search the web for current (this season) fashion trends, colour stories, and outfit ideas that are relevant to this specific wardrobe. Then:
-1. Build 3–4 complete, wearable outfit combinations using ONLY the items listed above — reference each piece by its EXACT name as written. Combine categories sensibly (typically a top + a bottom + footwear, plus optional outerwear/accessory). Give each outfit a short vibe/occasion label and a one-line reason grounded in what's current.
+${context ? `\nStyling context to honour: ${context}\n` : ''}${
+    influencers
+      ? `\nStyle icons the user wants to emulate: ${influencers}. Search the web for these specific people/accounts (their handles, names, plus terms like "outfit", "street style", "fit") and channel their aesthetic — silhouettes, colour palette, layering, and formality — into the outfits you build from the owned items. If you can't find reliable information on one of them, do your best from the name and say so briefly in the note rather than inventing details.\n`
+      : ''
+  }
+First, search the web for current (this season) fashion trends, colour stories, and outfit ideas relevant to this wardrobe${influencers ? ' and to the style icons above' : ''}. Then:
+1. Build 3–4 complete, wearable outfit combinations using ONLY the items listed above — reference each piece by its EXACT name as written. Combine categories sensibly (typically a top + a bottom + footwear, plus optional outerwear/accessory). Give each outfit a short vibe/occasion label and a one-line reason grounded in what's current${influencers ? ' and in the style-icon direction' : ''}.
 2. Suggest 3–5 "gaps": specific pieces the user does NOT already own that would unlock the most new outfits or modernise the wardrobe most — each with a one-line why.
 
 Reply with ONLY a JSON object — no markdown fences, no prose before or after — of exactly this shape:
 {"outfits":[{"title":string,"occasion":string,"items":string[],"why":string}],"gaps":[{"item":string,"why":string}],"note":string}
 Rules:
 - Every string in each outfit's "items" MUST be one of the owned item names above, copied exactly.
-- "note" is one short sentence on the overall trend direction you leaned on.
+- "note" is one short sentence on the overall direction you leaned on${influencers ? ' — mention the style icons or how much you could find on them' : ''}.
 - Keep every "why" to a single concise sentence.`
 
   const ai = new GoogleGenAI({ apiKey: key })

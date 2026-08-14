@@ -56,7 +56,7 @@ const SHIM = `<script>
     /* Closet stylist: the host relays the owned items to the server's Gemini
        route (grounded with live web search) and returns outfit combinations +
        shopping gaps. Long timeout — grounded generation can take tens of seconds. */
-    styleCloset: function (items, context) { return call('style', { items: items, context: context }, 90000); },
+    styleCloset: function (items, context, influencers) { return call('style', { items: items, context: context, influencers: influencers }, 90000); },
     /* Upload a photo to the owner's cloud storage; resolves { ok, url } or an
        error so the tile can fall back to storing the image inline. */
     uploadPhoto: function (image) { return call('uploadPhoto', { image: image }, 90000); },

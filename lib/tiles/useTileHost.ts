@@ -162,7 +162,7 @@ export function useTileHost(
           const res = await fetch('/api/closet/style', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ items: msg.items, context: msg.context }),
+            body: JSON.stringify({ items: msg.items, context: msg.context, influencers: msg.influencers }),
           })
           data = await res.json()
         } catch {

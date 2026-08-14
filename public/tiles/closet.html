@@ -52,6 +52,7 @@
   .stylist{margin-top:26px;border-top:1px solid var(--border);padding-top:18px}
   .style-h{font-family:var(--serif);font-style:italic;font-size:19px;margin:0 0 10px}
   .style-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+  .style-icons{width:100%;margin-bottom:8px}
   .style-row input{flex:1;min-width:150px}
   .style-hint{font-size:12.5px;color:var(--muted);line-height:1.45;min-height:14px;margin-bottom:4px}
   .style-hint.err{color:var(--neg)}
@@ -104,11 +105,12 @@
   <!-- AI stylist: builds outfits from the owned items + suggests what to buy next -->
   <div class="stylist">
     <h2 class="style-h">Stylist</h2>
+    <input id="styleIcons" class="style-icons" placeholder="Style icons to emulate — e.g. @ethan_kieffer, @caficosta_" autocomplete="off" />
     <div class="style-row">
       <input id="styleCtx" placeholder="Optional: occasion or weather — e.g. date night, cold" autocomplete="off" />
       <button class="snap-btn" type="button" id="styleBtn">&#10024; Style me</button>
     </div>
-    <div class="style-hint" id="styleHint">Build outfit combinations from your wardrobe, informed by current trends.</div>
+    <div class="style-hint" id="styleHint">Build outfit combinations from your wardrobe, in your style icons’ vibe and current trends.</div>
     <div id="styleOut"></div>
   </div>
 
@@ -124,9 +126,11 @@
      upload candidate (cloud storage removes the closet size cap); pendingThumb
      is the inline fallback used when cloud storage isn't configured. */
   var pendingFull = null, pendingThumb = null, addBusy = false;
+  var DEFAULT_ICONS = '@ethan_kieffer, @caficosta_';
+  var styleIcons = DEFAULT_ICONS; /* style icons to emulate; persisted with the closet */
   function persist(){
     if(!window.Vitality) return Promise.resolve();
-    return window.Vitality.save({ items: items }).catch(function(){
+    return window.Vitality.save({ items: items, styleIcons: styleIcons }).catch(function(){
       note('Couldn’t save — your closet may be too large. Remove a few photos.', true);
     });
   }
@@ -300,11 +304,13 @@
       styleNote('The stylist loads with the dashboard — reload it, then try again.', true); return;
     }
     styleBusy = true; $('styleBtn').disabled = true; $('styleOut').innerHTML = '';
-    styleNote('Styling you… searching current trends (can take ~15s).');
+    var icons = $('styleIcons') ? $('styleIcons').value.trim() : styleIcons;
+    styleNote(icons ? 'Styling you… searching your style icons + current trends (can take ~15s).' : 'Styling you… searching current trends (can take ~15s).');
     var payload = items.map(function(it){ return { name: it.name, cat: it.cat }; });
     var ctx = $('styleCtx') ? $('styleCtx').value.trim() : '';
+    if(icons !== styleIcons){ styleIcons = icons; persist(); } /* remember the icons */
     var r = null;
-    try{ r = await window.Vitality.styleCloset(payload, ctx); }catch(e){ r = null; }
+    try{ r = await window.Vitality.styleCloset(payload, ctx, icons); }catch(e){ r = null; }
     styleBusy = false; $('styleBtn').disabled = false;
     if(!r || !r.ok){
       var code = r && r.error;
@@ -320,6 +326,7 @@
   }
   $('styleBtn').addEventListener('click', styleMe);
   $('styleCtx').addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); styleMe(); } });
+  $('styleIcons').addEventListener('change', function(){ var v = this.value.trim(); if(v !== styleIcons){ styleIcons = v; persist(); } });
   $('styleOut').addEventListener('click', function(e){
     var img = e.target && e.target.tagName === 'IMG' ? e.target : null;
     if(img && img.getAttribute('src')) openLightbox(img.getAttribute('src'));
@@ -341,11 +348,13 @@
   });
 
   (function(){
-    if(!window.Vitality){ render(); return; }
+    var applyIcons = function(){ var el = $('styleIcons'); if(el) el.value = styleIcons; };
+    if(!window.Vitality){ applyIcons(); render(); return; }
     window.Vitality.load().then(function(d){
       items = (d && Array.isArray(d.items)) ? d.items : [];
-      render();
-    }, function(){ render(); });
+      if(d && typeof d.styleIcons === 'string') styleIcons = d.styleIcons;
+      applyIcons(); render();
+    }, function(){ applyIcons(); render(); });
   })();
 </script>
 </body>
