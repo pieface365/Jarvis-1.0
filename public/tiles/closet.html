@@ -24,8 +24,18 @@
   input:focus,select:focus{border-color:var(--mint)}
   #name{flex:1;min-width:130px}
   button.add-btn{background:var(--mint);color:#04140d;border:none;border-radius:10px;padding:0 16px;font-weight:600;font-size:14px;cursor:pointer}
-  .cat{margin-top:18px}
-  .cat-h{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:8px}
+  /* collapsible category dropdowns — collapsed by default to keep the page tidy */
+  .cat{margin-top:10px}
+  .cat-h{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font:inherit;color:var(--fg);cursor:pointer;text-align:left}
+  .cat-h:hover{border-color:var(--hair)}
+  .cat-name{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--fg)}
+  .cat-right{display:flex;align-items:center;gap:10px}
+  .cat-count{font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .cat-chev{color:var(--muted);font-size:11px;line-height:1;transition:transform .18s}
+  .cat.open .cat-chev{transform:rotate(180deg)}
+  .cat-body{display:none;padding:8px 2px 2px}
+  .cat.open .cat-body{display:block}
+  .cat-empty{color:var(--muted);font-size:12.5px;padding:6px 4px 2px}
   .item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:10px;margin-bottom:6px;font-size:14px;line-height:1.35}
   .item .x{background:transparent;border:none;color:var(--muted);font-size:19px;line-height:1;cursor:pointer;padding:0 4px;flex-shrink:0}
   .item .x:hover{color:var(--neg)}
@@ -137,28 +147,31 @@
   function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
   function note(msg, isErr){ var h=$('hint'); if(!h) return; h.textContent=msg||''; h.className='snap-hint'+(isErr?' err':''); }
 
+  var OPEN = {}; /* category -> expanded (session state; collapsed by default keeps it tidy) */
   function render(){
     $('count').textContent = items.length + (items.length===1 ? ' item' : ' items');
     var byCat = {};
     CATS.forEach(function(c){ byCat[c] = []; });
-    items.forEach(function(it){ (byCat[it.cat] || (byCat[it.cat] = [])).push(it); });
+    items.forEach(function(it){ if(byCat[it.cat]) byCat[it.cat].push(it); });
 
-    var html = '', any = false;
-    CATS.forEach(function(cat){
+    var intro = items.length ? '' : '<div class="empty">Snap or add an item — each one drops into its category below. Then ask <strong>Jarvis</strong> what to wear.</div>';
+    $('list').innerHTML = intro + CATS.map(function(cat){
       var list = byCat[cat] || [];
-      if(!list.length) return;
-      any = true;
-      html += '<div class="cat"><div class="cat-h"><span>' + cat + '</span><span>' + list.length + '</span></div>';
-      list.forEach(function(it){
-        var thumb = it.img ? '<img class="thumb" src="' + it.img + '" alt="" />' : '';
-        html += '<div class="item">' + thumb + '<span class="iname">' + esc(it.name) + '</span><button class="x" data-id="' + it.id + '" aria-label="Remove">×</button></div>';
-      });
-      html += '</div>';
-    });
-    if(!any){
-      html = '<div class="empty">Your closet is empty. Add clothes above to build your wardrobe — then ask <strong>Jarvis</strong> what to wear.</div>';
-    }
-    $('list').innerHTML = html;
+      var open = !!OPEN[cat];
+      var body = list.length
+        ? list.map(function(it){
+            var thumb = it.img ? '<img class="thumb" src="' + it.img + '" alt="" />' : '';
+            return '<div class="item">' + thumb + '<span class="iname">' + esc(it.name) + '</span><button class="x" data-id="' + it.id + '" aria-label="Remove">×</button></div>';
+          }).join('')
+        : '<div class="cat-empty">Nothing here yet.</div>';
+      return '<div class="cat' + (open ? ' open' : '') + '">'
+        + '<button class="cat-h" type="button" data-cattoggle="' + cat + '" aria-expanded="' + (open ? 'true' : 'false') + '">'
+          + '<span class="cat-name">' + cat + '</span>'
+          + '<span class="cat-right"><span class="cat-count">' + list.length + '</span><span class="cat-chev">&#9662;</span></span>'
+        + '</button>'
+        + '<div class="cat-body">' + body + '</div>'
+      + '</div>';
+    }).join('');
   }
 
   async function add(){
@@ -181,6 +194,7 @@
     var it = { id: Date.now() + '' + Math.random().toString(36).slice(2,6), name: name, cat: $('cat').value };
     if(img) it.img = img;
     items.push(it);
+    OPEN[it.cat] = true; /* expand the category so the new item is visible */
     $('name').value = '';
     pendingFull = null; pendingThumb = null; showPending(); note('');
     persist(); render();
@@ -333,6 +347,8 @@
   });
 
   $('list').addEventListener('click', function(e){
+    var toggle = e.target.closest ? e.target.closest('[data-cattoggle]') : null;
+    if(toggle){ var c = toggle.getAttribute('data-cattoggle'); OPEN[c] = !OPEN[c]; render(); return; }
     var thumb = e.target.closest ? e.target.closest('.thumb') : null;
     if(thumb){ openLightbox(thumb.getAttribute('src')); return; }
     var b = e.target.closest ? e.target.closest('.x') : null;
