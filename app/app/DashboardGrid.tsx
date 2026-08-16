@@ -659,6 +659,20 @@ export default function DashboardGrid({ userId, arranging = false }: DashboardGr
     }
   }, [])
 
+  // Deep link: opening /?jarvis=1 (or the #jarvis hash) lands straight in the
+  // coach — so a Home Screen icon or a Siri Shortcut pointed at that URL "calls
+  // on Jarvis" in one tap instead of dropping onto the dashboard first.
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search)
+      if (params.has('jarvis') || window.location.hash.toLowerCase() === '#jarvis') {
+        setCoachOpen(true)
+      }
+    } catch {
+      /* no-op — window.location is always present in the browser */
+    }
+  }, [])
+
   // The user's arrangement (order + per-tile sizes), persisted per user.
   const [order, setOrder] = useState<string[]>(GRID_ORDER)
   const [sizes, setSizes] = useState<Record<string, TileSize>>({})
