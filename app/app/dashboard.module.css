@@ -17,8 +17,11 @@
      bottom by the safe-area insets so the greeting clears the status bar and
      the last tile clears the home indicator on iPhone. Insets are 0 on
      desktop, so this is a no-op there. */
+  /* Bottom padding must clear the fixed chrome that floats over the scroll: the
+     centered dock and the "+ New tile" / "See the vision" buttons (bottom:92 in
+     DashboardGrid), or the last tile scrolls under them and can't be reached. */
   padding: calc(var(--space-10) + env(safe-area-inset-top)) var(--space-6)
-    calc(var(--space-16) + env(safe-area-inset-bottom));
+    calc(150px + env(safe-area-inset-bottom));
   overflow: hidden;
 }
 
@@ -257,8 +260,9 @@
 
 @media (max-width: 560px) {
   .page {
+    /* clear the fixed dock + floating buttons so the last tile is reachable */
     padding: calc(var(--space-8) + env(safe-area-inset-top)) var(--space-4)
-      calc(var(--space-12) + env(safe-area-inset-bottom));
+      calc(156px + env(safe-area-inset-bottom));
   }
 }
 
