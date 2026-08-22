@@ -21,7 +21,7 @@
      centered dock and the "+ New tile" / "See the vision" buttons (bottom:92 in
      DashboardGrid), or the last tile scrolls under them and can't be reached. */
   padding: calc(var(--space-10) + env(safe-area-inset-top)) var(--space-6)
-    calc(150px + env(safe-area-inset-bottom));
+    calc(240px + env(safe-area-inset-bottom));
   overflow: hidden;
 }
 
@@ -260,9 +260,9 @@
 
 @media (max-width: 560px) {
   .page {
-    /* clear the fixed dock + floating buttons so the last tile is reachable */
+    /* clear the fixed dock + floating buttons, with extra room to scroll past */
     padding: calc(var(--space-8) + env(safe-area-inset-top)) var(--space-4)
-      calc(156px + env(safe-area-inset-bottom));
+      calc(260px + env(safe-area-inset-bottom));
   }
 }
 
