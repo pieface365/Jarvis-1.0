@@ -944,7 +944,7 @@ export default function DashboardGrid({ userId, arranging = false }: DashboardGr
           style={{
             position: 'fixed',
             right: 24,
-            bottom: 92,
+            bottom: 'calc(env(safe-area-inset-bottom) + 92px)',
             zIndex: 50,
             background: 'var(--mint)',
             color: 'var(--mint-ink, #042a1c)',
@@ -976,7 +976,7 @@ export default function DashboardGrid({ userId, arranging = false }: DashboardGr
           style={{
             position: 'fixed',
             left: 24,
-            bottom: 92,
+            bottom: 'calc(env(safe-area-inset-bottom) + 92px)',
             zIndex: 50,
             background: 'transparent',
             color: 'var(--muted)',
@@ -1002,7 +1002,7 @@ export default function DashboardGrid({ userId, arranging = false }: DashboardGr
             if (syncEnabled()) void syncSave('_homeLayout', { order: [], sizes: {} }, new Date().toISOString())
           }}
           style={{
-            position: 'fixed', left: '50%', transform: 'translateX(calc(-50% + 120px))', bottom: 92, zIndex: 60,
+            position: 'fixed', left: '50%', transform: 'translateX(calc(-50% + 120px))', bottom: 'calc(env(safe-area-inset-bottom) + 92px)', zIndex: 60,
             background: 'transparent', color: 'var(--muted)', border: '1px solid var(--border)',
             borderRadius: 999, padding: '11px 16px', fontWeight: 500, fontSize: 13, cursor: 'pointer',
           }}

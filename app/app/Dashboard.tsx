@@ -239,7 +239,7 @@ export default function Dashboard({ firstName, userId }: DashboardProps) {
         aria-label="Customize dashboard"
         title="Customize"
         style={{
-          position: 'fixed', left: 24, bottom: 140, zIndex: 50,
+          position: 'fixed', left: 24, bottom: 'calc(env(safe-area-inset-bottom) + 140px)', zIndex: 50,
           background: 'transparent', color: 'var(--muted)', border: '1px solid var(--border)',
           borderRadius: 999, padding: '10px 16px', fontWeight: 500, fontSize: 13, cursor: 'pointer',
         }}
@@ -266,7 +266,7 @@ export default function Dashboard({ firstName, userId }: DashboardProps) {
           type="button"
           onClick={() => setArranging(false)}
           style={{
-            position: 'fixed', left: '50%', transform: 'translateX(-50%)', bottom: 92, zIndex: 60,
+            position: 'fixed', left: '50%', transform: 'translateX(-50%)', bottom: 'calc(env(safe-area-inset-bottom) + 92px)', zIndex: 60,
             background: '#6EE7B7', color: '#04140d', border: 'none', borderRadius: 999,
             padding: '12px 22px', fontWeight: 600, fontSize: 14, cursor: 'pointer',
             boxShadow: '0 6px 24px rgba(0,0,0,.45)',
