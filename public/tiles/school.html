@@ -1080,13 +1080,20 @@
       var SEED_TRAINING=[
         ['climb','Climb — volume',[1],'16:30','18:30','Flash V4–V5 · ARC'],
         ['lift','Lift — Push',[2],'06:30','07:30','Chest/shoulder/tri'],
-        ['climb','Climb — project',[3],'15:00','17:00','V6–V7 attempts'],
+        ['climb','Climb — project',[3],'18:30','20:30','V6–V7 attempts'],
         ['lift','Lift — Pull + Legs',[4],'12:00','13:30','Back/biceps + squat'],
-        ['climb','Climb — power',[5],'14:00','16:00','Limit boulders'],
+        ['climb','Climb — power',[5],'18:30','20:30','Limit boulders'],
         ['climb','Climb — long project',[6],'10:00','12:30','V6–V7 goals']
       ];
       SEED_TRAINING.forEach(function(t){ state.training.push({ id:uid(), kind:t[0], name:t[1], days:t[2], start:t[3], end:t[4], note:t[5] }); });
       state.seededTraining = true; persist();
+    }
+    // Migration: Wed + Fri climbs are night sessions (6:30–8:30 PM).
+    if(!state.trainingNightsV1){
+      (state.training||[]).forEach(function(t){
+        if(t.kind==='climb' && t.days && (t.days.indexOf(3)>=0 || t.days.indexOf(5)>=0)){ t.start='18:30'; t.end='20:30'; }
+      });
+      state.trainingNightsV1 = true; persist();
     }
     refreshClasses(); renderTasks();
   })();
