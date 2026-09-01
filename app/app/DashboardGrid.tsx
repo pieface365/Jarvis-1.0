@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { footprintFor, packTiles } from '@/lib/tiles/packLayout'
+import { tileStore } from '@/lib/tiles/tileStore'
 import { CORE_TILES, VEE_TILE, DEFAULT_HOME_ORDER, coreDefaultSize, type CoreTile } from '@/lib/tiles/coreTiles'
 import type { TileSize } from '@/lib/tiles/tileSkin'
 import { initVeeTiles } from '@/components/veeTilesAnim'
@@ -91,6 +92,26 @@ function VeeArt() {
   )
 }
 
+/** Count of not-done School assignments due within the next week (incl. overdue),
+ *  read from the tile's saved bridge blob so the number can sit on the tile face. */
+function schoolDueCount(data: unknown): number | null {
+  const items = (data as { items?: unknown } | null)?.items
+  if (!Array.isArray(items)) return null
+  const midnight = new Date()
+  midnight.setHours(0, 0, 0, 0)
+  let n = 0
+  for (const raw of items as Array<{ done?: boolean; due?: string }>) {
+    if (!raw || raw.done || !raw.due) continue
+    const p = String(raw.due).split('-')
+    if (p.length !== 3) continue
+    const d = new Date(+p[0], +p[1] - 1, +p[2])
+    d.setHours(0, 0, 0, 0)
+    const days = Math.round((d.getTime() - midnight.getTime()) / 86400000)
+    if (days <= 6) n++ // overdue or due within the week
+  }
+  return n
+}
+
 /* ── one tile face (core poster or Vee), inert: the hit layer opens a slot ── */
 function TileFace({
   id,
@@ -103,6 +124,7 @@ function TileFace({
   dragging,
   onDragStart,
   onResize,
+  badge,
 }: {
   id: string
   isVee: boolean
@@ -114,6 +136,7 @@ function TileFace({
   dragging?: boolean
   onDragStart?: (e: React.PointerEvent) => void
   onResize?: () => void
+  badge?: string | null
 }) {
   const label = isVee ? VEE_TILE.label : core!.label
   const index = isVee ? VEE_TILE.index : core!.index
@@ -160,6 +183,25 @@ function TileFace({
       ) : (
         <div className="cap">
           <span className="label">{label}</span>
+          {badge && (
+            <span
+              style={{
+                marginTop: 6,
+                alignSelf: 'flex-start',
+                background: 'rgba(110,231,183,.14)',
+                color: '#6EE7B7',
+                border: '1px solid rgba(110,231,183,.4)',
+                borderRadius: 999,
+                padding: '2px 9px',
+                fontSize: 11,
+                fontWeight: 700,
+                fontFamily: 'ui-monospace,SFMono-Regular,Menlo,monospace',
+                letterSpacing: '.02em',
+              }}
+            >
+              {badge}
+            </span>
+          )}
         </div>
       )}
       <span className="arrow">→</span>
@@ -642,7 +684,27 @@ export default function DashboardGrid({ userId, arranging = false }: DashboardGr
   const [loaded, setLoaded] = useState(false) // tile discovery finished — gates the blank "see the vision" state
   const [scratched, setScratched] = useState(false) // deliberate "start from scratch" → clean canvas, no onboarding text
 
-  const { register, unregister } = useTileHost(userId, undefined, () => {})
+  // School tile: a live "N due" badge on the tile face. Read the tile's saved
+  // bridge blob (assignments) and count what's due this week / overdue.
+  const [schoolDue, setSchoolDue] = useState<number | null>(null)
+  const refreshSchoolDue = useCallback(() => {
+    tileStore
+      .loadData(userId, 'school')
+      .then((d) => setSchoolDue(schoolDueCount(d)))
+      .catch(() => {})
+  }, [userId])
+
+  const { register, unregister } = useTileHost(
+    userId,
+    (info) => {
+      if (info.tileId === 'school' && info.type === 'save') refreshSchoolDue()
+    },
+    () => {},
+  )
+  // Refresh the badge on mount and whenever the School tile is closed (openId → null).
+  useEffect(() => {
+    refreshSchoolDue()
+  }, [refreshSchoolDue, openId])
 
   // Native bridge: the iOS wrapper app can't use the web mic, so its own
   // wake-word listener calls window.jarvisNativeAsk("…") to open Jarvis and ask a
@@ -916,6 +978,7 @@ export default function DashboardGrid({ userId, arranging = false }: DashboardGr
                 dragging={dragId === id}
                 onDragStart={startDrag(id)}
                 onResize={() => resizeTile(id)}
+                badge={id === 'school' && schoolDue ? `${schoolDue} due` : null}
               />
             )
           })}
