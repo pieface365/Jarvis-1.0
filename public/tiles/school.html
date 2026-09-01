@@ -182,6 +182,20 @@
   .tgDel{ position:absolute; top:2px; right:2px; appearance:none; background:transparent; border:0; color:var(--muted); cursor:pointer; padding:3px; border-radius:5px; opacity:.65; }
   .tgDel svg{ width:13px; height:13px; }
   .tgDel:hover{ color:var(--neg); opacity:1; }
+  .tgBlock.train{ border-style:dashed; }
+  .tgBlock.train .tgName{ display:flex; align-items:center; gap:4px; }
+
+  /* layer toggle */
+  .layerTog{ display:flex; gap:8px; margin-top:var(--space-2); }
+  .layChip{ appearance:none; display:inline-flex; align-items:center; gap:7px; background:var(--surface-2); border:1px solid var(--border-strong); color:var(--muted); border-radius:var(--radius-pill); padding:6px 13px; font-size:12px; font-weight:600; cursor:pointer; transition:all var(--dur) var(--ease); }
+  .layChip i{ width:8px; height:8px; border-radius:50%; display:inline-block; opacity:.35; transition:opacity var(--dur) var(--ease); }
+  .layChip.on{ color:var(--fg); border-color:var(--border); }
+  .layChip.on i{ opacity:1; }
+  .layChip:not(.on){ opacity:.55; }
+
+  /* exam-week deload banner */
+  .deload{ display:flex; align-items:center; gap:9px; margin-top:var(--space-3); padding:9px 13px; border-radius:10px; background:rgba(255,107,107,.10); border:1px solid rgba(255,107,107,.32); font-size:12px; color:#ffb3b3; line-height:1.35; }
+  .deload b{ color:#ff8f8f; }
 
   /* Grades */
   .gpaHero{ display:flex; gap:var(--space-4); margin-bottom:var(--space-6); }
@@ -329,15 +343,27 @@
           <button class="segBtn on" data-v="week" type="button">Week</button>
           <button class="segBtn" data-v="month" type="button">Month</button>
         </div>
-        <button class="btn ghost small" id="addClassBtn" type="button">＋ Class</button>
+        <button class="btn ghost small" id="addClassBtn" type="button">＋ Add</button>
+      </div>
+
+      <div class="layerTog" id="layerTog">
+        <button class="layChip on" data-layer="classes" type="button"><i style="background:#84848c"></i>Classes</button>
+        <button class="layChip on" data-layer="training" type="button"><i style="background:#a78bfa"></i>Training</button>
       </div>
 
       <div class="add" id="addClassForm" hidden>
         <div class="addGrid four">
-          <div class="field wide"><label for="mName">Class</label><input id="mName" type="text" list="classes" placeholder="e.g. Cannabis in Pharmacy" maxlength="60" /></div>
+          <div class="field"><label for="mKind">Type</label>
+            <select id="mKind">
+              <option value="class">Class</option>
+              <option value="climb">🧗 Climb</option>
+              <option value="lift">🏋️ Lift</option>
+            </select>
+          </div>
+          <div class="field wide"><label for="mName" id="mNameLabel">Class</label><input id="mName" type="text" list="classes" placeholder="e.g. Cannabis in Pharmacy" maxlength="60" /></div>
           <div class="field"><label for="mStart">Start</label><input id="mStart" type="time" /></div>
           <div class="field"><label for="mEnd">End</label><input id="mEnd" type="time" /></div>
-          <div class="field"><label for="mRoom">Room / note</label><input id="mRoom" type="text" placeholder="PH-130" maxlength="40" /></div>
+          <div class="field"><label for="mRoom" id="mRoomLabel">Room / note</label><input id="mRoom" type="text" placeholder="PH-130" maxlength="40" /></div>
         </div>
         <div class="dayToggles" id="mDays">
           <button data-d="1" type="button">Mon</button><button data-d="2" type="button">Tue</button><button data-d="3" type="button">Wed</button><button data-d="4" type="button">Thu</button><button data-d="5" type="button">Fri</button><button data-d="6" type="button">Sat</button><button data-d="0" type="button">Sun</button>
@@ -353,10 +379,11 @@
       </div>
       <div id="calBody"></div>
       <div class="calLegend">
-        <span><i style="background:#84848c"></i>Lecture</span>
+        <span><i style="background:#84848c"></i>Class</span>
+        <span><i style="background:#a78bfa"></i>Climb</span>
+        <span><i style="background:#fb923c"></i>Lift</span>
         <span><i style="background:#FBBF24"></i>Quiz</span>
         <span><i style="background:#ff6b6b"></i>Exam</span>
-        <span><i style="background:#6EE7B7"></i>Assignment</span>
       </div>
     </div>
 
@@ -517,6 +544,13 @@
   // ============ SCHEDULE (Day / Week / Month calendar) ============
   var calView = 'week', calSel = null;
   var KIND_COL = { lecture:'#84848c', quiz:'#FBBF24', exam:'#ff6b6b', assignment:'#6EE7B7' };
+  var TRAIN_COL = { climb:'#a78bfa', lift:'#fb923c' };
+  var TRAIN_ICON = { climb:'🧗', lift:'🏋️' };
+  var showClasses = true, showTraining = true;
+  function trainingForDow(dow){
+    return (state.training||[]).filter(function(t){ return t.days && t.days.indexOf(dow)>=0; })
+      .slice().sort(function(a,b){ return (a.start||'').localeCompare(b.start||''); });
+  }
   function pad2(n){ return (n<10?'0':'')+n; }
   function isoOf(d){ return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()); }
   function weekStart(d){ var x=new Date(d); var dow=x.getDay(); x.setDate(x.getDate()+(dow===0?-6:1-dow)); x.setHours(0,0,0,0); return x; } // Monday
@@ -558,27 +592,66 @@
   function fmtHour(h){ var ap=h>=12?'PM':'AM'; var hr=h%12; if(hr===0) hr=12; return hr+' '+ap; }
   function gridRange(){
     var minM=8*60, maxM=18*60;
-    state.meetings.forEach(function(m){ var s=toMin(m.start), e=toMin(m.end); if(s!=null) minM=Math.min(minM,s); if(e!=null) maxM=Math.max(maxM,e); });
+    function span(list){ list.forEach(function(m){ var s=toMin(m.start), e=toMin(m.end); if(s!=null) minM=Math.min(minM,s); if(e!=null) maxM=Math.max(maxM,e); }); }
+    if(showClasses) span(state.meetings||[]);
+    if(showTraining) span(state.training||[]);
     var startH=Math.floor(minM/60); return { startH:startH, endH:Math.max(Math.ceil(maxM/60), startH+1) };
   }
   function hourLabels(r){ var s=''; for(var h=r.startH; h<=r.endH; h++) s+='<span class="tgHr" style="top:'+((h-r.startH)*HOUR_PX)+'px">'+fmtHour(h)+'</span>'; return s; }
   function gridBg(){ return 'background-image:repeating-linear-gradient(to bottom, transparent 0, transparent '+(HOUR_PX-1)+'px, rgba(150,220,190,.06) '+(HOUR_PX-1)+'px, rgba(150,220,190,.06) '+HOUR_PX+'px);'; }
   function colBlocks(d, r){
-    return meetingsForDow(d.getDay()).filter(function(m){ return m.start; }).map(function(m){
-      var col=colorFor(m.name), s=toMin(m.start), e=toMin(m.end)||(s+60);
-      var top=(s-r.startH*60)/60*HOUR_PX, hgt=Math.max(30,(e-s)/60*HOUR_PX);
-      var t=fmtTime(m.start)+(m.end?'–'+fmtTime(m.end):'');
-      return '<div class="tgBlock" style="top:'+top+'px;height:'+hgt+'px;border-left-color:'+col+';background:'+col+'22">'
-        +'<span class="tgName">'+esc(m.name)+'</span><span class="tgMeta">'+esc(t)+(m.room?' · '+esc(m.room):'')+'</span>'
-        +'<button class="tgDel" data-act="delmeet" data-id="'+m.id+'" aria-label="Remove">'+delSvg+'</button></div>';
+    var dow=d.getDay(), blocks=[];
+    if(showClasses) meetingsForDow(dow).filter(function(m){ return m.start; }).forEach(function(m){
+      var s=toMin(m.start), e=toMin(m.end)||(s+60);
+      blocks.push({ s:s, e:e, col:colorFor(m.name), name:esc(m.name), icon:'',
+        meta:esc(fmtTime(m.start)+(m.end?'–'+fmtTime(m.end):'')+(m.room?' · '+m.room:'')), cls:'', act:'delmeet', id:m.id });
+    });
+    if(showTraining) trainingForDow(dow).filter(function(t){ return t.start; }).forEach(function(t){
+      var s=toMin(t.start), e=toMin(t.end)||(s+60), col=TRAIN_COL[t.kind]||'#a78bfa';
+      blocks.push({ s:s, e:e, col:col, name:esc(t.name||''), icon:(TRAIN_ICON[t.kind]||'')+' ',
+        meta:esc(fmtTime(t.start)+(t.end?'–'+fmtTime(t.end):'')+(t.note?' · '+t.note:'')), cls:' train', act:'deltrain', id:t.id });
+    });
+    if(!blocks.length) return '';
+    // lane layout so any overlapping blocks sit side-by-side instead of on top of each other
+    blocks.sort(function(a,b){ return a.s-b.s || a.e-b.e; });
+    var laneEnd=[];
+    blocks.forEach(function(b){
+      var placed=-1;
+      for(var i=0;i<laneEnd.length;i++){ if(laneEnd[i]<=b.s){ placed=i; laneEnd[i]=b.e; break; } }
+      if(placed<0){ placed=laneEnd.length; laneEnd.push(b.e); }
+      b.lane=placed;
+    });
+    var n=laneEnd.length;
+    return blocks.map(function(b){
+      var top=(b.s-r.startH*60)/60*HOUR_PX, hgt=Math.max(30,(b.e-b.s)/60*HOUR_PX);
+      var pos = n>1 ? 'left:calc(3px + '+(b.lane*100/n)+'%);width:calc('+(100/n)+'% - 5px);right:auto;' : '';
+      return '<div class="tgBlock'+b.cls+'" style="top:'+top+'px;height:'+hgt+'px;'+pos+'border-left-color:'+b.col+';background:'+b.col+'22">'
+        +'<span class="tgName">'+b.icon+b.name+'</span><span class="tgMeta">'+b.meta+'</span>'
+        +'<button class="tgDel" data-act="'+b.act+'" data-id="'+b.id+'" aria-label="Remove">'+delSvg+'</button></div>';
     }).join('');
   }
   function chipHtml(e){ var col=colorFor(e.cls); return '<span class="evChip"><span class="kind '+e.kind+'">'+e.kind+'</span>'+esc(e.title)+(e.cls?' <b style="color:'+col+';font-weight:600">'+esc(e.cls)+'</b>':'')+'</span>'; }
+
+  // ---- exam-week deload ----
+  function examsBetween(a, b){ // Date a..b inclusive, returns [{title,date}]
+    var lo=isoOf(a), hi=isoOf(b), out=[];
+    state.items.forEach(function(it){ if((it.type||'').toLowerCase()==='exam' && it.due && it.due>=lo && it.due<=hi) out.push({ title:it.title, date:it.due, cls:it.subject }); });
+    return out.sort(function(x,y){ return x.date<y.date?-1:1; });
+  }
+  function deloadBanner(d){
+    if(!showTraining) return '';
+    var mon=weekStart(d), sun=new Date(mon); sun.setDate(mon.getDate()+6);
+    var ex=examsBetween(mon, sun);
+    if(!ex.length) return '';
+    var names=ex.map(function(e){ return e.title+(e.cls?' ('+e.cls+')':''); }).slice(0,3).join(', ');
+    return '<div class="deload">⚠️ <span><b>Exam week — deload.</b> '+ex.length+' exam'+(ex.length>1?'s':'')+' this week ('+esc(names)+'). Cut to 2 easy climbs + 1 short full-body lift; the night before each exam is a rest day.</span></div>';
+  }
 
   function renderDay(d){
     var r=gridRange(), h=(r.endH-r.startH)*HOUR_PX, evts=buildEvents(), ds=isoOf(d);
     var un=evts[ds]||[]; var allday = un.length?'<div class="tgAllday">'+un.map(chipHtml).join('')+'</div>':'';
     $('calBody').innerHTML = '<div class="dayHead">'+esc(d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}))+'</div>'
+      + deloadBanner(d)
       + allday
       + '<div class="tgWrap"><div class="tgGutter" style="height:'+h+'px">'+hourLabels(r)+'</div>'
       + '<div class="tgCols one"><div class="tgCol" style="height:'+h+'px;'+gridBg()+'">'+colBlocks(d,r)+'</div></div></div>';
@@ -592,7 +665,8 @@
       heads += '<div class="tgHead'+(isT?' today':'')+'"><span class="tgHDow">'+dd.toLocaleDateString('en-US',{weekday:'short'})+'</span><span class="tgHDate">'+dd.getDate()+'</span><span class="tgHDots">'+dots+'</span></div>';
       cols += '<div class="tgCol" style="height:'+h+'px;'+gridBg()+'">'+colBlocks(dd,r)+'</div>';
     }
-    $('calBody').innerHTML = '<div class="tgScroll"><div class="tgHeadRow"><div class="tgGutterHead"></div>'+heads+'</div>'
+    $('calBody').innerHTML = deloadBanner(d)
+      + '<div class="tgScroll"><div class="tgHeadRow"><div class="tgGutterHead"></div>'+heads+'</div>'
       + '<div class="tgWrap"><div class="tgGutter" style="height:'+h+'px">'+hourLabels(r)+'</div><div class="tgCols week">'+cols+'</div></div></div>';
   }
   function renderMonth(anchor){
@@ -604,7 +678,8 @@
     var grid = cells.map(function(day){
       if(day===null) return '<div class="calCell empty"></div>';
       var ds=Y+'-'+pad2(M+1)+'-'+pad2(day), dow=new Date(Y,M,day).getDay(), dots=[];
-      meetingsForDow(dow).forEach(function(m){ dots.push(colorFor(m.name)); });
+      if(showClasses) meetingsForDow(dow).forEach(function(m){ dots.push(colorFor(m.name)); });
+      if(showTraining) trainingForDow(dow).forEach(function(t){ dots.push(TRAIN_COL[t.kind]||'#a78bfa'); });
       (evts[ds]||[]).forEach(function(e){ dots.push(KIND_COL[e.kind]); });
       var dh=dots.slice(0,5).map(function(c){ return '<span class="dot" style="background:'+c+'"></span>'; }).join('');
       var c='calCell'+(ds===todayStr?' today':'')+(ds===calSel?' selected':'');
@@ -621,18 +696,27 @@
   }
   function calGoToday(){ calSel=isoOf(todayMid()); renderSchedule(); }
 
-  // recurring-class management
+  // recurring class / training management
   function addMeeting(){
     var name=$('mName').value.trim(); if(!name){ $('mName').focus(); return; }
     var days=[]; Array.prototype.forEach.call($('mDays').children, function(b){ if(b.classList.contains('on')) days.push(+b.getAttribute('data-d')); });
     if(!days.length) return;
-    state.meetings.push({ id:uid(), name:name, days:days, start:$('mStart').value||'', end:$('mEnd').value||'', room:$('mRoom').value.trim() });
+    var kind=$('mKind').value;
+    if(kind==='climb' || kind==='lift'){
+      if(showTraining===false){ showTraining=true; syncLayerChips(); }
+      state.training.push({ id:uid(), kind:kind, name:name, days:days, start:$('mStart').value||'', end:$('mEnd').value||'', note:$('mRoom').value.trim() });
+    } else {
+      if(showClasses===false){ showClasses=true; syncLayerChips(); }
+      state.meetings.push({ id:uid(), name:name, days:days, start:$('mStart').value||'', end:$('mEnd').value||'', room:$('mRoom').value.trim() });
+    }
     $('mName').value=''; $('mStart').value=''; $('mEnd').value=''; $('mRoom').value='';
     Array.prototype.forEach.call($('mDays').children, function(b){ b.classList.remove('on'); });
     $('addClassForm').hidden = true;
     persist(); refreshClasses(); renderSchedule();
   }
   function delMeeting(id){ state.meetings = state.meetings.filter(function(x){ return x.id!==id; }); persist(); renderSchedule(); }
+  function delTraining(id){ state.training = state.training.filter(function(x){ return x.id!==id; }); persist(); renderSchedule(); }
+  function syncLayerChips(){ Array.prototype.forEach.call($('layerTog').children, function(b){ var l=b.getAttribute('data-layer'); b.classList.toggle('on', l==='classes'?showClasses:showTraining); }); }
 
   // ============ GRADES ============
   function addGrade(){
@@ -925,6 +1009,19 @@
   $('mCancel').addEventListener('click', function(){ $('addClassForm').hidden = true; });
   $('mDays').addEventListener('click', function(e){ var b=e.target.closest('button'); if(b) b.classList.toggle('on'); });
   $('mAdd').addEventListener('click', addMeeting);
+  $('mKind').addEventListener('change', function(){
+    var k=$('mKind').value, train=(k==='climb'||k==='lift');
+    $('mNameLabel').textContent = train?'Session':'Class';
+    $('mName').placeholder = train?(k==='climb'?'e.g. Climb — project':'e.g. Lift — Push'):'e.g. Cannabis in Pharmacy';
+    $('mRoomLabel').textContent = train?'Note':'Room / note';
+    $('mRoom').placeholder = train?'e.g. V6–V7':'PH-130';
+    $('mAdd').textContent = train?'Add session':'Add class';
+  });
+  $('layerTog').addEventListener('click', function(e){ var b=e.target.closest('.layChip'); if(!b) return;
+    var l=b.getAttribute('data-layer');
+    if(l==='classes') showClasses=!showClasses; else showTraining=!showTraining;
+    b.classList.toggle('on'); renderSchedule();
+  });
   $('gAdd').addEventListener('click', addGrade);
   $('gTotal').addEventListener('keydown', function(e){ if(e.key==='Enter') addGrade(); });
 
@@ -943,6 +1040,7 @@
     else if(act==='del') delTask(id);
     else if(act==='delgrade') delGrade(id);
     else if(act==='delmeet') delMeeting(id);
+    else if(act==='deltrain') delTraining(id);
     else if(act==='ledit') editRow(b.getAttribute('data-src'), id);
     else if(act==='lsave') saveRow(b);
     else if(act==='lcancel'){ editingRow=null; renderLectures(); }
@@ -962,7 +1060,7 @@
       if(saved && typeof saved==='object' && !Array.isArray(saved)) state = saved;
       else if(Array.isArray(saved)) state = { items: saved };
     } catch(e){}
-    if(!state.items) state.items=[]; if(!state.classes) state.classes=[]; if(!state.grades) state.grades=[]; if(!state.lectures) state.lectures=[]; if(!state.meetings) state.meetings=[];
+    if(!state.items) state.items=[]; if(!state.classes) state.classes=[]; if(!state.grades) state.grades=[]; if(!state.lectures) state.lectures=[]; if(!state.meetings) state.meetings=[]; if(!state.training) state.training=[];
     // One-time seed of Nishk's Fall 2026 weekly class schedule (recurring meetings).
     if(!state.seededSchedule){
       var SEED_MEETINGS=[
@@ -975,6 +1073,20 @@
       ];
       SEED_MEETINGS.forEach(function(m){ state.meetings.push({ id:uid(), name:m[0], days:m[1], start:m[2], end:m[3], room:m[4] }); });
       state.seededSchedule = true; persist();
+    }
+    // One-time seed of Nishk's training week, arranged around the class schedule
+    // (climb M/W/F/S, lift Tue/Thu). days use JS getDay: 1=Mon..6=Sat, 0=Sun.
+    if(!state.seededTraining){
+      var SEED_TRAINING=[
+        ['climb','Climb — volume',[1],'16:30','18:30','Flash V4–V5 · ARC'],
+        ['lift','Lift — Push',[2],'06:30','07:30','Chest/shoulder/tri'],
+        ['climb','Climb — project',[3],'15:00','17:00','V6–V7 attempts'],
+        ['lift','Lift — Pull + Legs',[4],'12:00','13:30','Back/biceps + squat'],
+        ['climb','Climb — power',[5],'14:00','16:00','Limit boulders'],
+        ['climb','Climb — long project',[6],'10:00','12:30','V6–V7 goals']
+      ];
+      SEED_TRAINING.forEach(function(t){ state.training.push({ id:uid(), kind:t[0], name:t[1], days:t[2], start:t[3], end:t[4], note:t[5] }); });
+      state.seededTraining = true; persist();
     }
     refreshClasses(); renderTasks();
   })();
