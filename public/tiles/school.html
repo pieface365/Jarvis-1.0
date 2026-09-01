@@ -144,6 +144,48 @@
   .gradeItem{ display:flex; align-items:center; gap:var(--space-3); padding:8px 0; border-top:1px solid var(--border); }
   .giTitle{ flex:1; min-width:0; font-size:var(--text-sm); color:var(--muted-strong); word-break:break-word; }
   .giScore{ font-family:var(--font-mono); font-size:12px; font-variant-numeric:tabular-nums; color:var(--fg); white-space:nowrap; }
+
+  /* Import */
+  .importBar{ display:flex; align-items:center; gap:var(--space-3); background:var(--surface); border:1px dashed var(--border-strong); border-radius:var(--radius-lg); padding:var(--space-4) var(--space-5); margin-bottom:var(--space-6); }
+  .importBar .txt{ flex:1; min-width:0; }
+  .importBar .t{ font-weight:600; font-size:var(--text-sm); }
+  .importBar .s{ font-size:12.5px; color:var(--muted); margin-top:2px; }
+  .btn.ghost{ background:transparent; color:var(--brand); border:1px solid var(--brand-line); }
+  .btn.ghost:hover{ background:var(--brand-soft); filter:none; }
+
+  /* Lectures timeline */
+  .courseCard{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:var(--space-4) var(--space-5); margin-bottom:var(--space-4); }
+  .courseHead{ display:flex; align-items:center; gap:var(--space-3); margin-bottom:var(--space-3); padding-bottom:var(--space-3); border-bottom:1px solid var(--border); }
+  .courseName{ font-family:var(--font-display); font-weight:700; font-size:var(--text-lg); letter-spacing:-0.01em; }
+  .courseCount{ margin-left:auto; font-family:var(--font-mono); font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); }
+  .tl{ display:flex; align-items:center; gap:var(--space-3); padding:8px 0; }
+  .tl+.tl{ border-top:1px solid rgba(255,255,255,0.03); }
+  .tlDate{ flex:none; width:58px; font-family:var(--font-mono); font-size:11px; font-variant-numeric:tabular-nums; color:var(--muted-strong); }
+  .tlDate.past{ color:var(--muted); opacity:.6; }
+  .tlTitle{ flex:1; min-width:0; font-size:var(--text-sm); word-break:break-word; }
+  .kind{ flex:none; font-family:var(--font-mono); font-size:9px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; padding:3px 8px; border-radius:var(--radius-pill); border:1px solid; }
+  .kind.lecture{ color:var(--muted); border-color:var(--border-strong); }
+  .kind.quiz{ color:var(--warn); border-color:var(--warn-line); background:var(--warn-soft); }
+  .kind.exam{ color:var(--neg); border-color:var(--neg-line); background:var(--neg-soft); }
+  .kind.assignment{ color:var(--brand); border-color:var(--brand-line); background:var(--brand-soft); }
+
+  /* Overlays */
+  .overlay{ position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center; padding:var(--space-5); background:rgba(3,3,4,0.78); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); }
+  .spinner{ width:44px; height:44px; border-radius:50%; border:3px solid var(--surface-3); border-top-color:var(--brand); animation:spin 0.8s linear infinite; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  .loadCard{ display:flex; flex-direction:column; align-items:center; gap:var(--space-4); color:var(--muted-strong); font-size:var(--text-sm); text-align:center; }
+  .modal{ width:min(560px,100%); max-height:86dvh; display:flex; flex-direction:column; background:var(--surface); border:1px solid var(--border-strong); border-radius:var(--radius-lg); overflow:hidden; box-shadow:0 24px 60px rgba(0,0,0,.6); }
+  .modalHead{ padding:var(--space-5); border-bottom:1px solid var(--border); }
+  .modalTitle{ font-family:var(--font-display); font-weight:700; font-size:var(--text-xl); letter-spacing:-0.02em; }
+  .modalSub{ font-size:12.5px; color:var(--muted); margin-top:4px; }
+  .modalBody{ padding:var(--space-4) var(--space-5); overflow-y:auto; }
+  .revRow{ display:flex; align-items:center; gap:var(--space-3); padding:7px 0; border-top:1px solid var(--border); }
+  .revRow:first-child{ border-top:0; }
+  .modalFoot{ display:flex; gap:var(--space-3); padding:var(--space-4) var(--space-5); border-top:1px solid var(--border); }
+  .modalFoot .btn{ flex:1; }
+  .btn.sub{ background:transparent; color:var(--fg); border:1px solid var(--border-strong); }
+  .btn.sub:hover{ filter:none; background:var(--surface-2); }
+  .errNote{ color:var(--neg); font-size:var(--text-sm); text-align:center; }
 </style>
 </head>
 <body>
@@ -156,6 +198,7 @@
 
     <div class="tabs" id="tabs">
       <button class="tabBtn on" data-tab="tasks" type="button">Tasks</button>
+      <button class="tabBtn" data-tab="lectures" type="button">Lectures</button>
       <button class="tabBtn" data-tab="schedule" type="button">Schedule</button>
       <button class="tabBtn" data-tab="grades" type="button">Grades</button>
     </div>
@@ -195,6 +238,18 @@
         </div>
       </div>
       <div class="list" id="list"></div>
+    </div>
+
+    <!-- ============ LECTURES ============ -->
+    <div id="panel-lectures" hidden>
+      <div class="importBar">
+        <div class="txt">
+          <div class="t">Import a syllabus</div>
+          <div class="s">Snap or upload screenshots of a class schedule — I'll pull out the lectures, quiz &amp; exam dates.</div>
+        </div>
+        <button class="btn ghost" id="importBtn" type="button">⇪ Import</button>
+      </div>
+      <div id="lectures"></div>
     </div>
 
     <!-- ============ SCHEDULE ============ -->
@@ -261,12 +316,36 @@
   </div>
 </div>
 
+<input type="file" id="fileInput" accept="image/*" multiple hidden />
+
+<div class="overlay" id="importLoading" hidden>
+  <div class="loadCard">
+    <div class="spinner"></div>
+    <div id="loadMsg">Reading your syllabus…</div>
+  </div>
+</div>
+
+<div class="overlay" id="reviewModal" hidden>
+  <div class="modal">
+    <div class="modalHead">
+      <div class="modalTitle" id="revTitle">Review import</div>
+      <div class="modalSub" id="revSub"></div>
+    </div>
+    <div class="modalBody" id="revBody"></div>
+    <div class="modalFoot">
+      <button class="btn sub" id="revCancel" type="button">Cancel</button>
+      <button class="btn" id="revConfirm" type="button">Add to School</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function(){
   var SUBJECT_COLORS = ['#6EE7B7','#7CB8FF','#F6A5C0','#FBBF24','#C4A5F6','#5EE6D0','#FF9F6E','#B7E36E'];
   var DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-  var state = { items: [], classes: [], grades: [] };
+  var state = { items: [], classes: [], grades: [], lectures: [] };
   var tab = 'tasks';
+  var pendingImport = null;
   var filter = 'todo';
   var saveT = null;
 
@@ -316,8 +395,10 @@
     state.classes.forEach(function(c){ if(c.name) subs[c.name]=1; });
     state.items.forEach(function(it){ if(it.subject) subs[it.subject]=1; });
     state.grades.forEach(function(g){ if(g.cls) subs[g.cls]=1; });
+    state.lectures.forEach(function(l){ if(l.cls) subs[l.cls]=1; });
     $('classes').innerHTML = Object.keys(subs).map(function(s){ return '<option value="'+esc(s)+'">'; }).join('');
   }
+  function fmtDate(s){ var d=parseDue(s); return d?d.toLocaleDateString('en-US',{month:'short',day:'numeric'}):''; }
 
   // ============ TASKS ============
   function addTask(){
@@ -430,14 +511,134 @@
     }).join('');
   }
 
+  // ============ LECTURES (course timeline) ============
+  function renderLectures(){
+    // Build a per-class timeline from lectures + the dated quiz/exam/assignment tasks.
+    var byClass = {};
+    function ensure(c){ return byClass[c] || (byClass[c] = []); }
+    state.lectures.forEach(function(l){ if(l.cls) ensure(l.cls).push({ date:l.date, title:l.title, kind:'lecture' }); });
+    state.items.forEach(function(it){
+      if(!it.subject || !it.due) return;
+      var t=(it.type||'').toLowerCase();
+      if(t==='quiz') ensure(it.subject).push({ date:it.due, title:it.title, kind:'quiz' });
+      else if(t==='exam') ensure(it.subject).push({ date:it.due, title:it.title, kind:'exam' });
+      else if(t==='assignment') ensure(it.subject).push({ date:it.due, title:it.title, kind:'assignment' });
+    });
+    var names = Object.keys(byClass);
+    if(!names.length){
+      $('lectures').innerHTML = '<div class="empty"><div class="big">No courses imported yet</div><div class="small">Tap Import above and add screenshots of a syllabus — your lectures, quizzes and exams will land here.</div></div>';
+      return;
+    }
+    names.sort();
+    var todayS = todayMid().getTime();
+    $('lectures').innerHTML = names.map(function(n){
+      var col = colorFor(n);
+      var rows = byClass[n].slice().sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
+      var lc = rows.filter(function(r){return r.kind==='lecture';}).length;
+      return '<div class="courseCard"><div class="courseHead"><span class="courseName" style="color:'+col+'">'+esc(n)+'</span><span class="courseCount">'+lc+' lectures</span></div>'
+        + rows.map(function(r){
+            var past = parseDue(r.date) && parseDue(r.date).getTime() < todayS;
+            return '<div class="tl"><span class="tlDate'+(past?' past':'')+'">'+esc(fmtDate(r.date))+'</span><span class="tlTitle">'+esc(r.title)+'</span><span class="kind '+r.kind+'">'+r.kind+'</span></div>';
+          }).join('')
+        + '</div>';
+    }).join('');
+  }
+
+  // ============ IMPORT SYLLABUS ============
+  function setImgLoading(on, msg){ $('importLoading').hidden = !on; if(msg) $('loadMsg').textContent = msg; }
+
+  // Downscale a File to a JPEG data URL (keeps syllabus text legible, caps size).
+  function fileToDataUrl(file){
+    return new Promise(function(resolve, reject){
+      var img = new Image();
+      var url = URL.createObjectURL(file);
+      img.onload = function(){
+        try {
+          var max = 1600, w = img.naturalWidth, h = img.naturalHeight;
+          var scale = Math.min(1, max/Math.max(w,h));
+          var cw = Math.max(1, Math.round(w*scale)), ch = Math.max(1, Math.round(h*scale));
+          var cv = document.createElement('canvas'); cv.width=cw; cv.height=ch;
+          cv.getContext('2d').drawImage(img, 0, 0, cw, ch);
+          URL.revokeObjectURL(url);
+          resolve(cv.toDataURL('image/jpeg', 0.9));
+        } catch(e){ URL.revokeObjectURL(url); reject(e); }
+      };
+      img.onerror = function(){ URL.revokeObjectURL(url); reject(new Error('bad_image')); };
+      img.src = url;
+    });
+  }
+
+  async function handleFiles(files){
+    if(!files || !files.length) return;
+    if(!window.Vitality || !window.Vitality.importSyllabus){ alert('Import needs the dashboard host.'); return; }
+    setImgLoading(true, files.length>1 ? 'Reading '+files.length+' pages…' : 'Reading your syllabus…');
+    try {
+      var imgs = [];
+      for(var i=0;i<files.length && i<8;i++){ imgs.push(await fileToDataUrl(files[i])); }
+      var res = await window.Vitality.importSyllabus(imgs);
+      setImgLoading(false);
+      if(!res || !res.ok){ showReviewError(res && res.error); return; }
+      openReview(res.syllabus);
+    } catch(e){ setImgLoading(false); showReviewError('bad_image'); }
+  }
+
+  var ERRS = { no_key:'AI key isn’t set up on the server yet.', too_large:'That image is too large — try a tighter screenshot.', rate_limited:'Too many requests just now — try again in a minute.', timeout:'That took too long — try one page at a time.', network:'Network problem — check your connection.', bad_image:'Couldn’t read that image.' };
+  function showReviewError(code){
+    pendingImport = null;
+    $('revTitle').textContent = 'Import failed';
+    $('revSub').textContent = '';
+    $('revBody').innerHTML = '<div class="errNote">'+esc(ERRS[code]||'Something went wrong reading the syllabus.')+'</div>';
+    $('revConfirm').hidden = true; $('revCancel').textContent = 'Close';
+    $('reviewModal').hidden = false;
+  }
+
+  function openReview(syl){
+    pendingImport = syl;
+    var nL=syl.lectures.length, nQ=syl.quizzes.length, nE=syl.exams.length, nA=syl.assignments.length;
+    $('revTitle').textContent = syl.className || 'Class';
+    $('revSub').textContent = nL+' lectures · '+nQ+' quizzes · '+nE+' exams'+(nA?(' · '+nA+' assignments'):'');
+    var rows = [];
+    syl.lectures.forEach(function(x){ rows.push([x.date,x.title,'lecture']); });
+    syl.quizzes.forEach(function(x){ rows.push([x.date,x.title,'quiz']); });
+    syl.exams.forEach(function(x){ rows.push([x.date,x.title,'exam']); });
+    syl.assignments.forEach(function(x){ rows.push([x.date,x.title,'assignment']); });
+    rows.sort(function(a,b){ return (a[0]||'').localeCompare(b[0]||''); });
+    $('revBody').innerHTML = rows.length
+      ? rows.map(function(r){ return '<div class="revRow"><span class="tlDate">'+esc(fmtDate(r[0]))+'</span><span class="tlTitle">'+esc(r[1])+'</span><span class="kind '+r[2]+'">'+r[2]+'</span></div>'; }).join('')
+      : '<div class="errNote">No dated items found. Try a clearer screenshot.</div>';
+    $('revConfirm').hidden = rows.length===0;
+    $('revCancel').textContent = 'Cancel';
+    $('reviewModal').hidden = false;
+  }
+
+  function confirmImport(){
+    var syl = pendingImport; $('reviewModal').hidden = true; pendingImport = null;
+    if(!syl) return;
+    var cls = syl.className || 'Class';
+    // dedup helpers
+    var lkey = {}; state.lectures.forEach(function(l){ lkey[l.cls+'|'+l.date+'|'+l.title]=1; });
+    syl.lectures.forEach(function(x){
+      var k=cls+'|'+x.date+'|'+x.title; if(lkey[k]) return; lkey[k]=1;
+      state.lectures.push({ id:uid(), cls:cls, title:x.title, date:x.date });
+    });
+    var ikey = {}; state.items.forEach(function(it){ ikey[(it.subject||'')+'|'+(it.type||'')+'|'+it.title+'|'+(it.due||'')]=1; });
+    function addTasks(list, type){ list.forEach(function(x){
+      var k=cls+'|'+type+'|'+x.title+'|'+x.date; if(ikey[k]) return; ikey[k]=1;
+      state.items.push({ id:uid(), title:x.title, subject:cls, type:type, due:x.date, done:false, createdAt:Date.now() });
+    }); }
+    addTasks(syl.quizzes,'Quiz'); addTasks(syl.exams,'Exam'); addTasks(syl.assignments,'Assignment');
+    persist(); refreshClasses();
+    setTab('lectures');
+  }
+
   // ---- tab switching ----
-  var SUBS={tasks:'Assignments &amp; deadlines', schedule:'Weekly timetable', grades:'Class averages &amp; GPA'};
+  var SUBS={tasks:'Assignments &amp; deadlines', lectures:'Course lectures &amp; dates', schedule:'Weekly timetable', grades:'Class averages &amp; GPA'};
   function setTab(t){
     tab=t;
-    ['tasks','schedule','grades'].forEach(function(k){ $('panel-'+k).hidden = (k!==t); });
+    ['tasks','lectures','schedule','grades'].forEach(function(k){ $('panel-'+k).hidden = (k!==t); });
     Array.prototype.forEach.call($('tabs').children, function(b){ b.classList.toggle('on', b.getAttribute('data-tab')===t); });
     $('subtitle').innerHTML = SUBS[t];
-    if(t==='tasks') renderTasks(); else if(t==='schedule') renderSchedule(); else renderGrades();
+    if(t==='tasks') renderTasks(); else if(t==='lectures') renderLectures(); else if(t==='schedule') renderSchedule(); else renderGrades();
   }
 
   // ---- events ----
@@ -450,6 +651,11 @@
   $('gTotal').addEventListener('keydown', function(e){ if(e.key==='Enter') addGrade(); });
 
   $('tabs').addEventListener('click', function(e){ var b=e.target.closest('.tabBtn'); if(b) setTab(b.getAttribute('data-tab')); });
+
+  $('importBtn').addEventListener('click', function(){ $('fileInput').value=''; $('fileInput').click(); });
+  $('fileInput').addEventListener('change', function(e){ handleFiles(e.target.files); });
+  $('revCancel').addEventListener('click', function(){ $('reviewModal').hidden=true; pendingImport=null; $('revConfirm').hidden=false; });
+  $('revConfirm').addEventListener('click', confirmImport);
   $('filter').addEventListener('click', function(e){ var b=e.target.closest('.segBtn'); if(!b) return; filter=b.getAttribute('data-f'); Array.prototype.forEach.call(this.children,function(c){c.classList.toggle('on',c===b);}); renderTasks(); });
 
   document.addEventListener('click', function(e){
@@ -468,7 +674,7 @@
       if(saved && typeof saved==='object' && !Array.isArray(saved)) state = saved;
       else if(Array.isArray(saved)) state = { items: saved };
     } catch(e){}
-    if(!state.items) state.items=[]; if(!state.classes) state.classes=[]; if(!state.grades) state.grades=[];
+    if(!state.items) state.items=[]; if(!state.classes) state.classes=[]; if(!state.grades) state.grades=[]; if(!state.lectures) state.lectures=[];
     refreshClasses(); renderTasks();
   })();
 })();

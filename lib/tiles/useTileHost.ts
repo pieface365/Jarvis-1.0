@@ -173,6 +173,26 @@ export function useTileHost(
         return
       }
 
+      if (msg.type === 'importSyllabus') {
+        // Relay one or more syllabus screenshots to the server's Gemini vision
+        // route — same origin reasoning as the other vision relays (the host
+        // reaches /api; the opaque-origin tile can't). Always settle.
+        let data: unknown = { ok: false, error: 'network' }
+        try {
+          const res = await fetch('/api/school/import', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ images: msg.images }),
+          })
+          data = await res.json()
+        } catch {
+          /* keep the network error payload */
+        }
+        src.postMessage({ source: 'vitality-host', type: 'syllabus:result', id: msg.id, data }, '*')
+        activity.current?.({ tileId, type: 'load', count: 0 })
+        return
+      }
+
       if (msg.type === 'uploadPhoto') {
         // Store a tile's photo in the owner's Supabase Storage (same client the
         // sync layer uses). The sealed tile can't reach Supabase itself; the host

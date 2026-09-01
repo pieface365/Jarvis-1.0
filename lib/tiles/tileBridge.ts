@@ -21,6 +21,7 @@ const SHIM = `<script>
     else if (m.type === 'estimate:result') p.resolve(m.data);
     else if (m.type === 'identify:result') p.resolve(m.data);
     else if (m.type === 'style:result') p.resolve(m.data);
+    else if (m.type === 'syllabus:result') p.resolve(m.data);
     else if (m.type === 'upload:result') p.resolve(m.data);
     else if (m.type === 'save:ok') p.resolve(true);
     else if (m.type === 'save:error') p.reject(new Error(m.reason || 'save_failed'));
@@ -37,7 +38,7 @@ const SHIM = `<script>
         if (!pending[id]) return;
         delete pending[id];
         if (type === 'load') resolve([]);
-        else if (type === 'estimate' || type === 'identify' || type === 'uploadPhoto' || type === 'style') resolve({ ok: false, error: 'timeout' });
+        else if (type === 'estimate' || type === 'identify' || type === 'uploadPhoto' || type === 'style' || type === 'importSyllabus') resolve({ ok: false, error: 'timeout' });
         else reject(new Error('vitality_timeout'));
       }, timeoutMs || 8000);
     });
@@ -57,6 +58,11 @@ const SHIM = `<script>
        route (grounded with live web search) and returns outfit combinations +
        shopping gaps. Long timeout — grounded generation can take tens of seconds. */
     styleCloset: function (items, context, influencers) { return call('style', { items: items, context: context, influencers: influencers }, 90000); },
+    /* Syllabus import: the host relays one or more screenshots of a class
+       syllabus to the server's Gemini vision route, which returns the class
+       name + dated lectures / quizzes / exams / assignments. Long timeout —
+       multi-image extraction can take tens of seconds. */
+    importSyllabus: function (images) { return call('importSyllabus', { images: images }, 120000); },
     /* Upload a photo to the owner's cloud storage; resolves { ok, url } or an
        error so the tile can fall back to storing the image inline. */
     uploadPhoto: function (image) { return call('uploadPhoto', { image: image }, 90000); },
