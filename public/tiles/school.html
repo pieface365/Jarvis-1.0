@@ -575,6 +575,12 @@
     return (state.meetings||[]).filter(function(m){ return occursOn(m,dow,w); })
       .slice().sort(function(a,b){ return (a.start||'').localeCompare(b.start||''); });
   }
+  // one-time dated events (e.g. a mandatory make-up class on a specific date)
+  function eventsForDate(d){
+    var ds=isoOf(d);
+    return (state.events||[]).filter(function(e){ return e.date===ds; })
+      .slice().sort(function(a,b){ return (a.start||'').localeCompare(b.start||''); });
+  }
 
   function initCal(){ if(calSel===null) calSel = isoOf(todayMid()); }
 
@@ -599,7 +605,7 @@
   function gridRange(){
     var minM=8*60, maxM=18*60;
     function span(list){ list.forEach(function(m){ var s=toMin(m.start), e=toMin(m.end); if(s!=null) minM=Math.min(minM,s); if(e!=null) maxM=Math.max(maxM,e); }); }
-    if(showClasses) span(state.meetings||[]);
+    if(showClasses){ span(state.meetings||[]); span(state.events||[]); }
     if(showTraining) span(state.training||[]);
     var startH=Math.floor(minM/60); return { startH:startH, endH:Math.max(Math.ceil(maxM/60), startH+1) };
   }
@@ -611,6 +617,11 @@
       var s=toMin(m.start), e=toMin(m.end)||(s+60);
       blocks.push({ s:s, e:e, col:colorFor(m.name), name:esc(m.name), icon:'',
         meta:esc(fmtTime(m.start)+(m.end?'–'+fmtTime(m.end):'')+(m.room?' · '+m.room:'')), cls:'', act:'delmeet', id:m.id });
+    });
+    if(showClasses) eventsForDate(d).filter(function(ev){ return ev.start; }).forEach(function(ev){
+      var s=toMin(ev.start), e=toMin(ev.end)||(s+60), col=colorFor(ev.cls||ev.name);
+      blocks.push({ s:s, e:e, col:col, name:esc(ev.name||''), icon:'📌 ',
+        meta:esc(fmtTime(ev.start)+(ev.end?'–'+fmtTime(ev.end):'')+(ev.note?' · '+ev.note:'')), cls:'', act:'delevent', id:ev.id });
     });
     if(showTraining) trainingForDate(d).filter(function(t){ return t.start; }).forEach(function(t){
       var s=toMin(t.start), e=toMin(t.end)||(s+60), col=TRAIN_COL[t.kind]||'#a78bfa';
@@ -685,6 +696,7 @@
       if(day===null) return '<div class="calCell empty"></div>';
       var cd=new Date(Y,M,day), ds=Y+'-'+pad2(M+1)+'-'+pad2(day), dots=[];
       if(showClasses) meetingsForDate(cd).forEach(function(m){ dots.push(colorFor(m.name)); });
+      if(showClasses) eventsForDate(cd).forEach(function(e){ dots.push(colorFor(e.cls||e.name)); });
       if(showTraining) trainingForDate(cd).forEach(function(t){ dots.push(TRAIN_COL[t.kind]||'#a78bfa'); });
       (evts[ds]||[]).forEach(function(e){ dots.push(KIND_COL[e.kind]); });
       var dh=dots.slice(0,5).map(function(c){ return '<span class="dot" style="background:'+c+'"></span>'; }).join('');
@@ -722,6 +734,7 @@
   }
   function delMeeting(id){ state.meetings = state.meetings.filter(function(x){ return x.id!==id; }); persist(); renderSchedule(); }
   function delTraining(id){ state.training = state.training.filter(function(x){ return x.id!==id; }); persist(); renderSchedule(); }
+  function delEvent(id){ state.events = state.events.filter(function(x){ return x.id!==id; }); persist(); renderSchedule(); }
   function syncLayerChips(){ Array.prototype.forEach.call($('layerTog').children, function(b){ var l=b.getAttribute('data-layer'); b.classList.toggle('on', l==='classes'?showClasses:showTraining); }); }
 
   // ============ GRADES ============
@@ -1047,6 +1060,7 @@
     else if(act==='delgrade') delGrade(id);
     else if(act==='delmeet') delMeeting(id);
     else if(act==='deltrain') delTraining(id);
+    else if(act==='delevent') delEvent(id);
     else if(act==='ledit') editRow(b.getAttribute('data-src'), id);
     else if(act==='lsave') saveRow(b);
     else if(act==='lcancel'){ editingRow=null; renderLectures(); }
@@ -1066,7 +1080,7 @@
       if(saved && typeof saved==='object' && !Array.isArray(saved)) state = saved;
       else if(Array.isArray(saved)) state = { items: saved };
     } catch(e){}
-    if(!state.items) state.items=[]; if(!state.classes) state.classes=[]; if(!state.grades) state.grades=[]; if(!state.lectures) state.lectures=[]; if(!state.meetings) state.meetings=[]; if(!state.training) state.training=[];
+    if(!state.items) state.items=[]; if(!state.classes) state.classes=[]; if(!state.grades) state.grades=[]; if(!state.lectures) state.lectures=[]; if(!state.meetings) state.meetings=[]; if(!state.training) state.training=[]; if(!state.events) state.events=[];
     // One-time seed of Nishk's Fall 2026 weekly class schedule (recurring meetings).
     if(!state.seededSchedule){
       var SEED_MEETINGS=[
@@ -1080,44 +1094,32 @@
       SEED_MEETINGS.forEach(function(m){ state.meetings.push({ id:uid(), name:m[0], days:m[1], start:m[2], end:m[3], room:m[4] }); });
       state.seededSchedule = true; persist();
     }
-    // One-time seed of Nishk's training week, arranged around class + gym hours.
-    // Climb: Mon/Sun Rutgers wall, Wed Gravity Vault (Princeton), Fri Method
-    // (Newark), + first-Sat Rutgers. Lift Tue/Thu. days: JS getDay 1=Mon..6=Sat,0=Sun.
-    if(!state.seededTraining){
-      var SEED_TRAINING=[
-        ['climb','Climb — volume',[1],'19:00','21:00','Rutgers Wall'],
-        ['lift','Lift — Push',[2],'06:30','07:30','Chest/shoulder/tri'],
+    // Balanced training week, arranged around classes + gym hours. Rebuilt as
+    // one plan so it stays consistent. 3 climbs / 3 lifts, Tue = full rest.
+    // Climbing already trains pull/grip/core, so lifts are push + legs + delts
+    // (the physique goal), not more pulling. Climb: Wed Gravity Vault (Princeton),
+    // Fri Method (Newark), Sun Rutgers wall (open Sun 4–7 PM). Lift: Mon Push,
+    // Thu Legs, Sat Shoulders/arms. days: JS getDay 1=Mon..6=Sat, 0=Sun.
+    function buildTrainingPlan(){
+      return [
+        ['lift','Lift — Push',[1],'16:30','17:45','Chest · delts · triceps'],
         ['climb','Climb — project',[3],'18:30','20:30','Gravity Vault, Princeton'],
-        ['lift','Lift — Pull + Legs',[4],'12:00','13:30','Back/biceps + squat'],
+        ['lift','Lift — Legs + core',[4],'12:00','13:30','Quads · hams · abs'],
         ['climb','Climb — power',[5],'18:30','20:30','Method, Newark'],
-        ['climb','Climb — weekend project',[0],'16:00','18:00','Rutgers Wall']
-      ];
-      SEED_TRAINING.forEach(function(t){ state.training.push({ id:uid(), kind:t[0], name:t[1], days:t[2], start:t[3], end:t[4], note:t[5] }); });
-      state.training.push({ id:uid(), kind:'climb', name:'Climb — 1st Sat long', days:[6], weeks:[1], start:'15:00', end:'18:00', note:'Rutgers Wall · 1st Sat only' });
-      state.seededTraining = true; persist();
+        ['lift','Lift — Shoulders & arms',[6],'10:00','11:15','Capped delts · arms'],
+        ['climb','Climb — weekend',[0],'16:00','18:00','Rutgers Wall']
+      ].map(function(t){ return { id:uid(), kind:t[0], name:t[1], days:t[2], start:t[3], end:t[4], note:t[5] }; });
     }
-    // Migration: Wed + Fri climbs are night sessions (6:30–8:30 PM).
-    if(!state.trainingNightsV1){
-      (state.training||[]).forEach(function(t){
-        if(t.kind==='climb' && t.days && (t.days.indexOf(3)>=0 || t.days.indexOf(5)>=0)){ t.start='18:30'; t.end='20:30'; }
+    if(!state.seededTraining){ state.training = buildTrainingPlan(); state.seededTraining = true; persist(); }
+    // Rebalance existing installs to the 3-climb / 3-lift plan (supersedes the
+    // earlier night/venue seeds). Training layer only — classes/tasks untouched.
+    if(!state.trainingBalanceV1){ state.training = buildTrainingPlan(); state.trainingBalanceV1 = true; persist(); }
+    // One-time mandatory Gerontology evening sessions (specific dates, timed).
+    if(!state.seededGeroMandatory){
+      [['2026-10-08'],['2026-10-22']].forEach(function(d){
+        state.events.push({ id:uid(), cls:'Gerontology', name:'Gerontology — mandatory', date:d[0], start:'18:00', end:'19:30', note:'Mandatory attendance' });
       });
-      state.trainingNightsV1 = true; persist();
-    }
-    // Migration: real gyms + hours — Mon/Sun Rutgers (M–Th 6–10p, Sun 4–7p),
-    // Wed Gravity Vault, Fri Method; old Sat-morning climb → Sun evening; add
-    // the first-Saturday Rutgers long session (3–7p window).
-    if(!state.trainingVenuesV1){
-      (state.training||[]).forEach(function(t){
-        if(t.kind!=='climb' || !t.days) return;
-        if(t.days.indexOf(1)>=0){ t.start='19:00'; t.end='21:00'; t.note='Rutgers Wall'; }
-        else if(t.days.indexOf(3)>=0){ t.start='18:30'; t.end='20:30'; t.note='Gravity Vault, Princeton'; }
-        else if(t.days.indexOf(5)>=0){ t.start='18:30'; t.end='20:30'; t.note='Method, Newark'; }
-        else if(t.days.indexOf(6)>=0 && !t.weeks){ t.days=[0]; t.name='Climb — weekend project'; t.start='16:00'; t.end='18:00'; t.note='Rutgers Wall'; }
-      });
-      if(!(state.training||[]).some(function(t){ return t.weeks && t.weeks.indexOf(1)>=0; })){
-        state.training.push({ id:uid(), kind:'climb', name:'Climb — 1st Sat long', days:[6], weeks:[1], start:'15:00', end:'18:00', note:'Rutgers Wall · 1st Sat only' });
-      }
-      state.trainingVenuesV1 = true; persist();
+      state.seededGeroMandatory = true; persist();
     }
     refreshClasses(); renderTasks();
   })();
