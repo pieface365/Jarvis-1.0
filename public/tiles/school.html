@@ -128,6 +128,32 @@
   .classRoom{ font-family:var(--font-mono); font-size:10.5px; color:var(--muted); margin-top:2px; }
   .classTime{ font-family:var(--font-mono); font-size:12px; font-weight:600; color:var(--muted-strong); font-variant-numeric:tabular-nums; white-space:nowrap; }
 
+  /* Calendar */
+  .calHead{ display:flex; align-items:center; gap:8px; margin-bottom:var(--space-4); }
+  .calNav{ appearance:none; background:var(--surface); border:1px solid var(--border); color:var(--fg); width:38px; height:38px; border-radius:var(--radius-md); cursor:pointer; font-size:18px; line-height:1; transition:border-color var(--dur) var(--ease); }
+  .calNav:hover{ border-color:var(--border-strong); }
+  .calTitle{ flex:1; text-align:center; font-family:var(--font-display); font-weight:700; font-size:var(--text-lg); letter-spacing:-0.01em; }
+  .calTodayBtn{ appearance:none; background:transparent; border:1px solid var(--brand-line); color:var(--brand); border-radius:var(--radius-pill); padding:8px 14px; font-size:12px; font-weight:600; cursor:pointer; transition:background var(--dur) var(--ease); }
+  .calTodayBtn:hover{ background:var(--brand-soft); }
+  .calDow{ display:grid; grid-template-columns:repeat(7,1fr); gap:5px; margin-bottom:5px; }
+  .calDow span{ text-align:center; font-family:var(--font-mono); font-size:10px; letter-spacing:0.04em; text-transform:uppercase; color:var(--muted); }
+  .calGrid{ display:grid; grid-template-columns:repeat(7,1fr); gap:5px; }
+  .calCell{ appearance:none; text-align:left; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); min-height:54px; padding:5px 5px 4px; cursor:pointer; display:flex; flex-direction:column; gap:3px; transition:border-color var(--dur) var(--ease); }
+  .calCell:hover{ border-color:var(--border-strong); }
+  .calCell.empty{ background:transparent; border-color:transparent; cursor:default; }
+  .calCell .cd{ font-family:var(--font-mono); font-size:11.5px; color:var(--muted-strong); font-variant-numeric:tabular-nums; }
+  .calCell.today .cd{ color:var(--brand-ink); background:var(--brand); border-radius:6px; width:19px; height:19px; display:grid; place-items:center; font-weight:700; }
+  .calCell.selected{ border-color:var(--brand); box-shadow:0 0 0 1px var(--brand-line) inset; }
+  .calCell .dots{ display:flex; gap:3px; flex-wrap:wrap; margin-top:auto; }
+  .calCell .dot{ width:6px; height:6px; border-radius:50%; }
+  .calLegend{ display:flex; gap:14px; flex-wrap:wrap; margin-top:var(--space-4); font-family:var(--font-mono); font-size:10px; color:var(--muted); }
+  .calLegend span{ display:inline-flex; align-items:center; gap:6px; }
+  .calLegend i{ width:8px; height:8px; border-radius:50%; display:inline-block; }
+  .calDetail{ margin-top:var(--space-6); }
+  .calDetailHead{ font-family:var(--font-mono); font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted); margin-bottom:var(--space-3); padding-left:2px; }
+  .calEmpty{ color:var(--muted); font-size:var(--text-sm); padding:var(--space-3) 2px; }
+  .calDetail .tl .kind{ margin-right:2px; }
+
   /* Grades */
   .gpaHero{ display:flex; gap:var(--space-4); margin-bottom:var(--space-6); }
   .gpaCard{ flex:1; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:var(--space-5); text-align:center; }
@@ -266,37 +292,23 @@
       <div id="lectures"></div>
     </div>
 
-    <!-- ============ SCHEDULE ============ -->
+    <!-- ============ SCHEDULE (calendar) ============ -->
     <div id="panel-schedule" hidden>
-      <div class="add">
-        <div class="addGrid four">
-          <div class="field wide">
-            <label for="sName">Class</label>
-            <input id="sName" type="text" placeholder="e.g. AP Biology" maxlength="40" />
-          </div>
-          <div class="field">
-            <label for="sDay">Day</label>
-            <select id="sDay">
-              <option value="0">Monday</option><option value="1">Tuesday</option><option value="2">Wednesday</option>
-              <option value="3">Thursday</option><option value="4">Friday</option><option value="5">Saturday</option><option value="6">Sunday</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="sStart">Start</label>
-            <input id="sStart" type="time" />
-          </div>
-          <div class="field">
-            <label for="sEnd">End</label>
-            <input id="sEnd" type="time" />
-          </div>
-          <div class="field">
-            <label for="sRoom">Room / note</label>
-            <input id="sRoom" type="text" placeholder="Room 204 · Mr. Lee" maxlength="40" />
-          </div>
-        </div>
-        <div class="btnRow"><button class="btn" id="sAdd" type="button">Add class</button></div>
+      <div class="calHead">
+        <button class="calNav" id="calPrev" type="button" aria-label="Previous month">‹</button>
+        <div class="calTitle" id="calTitle"></div>
+        <button class="calNav" id="calNext" type="button" aria-label="Next month">›</button>
+        <button class="calTodayBtn" id="calToday" type="button">Today</button>
       </div>
-      <div id="schedule"></div>
+      <div class="calDow"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div>
+      <div class="calGrid" id="calGrid"></div>
+      <div class="calLegend">
+        <span><i style="background:#84848c"></i>Lecture</span>
+        <span><i style="background:#FBBF24"></i>Quiz</span>
+        <span><i style="background:#ff6b6b"></i>Exam</span>
+        <span><i style="background:#6EE7B7"></i>Assignment</span>
+      </div>
+      <div class="calDetail" id="calDetail"></div>
     </div>
 
     <!-- ============ GRADES ============ -->
@@ -452,32 +464,70 @@
     $('list').innerHTML=html;
   }
 
-  // ============ SCHEDULE ============
-  function addClass(){
-    var name=$('sName').value.trim(); if(!name){ $('sName').focus(); return; }
-    state.classes.push({ id:uid(), name:name, day:+$('sDay').value, start:$('sStart').value||'', end:$('sEnd').value||'', room:$('sRoom').value.trim() });
-    $('sName').value=''; $('sStart').value=''; $('sEnd').value=''; $('sRoom').value=''; $('sName').focus();
-    persist(); renderSchedule(); refreshClasses();
+  // ============ SCHEDULE (calendar of imported syllabus dates) ============
+  var calY = null, calM = null, calSel = null;
+  var KIND_COL = { lecture:'#84848c', quiz:'#FBBF24', exam:'#ff6b6b', assignment:'#6EE7B7' };
+  function pad2(n){ return (n<10?'0':'')+n; }
+  function isoOf(d){ return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()); }
+
+  function buildEvents(){
+    var map = {};
+    function add(date, ev){ if(date) (map[date]||(map[date]=[])).push(ev); }
+    state.lectures.forEach(function(l){ add(l.date, { kind:'lecture', title:l.title, cls:l.cls }); });
+    state.items.forEach(function(it){
+      if(!it.due) return; var k=(it.type||'').toLowerCase();
+      if(k==='quiz'||k==='exam'||k==='assignment') add(it.due, { kind:k, title:it.title, cls:it.subject });
+    });
+    return map;
   }
-  function delClass(id){ state.classes=state.classes.filter(function(x){return x.id!==id;}); persist(); renderSchedule(); }
-  function renderSchedule(){
-    if(!state.classes.length){ $('schedule').innerHTML='<div class="empty"><div class="big">No classes yet</div><div class="small">Add your weekly classes above to build your timetable.</div></div>'; return; }
-    var ti=todayIdx(), html='';
-    for(var d=0; d<7; d++){
-      var rows=state.classes.filter(function(c){return c.day===d;}).sort(function(a,b){return (a.start||'').localeCompare(b.start||'');});
-      if(!rows.length) continue;
-      html+='<div class="day"><div class="dayName"><span class="n">'+DAYS[d]+'</span>'+(d===ti?'<span class="today-pill">Today</span>':'')+'</div>';
-      html+=rows.map(function(c){
-        var col=colorFor(c.name);
-        var time=c.start?(fmtTime(c.start)+(c.end?' – '+fmtTime(c.end):'')):'';
-        return '<div class="classRow" style="border-left-color:'+col+'"><div class="classMain"><div class="className">'+esc(c.name)+'</div>'+(c.room?'<div class="classRoom">'+esc(c.room)+'</div>':'')+'</div>'
-          +(time?'<span class="classTime">'+esc(time)+'</span>':'')
-          +'<button class="del" data-act="delclass" data-id="'+c.id+'" aria-label="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></button></div>';
-      }).join('');
-      html+='</div>';
-    }
-    $('schedule').innerHTML = html || '<div class="empty"><div class="small">No classes scheduled.</div></div>';
+  function firstEventDate(){
+    var dates=[];
+    state.lectures.forEach(function(l){ if(l.date) dates.push(l.date); });
+    state.items.forEach(function(it){ if(it.due && /quiz|exam|assignment/.test((it.type||'').toLowerCase())) dates.push(it.due); });
+    if(!dates.length) return null;
+    dates.sort();
+    var t = isoOf(todayMid());
+    var up = dates.filter(function(d){ return d>=t; });
+    return up.length ? up[0] : dates[dates.length-1];
   }
+
+  function renderSchedule(){ // the calendar (kept the name so setTab wiring is unchanged)
+    if(calY===null){ var f=firstEventDate(); var d=f?parseDue(f):todayMid(); calY=d.getFullYear(); calM=d.getMonth(); if(calSel===null && f) calSel=f; }
+    var evts = buildEvents();
+    var first = new Date(calY, calM, 1);
+    var startDow = first.getDay();
+    var dim = new Date(calY, calM+1, 0).getDate();
+    var todayStr = isoOf(todayMid());
+    $('calTitle').textContent = first.toLocaleDateString('en-US',{ month:'long', year:'numeric' });
+    var cells=[]; for(var i=0;i<startDow;i++) cells.push(null);
+    for(var dd=1; dd<=dim; dd++) cells.push(dd);
+    while(cells.length%7!==0) cells.push(null);
+    $('calGrid').innerHTML = cells.map(function(day){
+      if(day===null) return '<div class="calCell empty"></div>';
+      var ds = calY+'-'+pad2(calM+1)+'-'+pad2(day);
+      var evs = evts[ds]||[];
+      var dots = evs.slice(0,4).map(function(e){ return '<span class="dot" style="background:'+KIND_COL[e.kind]+'"></span>'; }).join('');
+      var c='calCell'+(ds===todayStr?' today':'')+(ds===calSel?' selected':'');
+      return '<button type="button" class="'+c+'" data-date="'+ds+'"><span class="cd">'+day+'</span><span class="dots">'+dots+'</span></button>';
+    }).join('');
+    renderCalDetail(evts);
+  }
+  function renderCalDetail(evts){
+    var el=$('calDetail');
+    if(!calSel){ el.innerHTML=''; return; }
+    var d=parseDue(calSel);
+    var head=d?d.toLocaleDateString('en-US',{ weekday:'long', month:'long', day:'numeric' }):'';
+    var list=(evts||buildEvents())[calSel]||[];
+    el.innerHTML='<div class="calDetailHead">'+esc(head)+'</div>'
+      + (list.length ? list.map(function(e){
+          var col=colorFor(e.cls);
+          return '<div class="tl"><span class="kind '+e.kind+'">'+e.kind+'</span><span class="tlTitle">'+esc(e.title)+'</span>'
+            + (e.cls?'<span class="tag" style="color:'+col+';border-color:'+col+'55;background:'+col+'14">'+esc(e.cls)+'</span>':'')+'</div>';
+        }).join('')
+        : '<div class="calEmpty">No events this day.</div>');
+  }
+  function calGo(delta){ var d=new Date(calY, calM+delta, 1); calY=d.getFullYear(); calM=d.getMonth(); renderSchedule(); }
+  function calGoToday(){ var d=todayMid(); calY=d.getFullYear(); calM=d.getMonth(); calSel=isoOf(d); renderSchedule(); }
 
   // ============ GRADES ============
   function addGrade(){
@@ -747,7 +797,7 @@
   }
 
   // ---- tab switching ----
-  var SUBS={tasks:'Assignments &amp; deadlines', lectures:'Course lectures &amp; dates', schedule:'Weekly timetable', grades:'Class averages &amp; GPA'};
+  var SUBS={tasks:'Assignments &amp; deadlines', lectures:'Course lectures &amp; dates', schedule:'Semester calendar', grades:'Class averages &amp; GPA'};
   function setTab(t){
     tab=t;
     ['tasks','lectures','schedule','grades'].forEach(function(k){ $('panel-'+k).hidden = (k!==t); });
@@ -760,8 +810,10 @@
   $('addBtn').addEventListener('click', addTask);
   $('fTitle').addEventListener('keydown', function(e){ if(e.key==='Enter') addTask(); });
   $('fDue').addEventListener('keydown', function(e){ if(e.key==='Enter') addTask(); });
-  $('sAdd').addEventListener('click', addClass);
-  $('sRoom').addEventListener('keydown', function(e){ if(e.key==='Enter') addClass(); });
+  $('calPrev').addEventListener('click', function(){ calGo(-1); });
+  $('calNext').addEventListener('click', function(){ calGo(1); });
+  $('calToday').addEventListener('click', calGoToday);
+  $('calGrid').addEventListener('click', function(e){ var c=e.target.closest('.calCell'); if(!c||c.classList.contains('empty')) return; calSel=c.getAttribute('data-date'); renderSchedule(); });
   $('gAdd').addEventListener('click', addGrade);
   $('gTotal').addEventListener('keydown', function(e){ if(e.key==='Enter') addGrade(); });
 
@@ -778,7 +830,6 @@
     var id=b.getAttribute('data-id'), act=b.getAttribute('data-act');
     if(act==='toggle') toggleTask(id);
     else if(act==='del') delTask(id);
-    else if(act==='delclass') delClass(id);
     else if(act==='delgrade') delGrade(id);
     else if(act==='ledit') editRow(b.getAttribute('data-src'), id);
     else if(act==='lsave') saveRow(b);
