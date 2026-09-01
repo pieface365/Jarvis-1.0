@@ -155,20 +155,33 @@
   .dayToggles{ display:flex; flex-wrap:wrap; gap:6px; margin-top:var(--space-1); }
   .dayToggles button{ appearance:none; background:var(--surface-2); border:1px solid var(--border-strong); color:var(--muted); border-radius:var(--radius-pill); padding:7px 12px; font-size:12px; font-weight:600; cursor:pointer; transition:all var(--dur) var(--ease); }
   .dayToggles button.on{ background:var(--brand); color:var(--brand-ink); border-color:var(--brand); }
-  /* agenda rows (day + week views) */
-  .agRow{ display:flex; align-items:center; gap:var(--space-3); background:var(--surface); border:1px solid var(--border); border-left:3px solid var(--brand); border-radius:var(--radius-md); padding:10px var(--space-4); margin-bottom:var(--space-2); }
-  .agRow.event{ border-left-color:var(--border-strong); }
-  .agTime{ flex:none; width:118px; font-family:var(--font-mono); font-size:11.5px; font-weight:600; color:var(--muted-strong); font-variant-numeric:tabular-nums; }
-  .agMain{ flex:1; min-width:0; }
-  .agName{ font-size:var(--text-sm); font-weight:600; word-break:break-word; }
-  .agRoom{ font-family:var(--font-mono); font-size:10.5px; color:var(--muted); margin-top:2px; }
-  .agTitle{ flex:1; min-width:0; font-size:var(--text-sm); word-break:break-word; }
-  .wkDay{ margin-bottom:var(--space-5); }
-  .wkHead{ display:flex; align-items:baseline; gap:8px; margin-bottom:var(--space-2); padding-left:2px; }
-  .wkDow{ font-family:var(--font-display); font-weight:700; font-size:var(--text-sm); }
-  .wkDate{ font-family:var(--font-mono); font-size:11px; color:var(--muted); }
-  .wkHead.today .wkDow{ color:var(--brand); }
   .dayHead{ font-family:var(--font-mono); font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted); margin-bottom:var(--space-3); padding-left:2px; }
+  /* vertical time-grid (day + week) */
+  .tgAllday{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:var(--space-4); }
+  .evChip{ display:inline-flex; align-items:center; gap:7px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-pill); padding:4px 11px 4px 5px; font-size:12.5px; }
+  .tgScroll{ overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:6px; }
+  .tgHeadRow{ display:flex; gap:6px; margin-bottom:6px; width:max-content; }
+  .tgGutterHead{ width:52px; flex:none; }
+  .tgHead{ width:112px; flex:none; text-align:center; }
+  .tgHDow{ display:block; font-family:var(--font-mono); font-size:10px; letter-spacing:0.04em; text-transform:uppercase; color:var(--muted); }
+  .tgHDate{ display:block; font-family:var(--font-display); font-weight:700; font-size:15px; margin-top:1px; }
+  .tgHDots{ display:inline-flex; gap:3px; margin-top:3px; min-height:6px; }
+  .tgHead.today .tgHDow,.tgHead.today .tgHDate{ color:var(--brand); }
+  .tgWrap{ display:flex; gap:6px; width:100%; }
+  .tgScroll .tgWrap{ width:max-content; }
+  .tgGutter{ position:relative; width:52px; flex:none; }
+  .tgHr{ position:absolute; right:8px; transform:translateY(-50%); font-family:var(--font-mono); font-size:10px; color:var(--muted); white-space:nowrap; }
+  .tgCols{ display:flex; gap:6px; }
+  .tgCols.one{ flex:1; }
+  .tgCols.one .tgCol{ flex:1; }
+  .tgCols.week .tgCol{ width:112px; flex:none; }
+  .tgCol{ position:relative; border:1px solid var(--border); border-radius:var(--radius-sm); }
+  .tgBlock{ position:absolute; left:3px; right:3px; border:1px solid var(--border); border-left-width:3px; border-radius:7px; padding:5px 8px; overflow:hidden; display:flex; flex-direction:column; gap:1px; }
+  .tgName{ font-size:12px; font-weight:600; line-height:1.15; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tgMeta{ font-family:var(--font-mono); font-size:9.5px; color:var(--muted-strong); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tgDel{ position:absolute; top:2px; right:2px; appearance:none; background:transparent; border:0; color:var(--muted); cursor:pointer; padding:3px; border-radius:5px; opacity:.65; }
+  .tgDel svg{ width:13px; height:13px; }
+  .tgDel:hover{ color:var(--neg); opacity:1; }
 
   /* Grades */
   .gpaHero{ display:flex; gap:var(--space-4); margin-bottom:var(--space-6); }
@@ -539,33 +552,48 @@
     else renderWeek(d);
   }
 
-  // one agenda block: recurring class meetings (timed) + syllabus events (untimed) for a date
-  function agendaFor(d, evts){
-    var ds=isoOf(d), ms=meetingsForDow(d.getDay()), es=evts[ds]||[];
-    if(!ms.length && !es.length) return '<div class="calEmpty">No classes or events.</div>';
-    var html = ms.map(function(m){ var col=colorFor(m.name);
-      var t = m.start ? (fmtTime(m.start)+(m.end?'–'+fmtTime(m.end):'')) : '';
-      return '<div class="agRow" style="border-left-color:'+col+'"><span class="agTime">'+esc(t)+'</span>'
-        +'<div class="agMain"><div class="agName">'+esc(m.name)+'</div>'+(m.room?'<div class="agRoom">'+esc(m.room)+'</div>':'')+'</div>'
-        +'<button class="del" data-act="delmeet" data-id="'+m.id+'" aria-label="Remove class">'+delSvg+'</button></div>';
-    }).join('');
-    html += es.map(function(e){ var col=colorFor(e.cls);
-      return '<div class="agRow event"><span class="kind '+e.kind+'">'+e.kind+'</span><span class="agTitle">'+esc(e.title)+'</span>'
-        +(e.cls?'<span class="tag" style="color:'+col+';border-color:'+col+'55;background:'+col+'14">'+esc(e.cls)+'</span>':'')+'</div>';
-    }).join('');
-    return html;
+  // ---- vertical time-grid (Day + Week views) ----
+  var HOUR_PX = 54;
+  function toMin(t){ if(!t) return null; var p=String(t).split(':'); if(p.length<2) return null; return (+p[0])*60+(+p[1]); }
+  function fmtHour(h){ var ap=h>=12?'PM':'AM'; var hr=h%12; if(hr===0) hr=12; return hr+' '+ap; }
+  function gridRange(){
+    var minM=8*60, maxM=18*60;
+    state.meetings.forEach(function(m){ var s=toMin(m.start), e=toMin(m.end); if(s!=null) minM=Math.min(minM,s); if(e!=null) maxM=Math.max(maxM,e); });
+    var startH=Math.floor(minM/60); return { startH:startH, endH:Math.max(Math.ceil(maxM/60), startH+1) };
   }
+  function hourLabels(r){ var s=''; for(var h=r.startH; h<=r.endH; h++) s+='<span class="tgHr" style="top:'+((h-r.startH)*HOUR_PX)+'px">'+fmtHour(h)+'</span>'; return s; }
+  function gridBg(){ return 'background-image:repeating-linear-gradient(to bottom, transparent 0, transparent '+(HOUR_PX-1)+'px, rgba(150,220,190,.06) '+(HOUR_PX-1)+'px, rgba(150,220,190,.06) '+HOUR_PX+'px);'; }
+  function colBlocks(d, r){
+    return meetingsForDow(d.getDay()).filter(function(m){ return m.start; }).map(function(m){
+      var col=colorFor(m.name), s=toMin(m.start), e=toMin(m.end)||(s+60);
+      var top=(s-r.startH*60)/60*HOUR_PX, hgt=Math.max(30,(e-s)/60*HOUR_PX);
+      var t=fmtTime(m.start)+(m.end?'–'+fmtTime(m.end):'');
+      return '<div class="tgBlock" style="top:'+top+'px;height:'+hgt+'px;border-left-color:'+col+';background:'+col+'22">'
+        +'<span class="tgName">'+esc(m.name)+'</span><span class="tgMeta">'+esc(t)+(m.room?' · '+esc(m.room):'')+'</span>'
+        +'<button class="tgDel" data-act="delmeet" data-id="'+m.id+'" aria-label="Remove">'+delSvg+'</button></div>';
+    }).join('');
+  }
+  function chipHtml(e){ var col=colorFor(e.cls); return '<span class="evChip"><span class="kind '+e.kind+'">'+e.kind+'</span>'+esc(e.title)+(e.cls?' <b style="color:'+col+';font-weight:600">'+esc(e.cls)+'</b>':'')+'</span>'; }
 
   function renderDay(d){
-    var evts=buildEvents();
-    $('calBody').innerHTML = '<div class="dayHead">'+esc(d.toLocaleDateString('en-US',{weekday:'long', month:'long', day:'numeric'}))+'</div>' + agendaFor(d, evts);
+    var r=gridRange(), h=(r.endH-r.startH)*HOUR_PX, evts=buildEvents(), ds=isoOf(d);
+    var un=evts[ds]||[]; var allday = un.length?'<div class="tgAllday">'+un.map(chipHtml).join('')+'</div>':'';
+    $('calBody').innerHTML = '<div class="dayHead">'+esc(d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}))+'</div>'
+      + allday
+      + '<div class="tgWrap"><div class="tgGutter" style="height:'+h+'px">'+hourLabels(r)+'</div>'
+      + '<div class="tgCols one"><div class="tgCol" style="height:'+h+'px;'+gridBg()+'">'+colBlocks(d,r)+'</div></div></div>';
   }
   function renderWeek(d){
-    var mon=weekStart(d), evts=buildEvents(), todayStr=isoOf(todayMid()), html='';
+    var mon=weekStart(d), r=gridRange(), h=(r.endH-r.startH)*HOUR_PX, evts=buildEvents(), todayStr=isoOf(todayMid());
+    var heads='', cols='';
     for(var i=0;i<7;i++){ var dd=new Date(mon); dd.setDate(mon.getDate()+i); var isT=isoOf(dd)===todayStr;
-      html += '<div class="wkDay"><div class="wkHead'+(isT?' today':'')+'"><span class="wkDow">'+dd.toLocaleDateString('en-US',{weekday:'short'})+'</span><span class="wkDate">'+dd.toLocaleDateString('en-US',{month:'short',day:'numeric'})+'</span></div>'+agendaFor(dd, evts)+'</div>';
+      var un=evts[isoOf(dd)]||[];
+      var dots=un.slice(0,4).map(function(e){ return '<span class="dot" style="background:'+KIND_COL[e.kind]+'"></span>'; }).join('');
+      heads += '<div class="tgHead'+(isT?' today':'')+'"><span class="tgHDow">'+dd.toLocaleDateString('en-US',{weekday:'short'})+'</span><span class="tgHDate">'+dd.getDate()+'</span><span class="tgHDots">'+dots+'</span></div>';
+      cols += '<div class="tgCol" style="height:'+h+'px;'+gridBg()+'">'+colBlocks(dd,r)+'</div>';
     }
-    $('calBody').innerHTML = html;
+    $('calBody').innerHTML = '<div class="tgScroll"><div class="tgHeadRow"><div class="tgGutterHead"></div>'+heads+'</div>'
+      + '<div class="tgWrap"><div class="tgGutter" style="height:'+h+'px">'+hourLabels(r)+'</div><div class="tgCols week">'+cols+'</div></div></div>';
   }
   function renderMonth(anchor){
     var Y=anchor.getFullYear(), M=anchor.getMonth(), evts=buildEvents();
