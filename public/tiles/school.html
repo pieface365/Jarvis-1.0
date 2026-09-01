@@ -170,7 +170,12 @@
   .kind.assignment{ color:var(--brand); border-color:var(--brand-line); background:var(--brand-soft); }
   .rowbtn{ flex:none; appearance:none; background:transparent; border:0; color:var(--muted); cursor:pointer; padding:5px 8px; border-radius:7px; font-size:14px; line-height:1; transition:all var(--dur) var(--ease); }
   .rowbtn:hover{ color:var(--brand); background:var(--brand-soft); }
-  .courseHead.editing{ flex-wrap:wrap; gap:8px; }
+  .rowbtn.danger:hover{ color:var(--neg); background:var(--neg-soft); }
+  .rowbtn.danger svg{ width:15px; height:15px; }
+  .courseHead.editing,.courseHead.deleting{ flex-wrap:wrap; gap:8px; }
+  .courseHead .delMsg{ flex:1; min-width:180px; font-size:var(--text-sm); color:var(--muted-strong); }
+  .btn.danger{ background:var(--neg); color:#160404; }
+  .btn.danger:hover{ filter:brightness(1.05); }
   .courseHead .edCourse{ flex:1; min-width:180px; padding:9px 11px; font-weight:600; font-size:var(--text-base); }
   .tl.editing{ flex-wrap:wrap; gap:8px; }
   .tl .edTitle{ flex:1; min-width:150px; padding:9px 11px; }
@@ -522,6 +527,7 @@
   // ============ LECTURES (course timeline) ============
   var editingRow = null; // { src:'lecture'|'item', id }
   var editingCourse = null; // class name being renamed
+  var deletingCourse = null; // class name pending delete-confirm
   var delSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>';
 
   function renderLectures(){
@@ -559,11 +565,27 @@
         + '<button class="btn sub small" data-act="ccancel" type="button">Cancel</button>'
         + '</div>';
     }
+    if(deletingCourse===n){
+      return '<div class="courseHead deleting">'
+        + '<span class="delMsg">Delete “'+esc(n)+'” and everything under it?</span>'
+        + '<button class="btn danger small" data-act="cdel" data-cls="'+esc(n)+'" type="button">Delete</button>'
+        + '<button class="btn sub small" data-act="cdelno" type="button">Cancel</button>'
+        + '</div>';
+    }
     return '<div class="courseHead">'
       + '<span class="courseName" style="color:'+col+'">'+esc(n)+'</span>'
       + '<button class="rowbtn" data-act="cedit" data-cls="'+esc(n)+'" aria-label="Rename class">✎</button>'
+      + '<button class="rowbtn danger" data-act="cdelask" data-cls="'+esc(n)+'" aria-label="Delete class">'+delSvg+'</button>'
       + '<span class="courseCount">'+lc+' lectures</span>'
       + '</div>';
+  }
+  function deleteCourse(name){
+    deletingCourse = null;
+    state.lectures = state.lectures.filter(function(l){ return l.cls!==name; });
+    state.items = state.items.filter(function(it){ return it.subject!==name; });
+    state.grades = state.grades.filter(function(g){ return g.cls!==name; });
+    state.classes = state.classes.filter(function(c){ return c.name!==name; });
+    persist(); refreshClasses(); renderLectures();
   }
   function renameCourse(oldName, newName){
     newName = (newName||'').trim();
@@ -745,9 +767,12 @@
     else if(act==='lsave') saveRow(b);
     else if(act==='lcancel'){ editingRow=null; renderLectures(); }
     else if(act==='ldel') delRow(b.getAttribute('data-src'), id);
-    else if(act==='cedit'){ editingCourse=b.getAttribute('data-cls'); renderLectures(); }
+    else if(act==='cedit'){ editingCourse=b.getAttribute('data-cls'); deletingCourse=null; renderLectures(); }
     else if(act==='csave'){ renameCourse(b.getAttribute('data-cls'), b.closest('.courseHead').querySelector('.edCourse').value); }
     else if(act==='ccancel'){ editingCourse=null; renderLectures(); }
+    else if(act==='cdelask'){ deletingCourse=b.getAttribute('data-cls'); editingCourse=null; renderLectures(); }
+    else if(act==='cdel'){ deleteCourse(b.getAttribute('data-cls')); }
+    else if(act==='cdelno'){ deletingCourse=null; renderLectures(); }
   });
 
   // ---- boot ----
