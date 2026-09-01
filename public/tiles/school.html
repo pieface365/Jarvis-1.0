@@ -168,6 +168,12 @@
   .kind.quiz{ color:var(--warn); border-color:var(--warn-line); background:var(--warn-soft); }
   .kind.exam{ color:var(--neg); border-color:var(--neg-line); background:var(--neg-soft); }
   .kind.assignment{ color:var(--brand); border-color:var(--brand-line); background:var(--brand-soft); }
+  .rowbtn{ flex:none; appearance:none; background:transparent; border:0; color:var(--muted); cursor:pointer; padding:5px 8px; border-radius:7px; font-size:14px; line-height:1; transition:all var(--dur) var(--ease); }
+  .rowbtn:hover{ color:var(--brand); background:var(--brand-soft); }
+  .tl.editing{ flex-wrap:wrap; gap:8px; }
+  .tl .edTitle{ flex:1; min-width:150px; padding:9px 11px; }
+  .tl .edDate{ flex:none; width:150px; padding:9px 11px; font-family:var(--font-mono); }
+  .btn.small{ padding:9px 15px; font-size:12.5px; }
 
   /* Overlays */
   .overlay{ position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center; padding:var(--space-5); background:rgba(3,3,4,0.78); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); }
@@ -512,17 +518,18 @@
   }
 
   // ============ LECTURES (course timeline) ============
+  var editingRow = null; // { src:'lecture'|'item', id }
+  var delSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>';
+
   function renderLectures(){
     // Build a per-class timeline from lectures + the dated quiz/exam/assignment tasks.
     var byClass = {};
     function ensure(c){ return byClass[c] || (byClass[c] = []); }
-    state.lectures.forEach(function(l){ if(l.cls) ensure(l.cls).push({ date:l.date, title:l.title, kind:'lecture' }); });
+    state.lectures.forEach(function(l){ if(l.cls) ensure(l.cls).push({ src:'lecture', id:l.id, date:l.date, title:l.title, kind:'lecture' }); });
     state.items.forEach(function(it){
       if(!it.subject || !it.due) return;
       var t=(it.type||'').toLowerCase();
-      if(t==='quiz') ensure(it.subject).push({ date:it.due, title:it.title, kind:'quiz' });
-      else if(t==='exam') ensure(it.subject).push({ date:it.due, title:it.title, kind:'exam' });
-      else if(t==='assignment') ensure(it.subject).push({ date:it.due, title:it.title, kind:'assignment' });
+      if(t==='quiz'||t==='exam'||t==='assignment') ensure(it.subject).push({ src:'item', id:it.id, date:it.due, title:it.title, kind:t });
     });
     var names = Object.keys(byClass);
     if(!names.length){
@@ -536,12 +543,51 @@
       var rows = byClass[n].slice().sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
       var lc = rows.filter(function(r){return r.kind==='lecture';}).length;
       return '<div class="courseCard"><div class="courseHead"><span class="courseName" style="color:'+col+'">'+esc(n)+'</span><span class="courseCount">'+lc+' lectures</span></div>'
-        + rows.map(function(r){
-            var past = parseDue(r.date) && parseDue(r.date).getTime() < todayS;
-            return '<div class="tl"><span class="tlDate'+(past?' past':'')+'">'+esc(fmtDate(r.date))+'</span><span class="tlTitle">'+esc(r.title)+'</span><span class="kind '+r.kind+'">'+r.kind+'</span></div>';
-          }).join('')
+        + rows.map(function(r){ return rowHtml(r, todayS); }).join('')
         + '</div>';
     }).join('');
+  }
+
+  function rowHtml(r, todayS){
+    if(editingRow && editingRow.src===r.src && editingRow.id===r.id){
+      return '<div class="tl editing">'
+        + '<input class="edTitle" type="text" value="'+esc(r.title)+'" maxlength="160" />'
+        + '<input class="edDate" type="date" value="'+esc(r.date)+'" />'
+        + '<button class="btn small" data-act="lsave" data-src="'+r.src+'" data-id="'+r.id+'" type="button">Save</button>'
+        + '<button class="btn sub small" data-act="lcancel" type="button">Cancel</button>'
+        + '</div>';
+    }
+    var past = parseDue(r.date) && parseDue(r.date).getTime() < todayS;
+    return '<div class="tl">'
+      + '<span class="tlDate'+(past?' past':'')+'">'+esc(fmtDate(r.date))+'</span>'
+      + '<span class="tlTitle">'+esc(r.title)+'</span>'
+      + '<span class="kind '+r.kind+'">'+r.kind+'</span>'
+      + '<button class="rowbtn" data-act="ledit" data-src="'+r.src+'" data-id="'+r.id+'" aria-label="Edit">✎</button>'
+      + '<button class="del" data-act="ldel" data-src="'+r.src+'" data-id="'+r.id+'" aria-label="Delete">'+delSvg+'</button>'
+      + '</div>';
+  }
+
+  function findRow(src, id){
+    return src==='lecture'
+      ? state.lectures.find(function(x){ return x.id===id; })
+      : state.items.find(function(x){ return x.id===id; });
+  }
+  function editRow(src, id){ editingRow = { src:src, id:id }; renderLectures(); }
+  function saveRow(btn){
+    var wrap = btn.closest('.tl'); if(!wrap) return;
+    var title = wrap.querySelector('.edTitle').value.trim();
+    var date = wrap.querySelector('.edDate').value;
+    var r = findRow(btn.getAttribute('data-src'), btn.getAttribute('data-id'));
+    if(r && title){
+      r.title = title;
+      if(btn.getAttribute('data-src')==='lecture') r.date = date; else r.due = date;
+    }
+    editingRow = null; persist(); refreshClasses(); renderLectures();
+  }
+  function delRow(src, id){
+    if(src==='lecture') state.lectures = state.lectures.filter(function(x){ return x.id!==id; });
+    else state.items = state.items.filter(function(x){ return x.id!==id; });
+    editingRow = null; persist(); refreshClasses(); renderLectures();
   }
 
   // ============ IMPORT SYLLABUS ============
@@ -665,6 +711,10 @@
     else if(act==='del') delTask(id);
     else if(act==='delclass') delClass(id);
     else if(act==='delgrade') delGrade(id);
+    else if(act==='ledit') editRow(b.getAttribute('data-src'), id);
+    else if(act==='lsave') saveRow(b);
+    else if(act==='lcancel'){ editingRow=null; renderLectures(); }
+    else if(act==='ldel') delRow(b.getAttribute('data-src'), id);
   });
 
   // ---- boot ----
