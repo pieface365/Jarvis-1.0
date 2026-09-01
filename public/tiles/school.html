@@ -149,10 +149,26 @@
   .calLegend{ display:flex; gap:14px; flex-wrap:wrap; margin-top:var(--space-4); font-family:var(--font-mono); font-size:10px; color:var(--muted); }
   .calLegend span{ display:inline-flex; align-items:center; gap:6px; }
   .calLegend i{ width:8px; height:8px; border-radius:50%; display:inline-block; }
-  .calDetail{ margin-top:var(--space-6); }
-  .calDetailHead{ font-family:var(--font-mono); font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted); margin-bottom:var(--space-3); padding-left:2px; }
   .calEmpty{ color:var(--muted); font-size:var(--text-sm); padding:var(--space-3) 2px; }
-  .calDetail .tl .kind{ margin-right:2px; }
+  .calTop{ display:flex; align-items:center; justify-content:space-between; gap:var(--space-3); margin-bottom:var(--space-4); }
+  .btn.ghost.small{ padding:8px 14px; font-size:12.5px; }
+  .dayToggles{ display:flex; flex-wrap:wrap; gap:6px; margin-top:var(--space-1); }
+  .dayToggles button{ appearance:none; background:var(--surface-2); border:1px solid var(--border-strong); color:var(--muted); border-radius:var(--radius-pill); padding:7px 12px; font-size:12px; font-weight:600; cursor:pointer; transition:all var(--dur) var(--ease); }
+  .dayToggles button.on{ background:var(--brand); color:var(--brand-ink); border-color:var(--brand); }
+  /* agenda rows (day + week views) */
+  .agRow{ display:flex; align-items:center; gap:var(--space-3); background:var(--surface); border:1px solid var(--border); border-left:3px solid var(--brand); border-radius:var(--radius-md); padding:10px var(--space-4); margin-bottom:var(--space-2); }
+  .agRow.event{ border-left-color:var(--border-strong); }
+  .agTime{ flex:none; width:118px; font-family:var(--font-mono); font-size:11.5px; font-weight:600; color:var(--muted-strong); font-variant-numeric:tabular-nums; }
+  .agMain{ flex:1; min-width:0; }
+  .agName{ font-size:var(--text-sm); font-weight:600; word-break:break-word; }
+  .agRoom{ font-family:var(--font-mono); font-size:10.5px; color:var(--muted); margin-top:2px; }
+  .agTitle{ flex:1; min-width:0; font-size:var(--text-sm); word-break:break-word; }
+  .wkDay{ margin-bottom:var(--space-5); }
+  .wkHead{ display:flex; align-items:baseline; gap:8px; margin-bottom:var(--space-2); padding-left:2px; }
+  .wkDow{ font-family:var(--font-display); font-weight:700; font-size:var(--text-sm); }
+  .wkDate{ font-family:var(--font-mono); font-size:11px; color:var(--muted); }
+  .wkHead.today .wkDow{ color:var(--brand); }
+  .dayHead{ font-family:var(--font-mono); font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted); margin-bottom:var(--space-3); padding-left:2px; }
 
   /* Grades */
   .gpaHero{ display:flex; gap:var(--space-4); margin-bottom:var(--space-6); }
@@ -294,21 +310,41 @@
 
     <!-- ============ SCHEDULE (calendar) ============ -->
     <div id="panel-schedule" hidden>
+      <div class="calTop">
+        <div class="seg" id="calViews">
+          <button class="segBtn" data-v="day" type="button">Day</button>
+          <button class="segBtn on" data-v="week" type="button">Week</button>
+          <button class="segBtn" data-v="month" type="button">Month</button>
+        </div>
+        <button class="btn ghost small" id="addClassBtn" type="button">＋ Class</button>
+      </div>
+
+      <div class="add" id="addClassForm" hidden>
+        <div class="addGrid four">
+          <div class="field wide"><label for="mName">Class</label><input id="mName" type="text" list="classes" placeholder="e.g. Cannabis in Pharmacy" maxlength="60" /></div>
+          <div class="field"><label for="mStart">Start</label><input id="mStart" type="time" /></div>
+          <div class="field"><label for="mEnd">End</label><input id="mEnd" type="time" /></div>
+          <div class="field"><label for="mRoom">Room / note</label><input id="mRoom" type="text" placeholder="PH-130" maxlength="40" /></div>
+        </div>
+        <div class="dayToggles" id="mDays">
+          <button data-d="1" type="button">Mon</button><button data-d="2" type="button">Tue</button><button data-d="3" type="button">Wed</button><button data-d="4" type="button">Thu</button><button data-d="5" type="button">Fri</button><button data-d="6" type="button">Sat</button><button data-d="0" type="button">Sun</button>
+        </div>
+        <div class="btnRow"><button class="btn sub small" id="mCancel" type="button">Cancel</button><button class="btn small" id="mAdd" type="button">Add class</button></div>
+      </div>
+
       <div class="calHead">
-        <button class="calNav" id="calPrev" type="button" aria-label="Previous month">‹</button>
+        <button class="calNav" id="calPrev" type="button" aria-label="Previous">‹</button>
         <div class="calTitle" id="calTitle"></div>
-        <button class="calNav" id="calNext" type="button" aria-label="Next month">›</button>
+        <button class="calNav" id="calNext" type="button" aria-label="Next">›</button>
         <button class="calTodayBtn" id="calToday" type="button">Today</button>
       </div>
-      <div class="calDow"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div>
-      <div class="calGrid" id="calGrid"></div>
+      <div id="calBody"></div>
       <div class="calLegend">
         <span><i style="background:#84848c"></i>Lecture</span>
         <span><i style="background:#FBBF24"></i>Quiz</span>
         <span><i style="background:#ff6b6b"></i>Exam</span>
         <span><i style="background:#6EE7B7"></i>Assignment</span>
       </div>
-      <div class="calDetail" id="calDetail"></div>
     </div>
 
     <!-- ============ GRADES ============ -->
@@ -422,6 +458,7 @@
     state.items.forEach(function(it){ if(it.subject) subs[it.subject]=1; });
     state.grades.forEach(function(g){ if(g.cls) subs[g.cls]=1; });
     state.lectures.forEach(function(l){ if(l.cls) subs[l.cls]=1; });
+    (state.meetings||[]).forEach(function(m){ if(m.name) subs[m.name]=1; });
     $('classes').innerHTML = Object.keys(subs).map(function(s){ return '<option value="'+esc(s)+'">'; }).join('');
   }
   function fmtDate(s){ var d=parseDue(s); return d?d.toLocaleDateString('en-US',{month:'short',day:'numeric'}):''; }
@@ -464,11 +501,12 @@
     $('list').innerHTML=html;
   }
 
-  // ============ SCHEDULE (calendar of imported syllabus dates) ============
-  var calY = null, calM = null, calSel = null;
+  // ============ SCHEDULE (Day / Week / Month calendar) ============
+  var calView = 'week', calSel = null;
   var KIND_COL = { lecture:'#84848c', quiz:'#FBBF24', exam:'#ff6b6b', assignment:'#6EE7B7' };
   function pad2(n){ return (n<10?'0':'')+n; }
   function isoOf(d){ return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()); }
+  function weekStart(d){ var x=new Date(d); var dow=x.getDay(); x.setDate(x.getDate()+(dow===0?-6:1-dow)); x.setHours(0,0,0,0); return x; } // Monday
 
   function buildEvents(){
     var map = {};
@@ -480,54 +518,93 @@
     });
     return map;
   }
-  function firstEventDate(){
-    var dates=[];
-    state.lectures.forEach(function(l){ if(l.date) dates.push(l.date); });
-    state.items.forEach(function(it){ if(it.due && /quiz|exam|assignment/.test((it.type||'').toLowerCase())) dates.push(it.due); });
-    if(!dates.length) return null;
-    dates.sort();
-    var t = isoOf(todayMid());
-    var up = dates.filter(function(d){ return d>=t; });
-    return up.length ? up[0] : dates[dates.length-1];
+  function meetingsForDow(dow){
+    return state.meetings.filter(function(m){ return m.days && m.days.indexOf(dow)>=0; })
+      .slice().sort(function(a,b){ return (a.start||'').localeCompare(b.start||''); });
   }
 
-  function renderSchedule(){ // the calendar (kept the name so setTab wiring is unchanged)
-    if(calY===null){ var f=firstEventDate(); var d=f?parseDue(f):todayMid(); calY=d.getFullYear(); calM=d.getMonth(); if(calSel===null && f) calSel=f; }
-    var evts = buildEvents();
-    var first = new Date(calY, calM, 1);
-    var startDow = first.getDay();
-    var dim = new Date(calY, calM+1, 0).getDate();
-    var todayStr = isoOf(todayMid());
-    $('calTitle').textContent = first.toLocaleDateString('en-US',{ month:'long', year:'numeric' });
+  function initCal(){ if(calSel===null) calSel = isoOf(todayMid()); }
+
+  function renderSchedule(){ // dispatch by view (name kept so setTab wiring is unchanged)
+    initCal();
+    Array.prototype.forEach.call($('calViews').children, function(b){ b.classList.toggle('on', b.getAttribute('data-v')===calView); });
+    var d = parseDue(calSel);
+    if(calView==='month') $('calTitle').textContent = d.toLocaleDateString('en-US',{ month:'long', year:'numeric' });
+    else if(calView==='day') $('calTitle').textContent = d.toLocaleDateString('en-US',{ weekday:'long', month:'long', day:'numeric' });
+    else { var mon=weekStart(d), sun=new Date(mon); sun.setDate(mon.getDate()+6);
+      var sm=mon.getMonth()===sun.getMonth();
+      $('calTitle').textContent = mon.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' – '+sun.toLocaleDateString('en-US', sm?{day:'numeric'}:{month:'short',day:'numeric'}); }
+    if(calView==='month') renderMonth(d);
+    else if(calView==='day') renderDay(d);
+    else renderWeek(d);
+  }
+
+  // one agenda block: recurring class meetings (timed) + syllabus events (untimed) for a date
+  function agendaFor(d, evts){
+    var ds=isoOf(d), ms=meetingsForDow(d.getDay()), es=evts[ds]||[];
+    if(!ms.length && !es.length) return '<div class="calEmpty">No classes or events.</div>';
+    var html = ms.map(function(m){ var col=colorFor(m.name);
+      var t = m.start ? (fmtTime(m.start)+(m.end?'–'+fmtTime(m.end):'')) : '';
+      return '<div class="agRow" style="border-left-color:'+col+'"><span class="agTime">'+esc(t)+'</span>'
+        +'<div class="agMain"><div class="agName">'+esc(m.name)+'</div>'+(m.room?'<div class="agRoom">'+esc(m.room)+'</div>':'')+'</div>'
+        +'<button class="del" data-act="delmeet" data-id="'+m.id+'" aria-label="Remove class">'+delSvg+'</button></div>';
+    }).join('');
+    html += es.map(function(e){ var col=colorFor(e.cls);
+      return '<div class="agRow event"><span class="kind '+e.kind+'">'+e.kind+'</span><span class="agTitle">'+esc(e.title)+'</span>'
+        +(e.cls?'<span class="tag" style="color:'+col+';border-color:'+col+'55;background:'+col+'14">'+esc(e.cls)+'</span>':'')+'</div>';
+    }).join('');
+    return html;
+  }
+
+  function renderDay(d){
+    var evts=buildEvents();
+    $('calBody').innerHTML = '<div class="dayHead">'+esc(d.toLocaleDateString('en-US',{weekday:'long', month:'long', day:'numeric'}))+'</div>' + agendaFor(d, evts);
+  }
+  function renderWeek(d){
+    var mon=weekStart(d), evts=buildEvents(), todayStr=isoOf(todayMid()), html='';
+    for(var i=0;i<7;i++){ var dd=new Date(mon); dd.setDate(mon.getDate()+i); var isT=isoOf(dd)===todayStr;
+      html += '<div class="wkDay"><div class="wkHead'+(isT?' today':'')+'"><span class="wkDow">'+dd.toLocaleDateString('en-US',{weekday:'short'})+'</span><span class="wkDate">'+dd.toLocaleDateString('en-US',{month:'short',day:'numeric'})+'</span></div>'+agendaFor(dd, evts)+'</div>';
+    }
+    $('calBody').innerHTML = html;
+  }
+  function renderMonth(anchor){
+    var Y=anchor.getFullYear(), M=anchor.getMonth(), evts=buildEvents();
+    var first=new Date(Y,M,1), startDow=first.getDay(), dim=new Date(Y,M+1,0).getDate(), todayStr=isoOf(todayMid());
     var cells=[]; for(var i=0;i<startDow;i++) cells.push(null);
     for(var dd=1; dd<=dim; dd++) cells.push(dd);
     while(cells.length%7!==0) cells.push(null);
-    $('calGrid').innerHTML = cells.map(function(day){
+    var grid = cells.map(function(day){
       if(day===null) return '<div class="calCell empty"></div>';
-      var ds = calY+'-'+pad2(calM+1)+'-'+pad2(day);
-      var evs = evts[ds]||[];
-      var dots = evs.slice(0,4).map(function(e){ return '<span class="dot" style="background:'+KIND_COL[e.kind]+'"></span>'; }).join('');
+      var ds=Y+'-'+pad2(M+1)+'-'+pad2(day), dow=new Date(Y,M,day).getDay(), dots=[];
+      meetingsForDow(dow).forEach(function(m){ dots.push(colorFor(m.name)); });
+      (evts[ds]||[]).forEach(function(e){ dots.push(KIND_COL[e.kind]); });
+      var dh=dots.slice(0,5).map(function(c){ return '<span class="dot" style="background:'+c+'"></span>'; }).join('');
       var c='calCell'+(ds===todayStr?' today':'')+(ds===calSel?' selected':'');
-      return '<button type="button" class="'+c+'" data-date="'+ds+'"><span class="cd">'+day+'</span><span class="dots">'+dots+'</span></button>';
+      return '<button type="button" class="'+c+'" data-date="'+ds+'"><span class="cd">'+day+'</span><span class="dots">'+dh+'</span></button>';
     }).join('');
-    renderCalDetail(evts);
+    $('calBody').innerHTML = '<div class="calDow"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div><div class="calGrid">'+grid+'</div>';
   }
-  function renderCalDetail(evts){
-    var el=$('calDetail');
-    if(!calSel){ el.innerHTML=''; return; }
-    var d=parseDue(calSel);
-    var head=d?d.toLocaleDateString('en-US',{ weekday:'long', month:'long', day:'numeric' }):'';
-    var list=(evts||buildEvents())[calSel]||[];
-    el.innerHTML='<div class="calDetailHead">'+esc(head)+'</div>'
-      + (list.length ? list.map(function(e){
-          var col=colorFor(e.cls);
-          return '<div class="tl"><span class="kind '+e.kind+'">'+e.kind+'</span><span class="tlTitle">'+esc(e.title)+'</span>'
-            + (e.cls?'<span class="tag" style="color:'+col+';border-color:'+col+'55;background:'+col+'14">'+esc(e.cls)+'</span>':'')+'</div>';
-        }).join('')
-        : '<div class="calEmpty">No events this day.</div>');
+
+  function calGo(delta){ var d=parseDue(calSel);
+    if(calView==='month') d=new Date(d.getFullYear(), d.getMonth()+delta, Math.min(d.getDate(),28));
+    else if(calView==='week') d.setDate(d.getDate()+7*delta);
+    else d.setDate(d.getDate()+delta);
+    calSel=isoOf(d); renderSchedule();
   }
-  function calGo(delta){ var d=new Date(calY, calM+delta, 1); calY=d.getFullYear(); calM=d.getMonth(); renderSchedule(); }
-  function calGoToday(){ var d=todayMid(); calY=d.getFullYear(); calM=d.getMonth(); calSel=isoOf(d); renderSchedule(); }
+  function calGoToday(){ calSel=isoOf(todayMid()); renderSchedule(); }
+
+  // recurring-class management
+  function addMeeting(){
+    var name=$('mName').value.trim(); if(!name){ $('mName').focus(); return; }
+    var days=[]; Array.prototype.forEach.call($('mDays').children, function(b){ if(b.classList.contains('on')) days.push(+b.getAttribute('data-d')); });
+    if(!days.length) return;
+    state.meetings.push({ id:uid(), name:name, days:days, start:$('mStart').value||'', end:$('mEnd').value||'', room:$('mRoom').value.trim() });
+    $('mName').value=''; $('mStart').value=''; $('mEnd').value=''; $('mRoom').value='';
+    Array.prototype.forEach.call($('mDays').children, function(b){ b.classList.remove('on'); });
+    $('addClassForm').hidden = true;
+    persist(); refreshClasses(); renderSchedule();
+  }
+  function delMeeting(id){ state.meetings = state.meetings.filter(function(x){ return x.id!==id; }); persist(); renderSchedule(); }
 
   // ============ GRADES ============
   function addGrade(){
@@ -813,7 +890,13 @@
   $('calPrev').addEventListener('click', function(){ calGo(-1); });
   $('calNext').addEventListener('click', function(){ calGo(1); });
   $('calToday').addEventListener('click', calGoToday);
-  $('calGrid').addEventListener('click', function(e){ var c=e.target.closest('.calCell'); if(!c||c.classList.contains('empty')) return; calSel=c.getAttribute('data-date'); renderSchedule(); });
+  $('calViews').addEventListener('click', function(e){ var b=e.target.closest('.segBtn'); if(!b) return; calView=b.getAttribute('data-v'); renderSchedule(); });
+  // Month view: tap a day to drill into Day view
+  $('calBody').addEventListener('click', function(e){ var c=e.target.closest('.calCell'); if(!c||c.classList.contains('empty')) return; calSel=c.getAttribute('data-date'); calView='day'; renderSchedule(); });
+  $('addClassBtn').addEventListener('click', function(){ $('addClassForm').hidden = !$('addClassForm').hidden; });
+  $('mCancel').addEventListener('click', function(){ $('addClassForm').hidden = true; });
+  $('mDays').addEventListener('click', function(e){ var b=e.target.closest('button'); if(b) b.classList.toggle('on'); });
+  $('mAdd').addEventListener('click', addMeeting);
   $('gAdd').addEventListener('click', addGrade);
   $('gTotal').addEventListener('keydown', function(e){ if(e.key==='Enter') addGrade(); });
 
@@ -831,6 +914,7 @@
     if(act==='toggle') toggleTask(id);
     else if(act==='del') delTask(id);
     else if(act==='delgrade') delGrade(id);
+    else if(act==='delmeet') delMeeting(id);
     else if(act==='ledit') editRow(b.getAttribute('data-src'), id);
     else if(act==='lsave') saveRow(b);
     else if(act==='lcancel'){ editingRow=null; renderLectures(); }
@@ -850,7 +934,20 @@
       if(saved && typeof saved==='object' && !Array.isArray(saved)) state = saved;
       else if(Array.isArray(saved)) state = { items: saved };
     } catch(e){}
-    if(!state.items) state.items=[]; if(!state.classes) state.classes=[]; if(!state.grades) state.grades=[]; if(!state.lectures) state.lectures=[];
+    if(!state.items) state.items=[]; if(!state.classes) state.classes=[]; if(!state.grades) state.grades=[]; if(!state.lectures) state.lectures=[]; if(!state.meetings) state.meetings=[];
+    // One-time seed of Nishk's Fall 2026 weekly class schedule (recurring meetings).
+    if(!state.seededSchedule){
+      var SEED_MEETINGS=[
+        ['Endocrine & Reproduction Pharmacotherapy',[2,4,5],'08:30','10:40','PH-130 · Busch'],
+        ['IPASS 4',[1],'10:35','11:55','PH-135 · Busch'],
+        ['Self Care',[2,5],'10:55','12:15','PH-131 · Busch'],
+        ['Cannabis in Pharmacy',[3],'10:00','11:50','PH-288 · Busch'],
+        ['Pharmacy Outcomes',[2],'12:45','14:35','PH-131 · Busch'],
+        ['Gerontology',[2],'15:10','17:00','PH-288 · Busch']
+      ];
+      SEED_MEETINGS.forEach(function(m){ state.meetings.push({ id:uid(), name:m[0], days:m[1], start:m[2], end:m[3], room:m[4] }); });
+      state.seededSchedule = true; persist();
+    }
     refreshClasses(); renderTasks();
   })();
 })();
