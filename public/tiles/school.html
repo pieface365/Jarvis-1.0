@@ -170,6 +170,8 @@
   .kind.assignment{ color:var(--brand); border-color:var(--brand-line); background:var(--brand-soft); }
   .rowbtn{ flex:none; appearance:none; background:transparent; border:0; color:var(--muted); cursor:pointer; padding:5px 8px; border-radius:7px; font-size:14px; line-height:1; transition:all var(--dur) var(--ease); }
   .rowbtn:hover{ color:var(--brand); background:var(--brand-soft); }
+  .courseHead.editing{ flex-wrap:wrap; gap:8px; }
+  .courseHead .edCourse{ flex:1; min-width:180px; padding:9px 11px; font-weight:600; font-size:var(--text-base); }
   .tl.editing{ flex-wrap:wrap; gap:8px; }
   .tl .edTitle{ flex:1; min-width:150px; padding:9px 11px; }
   .tl .edDate{ flex:none; width:150px; padding:9px 11px; font-family:var(--font-mono); }
@@ -519,6 +521,7 @@
 
   // ============ LECTURES (course timeline) ============
   var editingRow = null; // { src:'lecture'|'item', id }
+  var editingCourse = null; // class name being renamed
   var delSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>';
 
   function renderLectures(){
@@ -542,10 +545,37 @@
       var col = colorFor(n);
       var rows = byClass[n].slice().sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
       var lc = rows.filter(function(r){return r.kind==='lecture';}).length;
-      return '<div class="courseCard"><div class="courseHead"><span class="courseName" style="color:'+col+'">'+esc(n)+'</span><span class="courseCount">'+lc+' lectures</span></div>'
+      return '<div class="courseCard">'+courseHead(n, col, lc)
         + rows.map(function(r){ return rowHtml(r, todayS); }).join('')
         + '</div>';
     }).join('');
+  }
+
+  function courseHead(n, col, lc){
+    if(editingCourse===n){
+      return '<div class="courseHead editing">'
+        + '<input class="edCourse" type="text" value="'+esc(n)+'" maxlength="80" />'
+        + '<button class="btn small" data-act="csave" data-cls="'+esc(n)+'" type="button">Save</button>'
+        + '<button class="btn sub small" data-act="ccancel" type="button">Cancel</button>'
+        + '</div>';
+    }
+    return '<div class="courseHead">'
+      + '<span class="courseName" style="color:'+col+'">'+esc(n)+'</span>'
+      + '<button class="rowbtn" data-act="cedit" data-cls="'+esc(n)+'" aria-label="Rename class">✎</button>'
+      + '<span class="courseCount">'+lc+' lectures</span>'
+      + '</div>';
+  }
+  function renameCourse(oldName, newName){
+    newName = (newName||'').trim();
+    editingCourse = null;
+    if(newName && newName!==oldName){
+      state.lectures.forEach(function(l){ if(l.cls===oldName) l.cls=newName; });
+      state.items.forEach(function(it){ if(it.subject===oldName) it.subject=newName; });
+      state.grades.forEach(function(g){ if(g.cls===oldName) g.cls=newName; });
+      state.classes.forEach(function(c){ if(c.name===oldName) c.name=newName; });
+      persist(); refreshClasses();
+    }
+    renderLectures();
   }
 
   function rowHtml(r, todayS){
@@ -715,6 +745,9 @@
     else if(act==='lsave') saveRow(b);
     else if(act==='lcancel'){ editingRow=null; renderLectures(); }
     else if(act==='ldel') delRow(b.getAttribute('data-src'), id);
+    else if(act==='cedit'){ editingCourse=b.getAttribute('data-cls'); renderLectures(); }
+    else if(act==='csave'){ renameCourse(b.getAttribute('data-cls'), b.closest('.courseHead').querySelector('.edCourse').value); }
+    else if(act==='ccancel'){ editingCourse=null; renderLectures(); }
   });
 
   // ---- boot ----
