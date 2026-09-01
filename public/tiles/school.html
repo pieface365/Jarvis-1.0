@@ -179,6 +179,7 @@
   .courseHead .edCourse{ flex:1; min-width:180px; padding:9px 11px; font-weight:600; font-size:var(--text-base); }
   .tl.editing{ flex-wrap:wrap; gap:8px; }
   .tl .edTitle{ flex:1; min-width:150px; padding:9px 11px; }
+  .tl .edKind{ flex:none; width:128px; padding:9px 11px; }
   .tl .edDate{ flex:none; width:150px; padding:9px 11px; font-family:var(--font-mono); }
   .btn.small{ padding:9px 15px; font-size:12.5px; }
 
@@ -602,8 +603,10 @@
 
   function rowHtml(r, todayS){
     if(editingRow && editingRow.src===r.src && editingRow.id===r.id){
+      var opt = function(v,lbl){ return '<option value="'+v+'"'+(r.kind===v?' selected':'')+'>'+lbl+'</option>'; };
       return '<div class="tl editing">'
         + '<input class="edTitle" type="text" value="'+esc(r.title)+'" maxlength="160" />'
+        + '<select class="edKind">'+opt('lecture','Lecture')+opt('quiz','Quiz')+opt('exam','Exam')+opt('assignment','Assignment')+'</select>'
         + '<input class="edDate" type="date" value="'+esc(r.date)+'" />'
         + '<button class="btn small" data-act="lsave" data-src="'+r.src+'" data-id="'+r.id+'" type="button">Save</button>'
         + '<button class="btn sub small" data-act="lcancel" type="button">Cancel</button>'
@@ -629,10 +632,24 @@
     var wrap = btn.closest('.tl'); if(!wrap) return;
     var title = wrap.querySelector('.edTitle').value.trim();
     var date = wrap.querySelector('.edDate').value;
-    var r = findRow(btn.getAttribute('data-src'), btn.getAttribute('data-id'));
-    if(r && title){
-      r.title = title;
-      if(btn.getAttribute('data-src')==='lecture') r.date = date; else r.due = date;
+    var newKind = wrap.querySelector('.edKind').value;
+    var src = btn.getAttribute('data-src'), id = btn.getAttribute('data-id');
+    var rec = findRow(src, id);
+    if(!rec || !title){ editingRow=null; renderLectures(); return; }
+    var cls = src==='lecture' ? rec.cls : rec.subject; // class carries over on a type change
+    if(newKind==='lecture'){
+      if(src==='lecture'){ rec.title=title; rec.date=date; }
+      else { // Task → lecture: move between arrays
+        state.items = state.items.filter(function(x){ return x.id!==id; });
+        state.lectures.push({ id:uid(), cls:cls, title:title, date:date });
+      }
+    } else {
+      var type = newKind.charAt(0).toUpperCase()+newKind.slice(1); // Quiz / Exam / Assignment
+      if(src==='item'){ rec.title=title; rec.due=date; rec.type=type; }
+      else { // lecture → Task: move between arrays
+        state.lectures = state.lectures.filter(function(x){ return x.id!==id; });
+        state.items.push({ id:uid(), title:title, subject:cls, type:type, due:date, done:false, createdAt:Date.now() });
+      }
     }
     editingRow = null; persist(); refreshClasses(); renderLectures();
   }
