@@ -175,6 +175,8 @@
   .tgCols.one{ flex:1; }
   .tgCols.one .tgCol{ flex:1; }
   .tgCols.week .tgCol{ width:112px; flex:none; }
+  @media (min-width:640px){ .tgCols.week .tgCol{ width:150px; } }
+  @media (min-width:1000px){ .tgCols.week .tgCol{ width:190px; } }
   .tgCol{ position:relative; border:1px solid var(--border); border-radius:var(--radius-sm); }
   .tgBlock{ position:absolute; left:3px; right:3px; border:1px solid var(--border); border-left-width:3px; border-radius:7px; padding:5px 8px; overflow:hidden; display:flex; flex-direction:column; gap:1px; }
   .tgName{ font-size:12px; font-weight:600; line-height:1.15; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -586,6 +588,9 @@
 
   function renderSchedule(){ // dispatch by view (name kept so setTab wiring is unchanged)
     initCal();
+    // roomier vertical grid on wider (desktop) viewports; compact on phones
+    var vw = window.innerWidth || document.documentElement.clientWidth || 400;
+    HOUR_PX = vw >= 1000 ? 96 : vw >= 640 ? 78 : 54;
     Array.prototype.forEach.call($('calViews').children, function(b){ b.classList.toggle('on', b.getAttribute('data-v')===calView); });
     var d = parseDue(calSel);
     if(calView==='month') $('calTitle').textContent = d.toLocaleDateString('en-US',{ month:'long', year:'numeric' });
@@ -1022,6 +1027,8 @@
   $('calNext').addEventListener('click', function(){ calGo(1); });
   $('calToday').addEventListener('click', calGoToday);
   $('calViews').addEventListener('click', function(e){ var b=e.target.closest('.segBtn'); if(!b) return; calView=b.getAttribute('data-v'); renderSchedule(); });
+  // re-fit the time-grid when the (desktop) window is resized across a breakpoint
+  var rsT; window.addEventListener('resize', function(){ if(!$('panel-schedule') || $('panel-schedule').hidden) return; clearTimeout(rsT); rsT=setTimeout(renderSchedule, 150); });
   // Month view: tap a day to drill into Day view
   $('calBody').addEventListener('click', function(e){ var c=e.target.closest('.calCell'); if(!c||c.classList.contains('empty')) return; calSel=c.getAttribute('data-date'); calView='day'; renderSchedule(); });
   $('addClassBtn').addEventListener('click', function(){ $('addClassForm').hidden = !$('addClassForm').hidden; });
