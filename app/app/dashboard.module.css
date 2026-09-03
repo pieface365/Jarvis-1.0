@@ -757,7 +757,10 @@
      only cap its width here so the backdrop still breathes on the sides. */
   .page.oneScreen {
     padding-top: var(--space-8);
-    padding-bottom: var(--space-8);
+    /* clear the fixed bottom dock (~75px tall, 10px off the bottom) plus the
+       floating "+ New tile" button, with extra room to scroll the last row
+       fully clear of the dock instead of being pinned behind it. */
+    padding-bottom: calc(150px + env(safe-area-inset-bottom));
   }
   .oneScreen .shell {
     width: 100%;
