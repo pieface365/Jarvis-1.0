@@ -157,7 +157,10 @@ const FOODS=[
   {name:'Green beans',cal:31,p:1.8,c:7,f:0.2},{name:'Zucchini',cal:17,p:1.2,c:3.1,f:0.3},
   {name:'Carrots',cal:41,p:0.9,c:10,f:0.2},{name:'Cucumber',cal:15,p:0.7,c:3.6,f:0.1},
   {name:'Salad greens',cal:17,p:1.5,c:3,f:0.2},{name:'Mushrooms',cal:22,p:3.1,c:3.3,f:0.3},
-  {name:'Asparagus',cal:20,p:2.2,c:3.9,f:0.1},{name:'Edamame',cal:121,p:11,c:9,f:5}
+  {name:'Asparagus',cal:20,p:2.2,c:3.9,f:0.1},{name:'Edamame',cal:121,p:11,c:9,f:5},
+  {name:'Shrimp',cal:99,p:24,c:0.2,f:0.3},{name:'Ground turkey (93%)',cal:170,p:22,c:0,f:9},
+  {name:'Pork loin',cal:173,p:27,c:0,f:7},{name:'Sirloin steak',cal:201,p:29,c:0,f:9},
+  {name:'Black beans',cal:132,p:8.9,c:24,f:0.5},{name:'Quinoa (cooked)',cal:120,p:4.4,c:21,f:1.9}
 ];
 
 /* ---- the weekly meal schedule (Train-style day tabs) ----------------
@@ -170,21 +173,26 @@ const FOODS=[
 const PLAN_TARGET = { cal:2400, p:150 };
 const WEEK=['mon','tue','wed','thu','fri','sat','sun'];
 const DAY_LABEL={mon:'Mon',tue:'Tue',wed:'Wed',thu:'Thu',fri:'Fri',sat:'Sat',sun:'Sun'};
-const DAY_TYPE={mon:'climb',tue:'lift',wed:'climb',thu:'lift',fri:'climb',sat:'lift',sun:'rest'};
+/* Day types follow Nishk's real school-year training week: lift Mon/Thu/Sat,
+   climb Wed/Fri/Sun, Tue is the packed-class rest day (lightest). */
+const DAY_TYPE={mon:'lift',tue:'rest',wed:'climb',thu:'lift',fri:'climb',sat:'lift',sun:'climb'};
 const DAY_FOCUS={lift:'Lift day — training fuel',climb:'Climb day — carbs up for the wall',rest:'Rest day — lightest, protein stays'};
-/* Lunch + dinner rotate through the week (new combo every 2-3 days, two
-   veg per plate); breakfasts and snacks stay stable for easy prep. */
+/* Lunch + dinner rotate through the week, two veg per plate. Weekdays (at
+   school, off the chicken/tofu-only restriction) each get their own protein
+   for variety — beef, salmon, shrimp, turkey, steak, pork; carbs run higher
+   on climb days (Wed/Fri). Weekend stays on the '@main' chicken/tofu toggle.
+   Breakfasts and snacks stay stable for easy prep. */
 const DAY_LD={
-  mon:{ lunch:{ name:'Lunch — @main pasta, spinach + zucchini', items:[['@main',150],['Pasta (cooked)',250],['Spinach',100],['Zucchini',150],['Olive oil',8]] },
-        dinner:{ name:'Post-climb — @main, potatoes, peppers + mushrooms', items:[['@main',150],['Potato',350],['Bell pepper',100],['Mushrooms',100],['Olive oil',8]] } },
-  tue:{ lunch:{ name:'Lunch — @main rice bowl, broccoli + carrots', items:[['@main',150],['White rice',250],['Broccoli',100],['Carrots',100],['Olive oil',8]] },
-        dinner:{ name:'Dinner — @main, sweet potato + green beans', items:[['@main',150],['Sweet potato',300],['Green beans',150],['Olive oil',8]] } },
-  wed:{ lunch:{ name:'Lunch — @main rice bowl, edamame + cucumber', items:[['@main',150],['White rice',230],['Edamame',75],['Cucumber',100],['Olive oil',8]] },
-        dinner:{ name:'Post-climb — @main pasta, zucchini + mushrooms', items:[['@main',150],['Pasta (cooked)',210],['Zucchini',150],['Mushrooms',100],['Olive oil',8]] } },
-  thu:{ lunch:{ name:'Lunch — @main fajita bowl (peppers + avocado)', items:[['@main',150],['White rice',250],['Bell pepper',150],['Avocado',50],['Olive oil',5]] },
-        dinner:{ name:'Dinner — @main pasta, mushrooms + spinach', items:[['@main',150],['Pasta (cooked)',200],['Mushrooms',100],['Spinach',100],['Olive oil',8]] } },
-  fri:{ lunch:{ name:'Lunch — @main pasta, peppers + spinach', items:[['@main',150],['Pasta (cooked)',250],['Bell pepper',100],['Spinach',100],['Olive oil',8]] },
-        dinner:{ name:'Post-climb — @main, potatoes, carrots + green beans', items:[['@main',150],['Potato',350],['Carrots',100],['Green beans',100],['Olive oil',8]] } },
+  mon:{ lunch:{ name:'Lunch — beef & rice bowl, peppers + broccoli', items:[['Beef mince (5%)',170],['White rice',250],['Bell pepper',100],['Broccoli',100],['Olive oil',6]] },
+        dinner:{ name:'Dinner — salmon, sweet potato, asparagus + green beans', items:[['Salmon',170],['Sweet potato',300],['Asparagus',100],['Green beans',100],['Olive oil',5]] } },
+  tue:{ lunch:{ name:'Lunch — big salmon salad (greens, cucumber, peppers, avocado)', items:[['Salmon',150],['Salad greens',100],['Cucumber',100],['Bell pepper',100],['Avocado',50],['Olive oil',6]] },
+        dinner:{ name:'Dinner — shrimp stir-fry, broccoli + mushrooms', items:[['Shrimp',180],['White rice',180],['Broccoli',100],['Mushrooms',100],['Olive oil',6]] } },
+  wed:{ lunch:{ name:'Lunch — chicken pasta, spinach + zucchini', items:[['Chicken breast',170],['Pasta (cooked)',240],['Spinach',100],['Zucchini',100],['Olive oil',8]] },
+        dinner:{ name:'Post-climb — pork loin, potatoes, carrots + green beans', items:[['Pork loin',170],['Potato',300],['Carrots',100],['Green beans',100],['Olive oil',6]] } },
+  thu:{ lunch:{ name:'Lunch — turkey burrito bowl, black beans + peppers', items:[['Ground turkey (93%)',170],['White rice',250],['Black beans',80],['Bell pepper',100],['Avocado',40]] },
+        dinner:{ name:'Dinner — sirloin steak, sweet potato + asparagus', items:[['Sirloin steak',170],['Sweet potato',280],['Asparagus',120],['Olive oil',5]] } },
+  fri:{ lunch:{ name:'Lunch — shrimp fried rice, edamame + carrots', items:[['Shrimp',180],['White rice',210],['Edamame',75],['Carrots',100],['Olive oil',6]] },
+        dinner:{ name:'Post-climb — salmon pasta, mushrooms + spinach', items:[['Salmon',170],['Pasta (cooked)',210],['Mushrooms',100],['Spinach',100],['Olive oil',6]] } },
   sat:{ lunch:{ name:'Lunch — @main stir-fry rice, green beans + mushrooms', items:[['@main',150],['White rice',250],['Green beans',100],['Mushrooms',100],['Olive oil',8]] },
         dinner:{ name:'Dinner — @main, sweet potato + asparagus', items:[['@main',150],['Sweet potato',300],['Asparagus',150],['Olive oil',8]] } },
   sun:{ lunch:{ name:'Lunch — @main big salad (greens, cucumber, peppers, avocado)', items:[['@main',150],['Salad greens',100],['Cucumber',100],['Bell pepper',100],['Avocado',70],['Olive oil',8]] },
@@ -214,7 +222,7 @@ function planDayMeals(k){
     evening,
   ];
 }
-const PLAN_V=3;
+const PLAN_V=4;
 function ensurePlan(){
   if(store.plan && store.plan.v===PLAN_V) return;
   const days={};
