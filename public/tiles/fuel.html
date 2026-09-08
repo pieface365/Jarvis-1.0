@@ -69,6 +69,26 @@
   .goalName{font-family:Georgia,serif;font-style:italic;font-size:15px}
   .goalLeft{font-family:var(--font-mono);font-size:11px;color:var(--brand);white-space:nowrap}
   .goalLeft.soon{color:#F5B044}
+  /* grocery list (side column) */
+  .groCard{padding:16px;border:1px solid var(--border);border-radius:16px;background:var(--surface)}
+  .groHead{display:flex;align-items:baseline;justify-content:space-between;gap:6px;margin-bottom:10px}
+  .groTitle{font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.18em;font-size:10px;font-weight:600;color:var(--muted)}
+  .groLeft{font-family:var(--font-mono);font-size:9.5px;color:var(--brand);white-space:nowrap}
+  .groBody{max-height:352px;overflow-y:auto;margin:0 -3px;padding:0 3px}
+  .groAisle{font-family:var(--font-mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted-strong);margin:11px 0 3px}
+  .groAisle:first-child{margin-top:0}
+  .groRow{display:flex;align-items:flex-start;gap:7px;width:100%;background:none;border:none;color:var(--fg);text-align:left;font:inherit;font-size:12.5px;line-height:1.35;padding:4px 0;cursor:pointer}
+  .groRow:hover .groName{color:var(--brand)}
+  .groTick{flex:none;width:13px;height:13px;margin-top:2px;border:1px solid var(--border);border-radius:4px;display:grid;place-items:center;font-size:9px;color:#04140d}
+  .groRow.on .groTick{background:var(--brand);border-color:var(--brand)}
+  .groName{flex:1;min-width:0}
+  .groRow.on .groName{color:var(--muted);text-decoration:line-through}
+  .groAmt{flex:none;font-family:var(--font-mono);font-size:10.5px;color:var(--muted);white-space:nowrap;margin-top:1.5px}
+  .groRow.on .groAmt{opacity:.45}
+  .groFoot{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;margin-top:10px;padding-top:9px;border-top:1px solid var(--border)}
+  .groNote{font-size:10px;color:var(--muted);line-height:1.4}
+  .groClear{background:none;border:none;color:var(--muted);font:inherit;font-size:10.5px;text-decoration:underline;cursor:pointer;padding:0;white-space:nowrap}
+  .groClear:hover{color:var(--fg)}
   .cardWrap{position:relative}
   .cardGrip{position:absolute;top:-4px;left:50%;transform:translateX(-50%);z-index:5;background:none;border:none;color:var(--muted);opacity:.45;font-size:13px;letter-spacing:2px;line-height:1;padding:5px 18px;cursor:grab;touch-action:none}
   .cardGrip:hover{opacity:1;color:var(--fg)}
@@ -363,7 +383,7 @@ function markFuelDay(){
 }
 function sideOrder(){
   const saved=Array.isArray(store._sideOrder)?store._sideOrder:[];
-  const keys=['week','goal']; const out=[]; const seen={};
+  const keys=['week','goal','grocery']; const out=[]; const seen={};
   saved.forEach(k=>{ if(keys.includes(k)&&!seen[k]){out.push(k);seen[k]=1;} });
   keys.forEach(k=>{ if(!seen[k]) out.push(k); });
   return out;
@@ -396,12 +416,91 @@ function goalCardHtml(){
   }).join('');
   return rows?'<div class="goalCard"><div class="gTitle">Countdown</div>'+rows+'</div>':'';
 }
+/* ---- grocery list: the week's plan, totalled and grouped by aisle ----
+   Every item across the seven planned days, summed. Two corrections turn a
+   macro dump into an actual shopping list: rice and pasta are LOGGED cooked
+   but BOUGHT dry, and things you buy by the piece (eggs, bananas, apples,
+   avocado, bread, whey scoops) are shown as counts, rounded up. Reads the
+   materialized store.plan, so reordering or editing meals is reflected.
+   Ticks live in store._grocery and clear themselves when the week rolls. */
+const AISLES=['Meat & fish','Produce','Dairy & eggs','Pantry','Supplements','Other'];
+const AISLE={
+  'Chicken breast':'Meat & fish','Beef mince (5%)':'Meat & fish','Salmon':'Meat & fish',
+  'Shrimp':'Meat & fish','Ground turkey (93%)':'Meat & fish','Pork loin':'Meat & fish',
+  'Sirloin steak':'Meat & fish','Tofu (extra-firm)':'Meat & fish',
+  'Broccoli':'Produce','Bell pepper':'Produce','Green beans':'Produce','Mushrooms':'Produce',
+  'Asparagus':'Produce','Zucchini':'Produce','Salad greens':'Produce','Cucumber':'Produce',
+  'Avocado':'Produce','Spinach':'Produce','Carrots':'Produce','Sweet potato':'Produce',
+  'Potato':'Produce','Banana':'Produce','Apple':'Produce',
+  'Greek yogurt':'Dairy & eggs','Egg':'Dairy & eggs','Milk (whole)':'Dairy & eggs',
+  'Cheddar cheese':'Dairy & eggs',
+  'White rice':'Pantry','Pasta (cooked)':'Pantry','Quinoa (cooked)':'Pantry','Oats':'Pantry',
+  'Bread (slice)':'Pantry','Olive oil':'Pantry','Peanut butter':'Pantry','Almonds':'Pantry',
+  'Black beans':'Pantry','Tuna (canned)':'Pantry','Edamame':'Pantry',
+  'Gold Standard Whey (Vanilla)':'Supplements','Whey protein':'Supplements',
+};
+/* dry:<cooked->dry ratio, because you buy it dry>  each:<grams per piece> */
+const SHOP={
+  'White rice':{dry:0.36,label:'dry'},'Pasta (cooked)':{dry:0.42,label:'dry'},
+  'Quinoa (cooked)':{dry:0.35,label:'dry'},
+  'Egg':{each:50,one:'egg',many:'eggs'},'Banana':{each:118,one:'banana',many:'bananas'},
+  'Apple':{each:150,one:'apple',many:'apples'},'Avocado':{each:70,one:'avocado',many:'avocados'},
+  'Bread (slice)':{each:32,one:'slice',many:'slices'},
+  'Gold Standard Whey (Vanilla)':{each:31,one:'scoop',many:'scoops'},
+};
+/* shelf names: the food table logs cooked/portion forms, the shop sells the
+   plain thing — "Pasta (cooked) 325g dry" is nonsense on a shopping list. */
+const SHOP_NAME={'Pasta (cooked)':'Pasta','Quinoa (cooked)':'Quinoa','Bread (slice)':'Bread'};
+function shopName(n){ return SHOP_NAME[n]||n; }
+function shopAmount(name,g){
+  const sh=SHOP[name]||{};
+  if(sh.each){ const n=Math.ceil(g/sh.each); return n+' '+(n===1?sh.one:sh.many); }
+  const grams=sh.dry?Math.round(g*sh.dry/5)*5:Math.round(g);
+  return (grams>=1000?(grams/1000).toFixed(1)+' kg':grams+'g')+(sh.label?' '+sh.label:'');
+}
+function groceryTotals(){
+  const agg={}; const days=(store.plan&&store.plan.days)||{};
+  WEEK.forEach(k=>{
+    const ms=(days[k]&&days[k].meals)||planDayMeals(k);
+    ms.forEach(m=>(m.items||[]).forEach(it=>{ const [n,g]=it; agg[n]=(agg[n]||0)+g; }));
+  });
+  return agg;
+}
+/* a new shopping week wipes last week's ticks */
+function groceryWeekRoll(){
+  const monday=weekDates()[0];
+  if(store._groceryWeek!==monday){ store._groceryWeek=monday; store._grocery={}; persist(); }
+}
+function groceryCardHtml(){
+  const agg=groceryTotals();
+  const ticked=store._grocery||{};
+  const names=Object.keys(agg);
+  const left=names.filter(n=>!ticked[n]).length;
+  const byAisle={};
+  names.forEach(n=>{ const a=AISLE[n]||'Other'; (byAisle[a]=byAisle[a]||[]).push(n); });
+  const body=AISLES.filter(a=>byAisle[a]).map(a=>
+    '<div class="groAisle">'+esc(a)+'</div>'
+    +byAisle[a].sort((x,y)=>agg[y]-agg[x]).map(n=>{
+        const on=!!ticked[n];
+        return '<button class="groRow'+(on?' on':'')+'" data-gro="'+esc(n)+'">'
+          +'<span class="groTick">'+(on?'&#10003;':'')+'</span>'
+          +'<span class="groName">'+esc(shopName(n))+'</span>'
+          +'<span class="groAmt">'+esc(shopAmount(n,agg[n]))+'</span></button>';
+      }).join('')
+  ).join('');
+  return '<div class="groCard"><div class="groHead"><div class="groTitle">Grocery list</div>'
+    +'<div class="groLeft">'+(left===0?'all set':left+'/'+names.length+' left')+'</div></div>'
+    +'<div class="groBody">'+body+'</div>'
+    +'<div class="groFoot"><div class="groNote">One week of the plan. Rice &amp; pasta are dry weights.</div>'
+    +'<button class="groClear" data-groclear="1">reset</button></div></div>';
+}
 function renderSide(){
   markFuelDay();
+  groceryWeekRoll();
   const side=document.getElementById('side'); if(!side) return;
   side.innerHTML=sideOrder().map(k=>'<div class="sideWrap" data-side="'+k+'">'
     +'<button class="cardGrip" data-sidegrip="'+k+'" aria-label="Drag to reorder" title="Drag to reorder">&#10495;</button>'
-    +(k==='week'?weekCardHtml():goalCardHtml())+'</div>').join('');
+    +(k==='week'?weekCardHtml():k==='grocery'?groceryCardHtml():goalCardHtml())+'</div>').join('');
 }
 /* ---- barcode scanner: photo (or typed digits) → Open Food Facts ------
    The one deliberate crack in the "no network" seal: product lookups hit
@@ -777,6 +876,14 @@ document.addEventListener('click',e=>{
   if(del){const log=todaysLog();log.splice(Number(del.getAttribute('data-del')),1);setTodaysLog(log);render();return;}
   const hb=e.target.closest('[data-histday]');
   if(hb){const k=hb.getAttribute('data-histday');histSel=histSel===k?null:k;render();return;}
+  const gr=e.target.closest('[data-gro]');
+  if(gr){
+    const n=gr.getAttribute('data-gro');
+    if(!store._grocery) store._grocery={};
+    if(store._grocery[n]) delete store._grocery[n]; else store._grocery[n]=true;
+    persist();renderSide();return;
+  }
+  if(e.target.closest('[data-groclear]')){ store._grocery={};persist();renderSide();return; }
   const pd=e.target.closest('[data-planday]');
   if(pd){planDay=pd.getAttribute('data-planday');render();return;}
   const lm=e.target.closest('[data-logmeal]');
