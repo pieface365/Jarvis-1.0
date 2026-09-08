@@ -89,6 +89,30 @@
   .groNote{font-size:10px;color:var(--muted);line-height:1.4}
   .groClear{background:none;border:none;color:var(--muted);font:inherit;font-size:10.5px;text-decoration:underline;cursor:pointer;padding:0;white-space:nowrap}
   .groClear:hover{color:var(--fg)}
+  /* a plan meal is a doorway to its recipe */
+  .planMeal{cursor:pointer}
+  .planMeal:hover{border-color:var(--brand-line)}
+  .planMeal:hover .foodName{color:var(--brand)}
+  .rcpCue{font-family:var(--font-mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);opacity:0;transition:opacity var(--duration) ease}
+  .planMeal:hover .rcpCue{opacity:1}
+  /* recipe sheet */
+  .rcpBack{position:fixed;inset:0;z-index:60;background:rgba(3,3,4,.74);display:flex;align-items:flex-start;justify-content:center;padding:28px 18px;overflow-y:auto}
+  .rcpSheet{width:100%;max-width:540px;border:1px solid var(--border);border-radius:18px;background:var(--surface);padding:24px 24px 22px;position:relative}
+  .rcpKind{font-family:var(--font-mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--brand)}
+  .rcpTitle{font-family:Georgia,serif;font-style:italic;font-size:25px;line-height:1.15;margin:7px 0 0;padding-right:34px}
+  .rcpMeta{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5}
+  .rcpX{position:absolute;top:16px;right:16px;width:28px;height:28px;border-radius:50%;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:15px;line-height:1;cursor:pointer;display:grid;place-items:center}
+  .rcpX:hover{color:var(--fg);border-color:var(--brand-line)}
+  .rcpSec{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin:20px 0 9px;padding-top:15px;border-top:1px solid var(--border)}
+  .rcpIng{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:5px 0;font-size:13.5px}
+  .rcpIng+.rcpIng{border-top:1px solid rgba(255,255,255,.035)}
+  .rcpIng .g{font-family:var(--font-mono);font-size:11.5px;color:var(--brand);white-space:nowrap}
+  .rcpIng.cook .g{color:var(--muted-strong)}
+  .rcpSteps{margin:0;padding:0;list-style:none;counter-reset:rs}
+  .rcpSteps li{counter-increment:rs;position:relative;padding:0 0 11px 30px;font-size:13.5px;line-height:1.55}
+  .rcpSteps li:before{content:counter(rs);position:absolute;left:0;top:0;width:20px;height:20px;border-radius:50%;background:var(--brand-soft);border:1px solid var(--brand-line);color:var(--brand);font-family:var(--font-mono);font-size:10px;display:grid;place-items:center}
+  .rcpStore{margin-top:14px;padding:11px 13px;border:1px solid var(--border);border-radius:11px;background:var(--bg);font-size:12px;color:var(--muted);line-height:1.5}
+  @media (max-width:560px){ .rcpSheet{padding:20px 17px 18px} .rcpTitle{font-size:21px} }
   .cardWrap{position:relative}
   .cardGrip{position:absolute;top:-4px;left:50%;transform:translateX(-50%);z-index:5;background:none;border:none;color:var(--muted);opacity:.45;font-size:13px;letter-spacing:2px;line-height:1;padding:5px 18px;cursor:grab;touch-action:none}
   .cardGrip:hover{opacity:1;color:var(--fg)}
@@ -154,6 +178,7 @@
   <aside class="sideCol" id="side"></aside>
   <div class="shell" id="app"></div>
 </div></main>
+<div id="rcp"></div>
 <script>
 /* Fuel — daily food + macro tracker. Ported from the Patron "Macros" standalone:
    reskinned to Vitality mint, sealed (no external assets), and persisting through
@@ -239,9 +264,9 @@ const DAY_LD={
 };
 /* The two slots the batches don't reach — deliberately zero-effort. */
 const NOCOOK={
-  sat:{ dinner:{ name:'Dinner — free slot (batch is done; eat out, or eggs & rice)',
+  sat:{ dinner:{ name:'Dinner — free slot (batch is done; eat out, or eggs & rice)', r:'eggsrice',
                  items:[['Egg',200],['White rice',250],['Salad greens',80],['Olive oil',6]] } },
-  sun:{ lunch:{ name:'Lunch — no-cook eggs, avocado toast + greens',
+  sun:{ lunch:{ name:'Lunch — no-cook eggs, avocado toast + greens', r:'avotoast',
                 items:[['Egg',200],['Bread (slice)',90],['Avocado',70],['Salad greens',80]] } },
 };
 /* Which batch gets cooked on which day — surfaced as a nudge in the tile. */
@@ -255,6 +280,7 @@ function slotMeal(k,slot,id,when){
   return {
     id,
     name:(slot==='lunch'?'Lunch':'Dinner')+' — '+b.dish,
+    r:'batch'+s.b,
     when:when+' · batch '+s.b+', serving '+s.n+'/4 ('+(s.n===1?'cook it '+b.cook:'cooked '+b.cook)+')',
     items:[b.protein,[b.carb,s.carb]].concat(b.veg,[b.fat]),
   };
@@ -262,18 +288,18 @@ function slotMeal(k,slot,id,when){
 function planDayMeals(k){
   const type=DAY_TYPE[k];
   const bfast = type==='rest'
-    ? { id:'m1', name:'Breakfast — yogurt whey bowl', when:'~9:00', items:[['Greek yogurt',200],['Gold Standard Whey (Vanilla)',31],['Banana',100]] }
-    : { id:'m1', name:'Breakfast — vanilla protein oats', when:'~8:00', items:[['Oats',70],['Gold Standard Whey (Vanilla)',31],['Banana',100],['Peanut butter',15]] };
+    ? { id:'m1', r:'yogurtbowl', name:'Breakfast — yogurt whey bowl', when:'~9:00', items:[['Greek yogurt',200],['Gold Standard Whey (Vanilla)',31],['Banana',100]] }
+    : { id:'m1', r:'oats', name:'Breakfast — vanilla protein oats', when:'~8:00', items:[['Oats',70],['Gold Standard Whey (Vanilla)',31],['Banana',100],['Peanut butter',15]] };
   const snack = type==='climb'
-    ? { id:'m3', name:'Pre-climb — quick carbs', when:'45 min before', items:[['Banana',100],['Peanut butter',15]] }
+    ? { id:'m3', r:'preclimb', name:'Pre-climb — quick carbs', when:'45 min before', items:[['Banana',100],['Peanut butter',15]] }
     : type==='rest'
-      ? { id:'m3', name:'Snack — apple + almonds', when:'afternoon', items:[['Apple',150],['Almonds',20]] }
-      : { id:'m3', name:'Snack — yogurt + fruit', when:'pre-train', items:[['Greek yogurt',170],['Apple',150]] };
+      ? { id:'m3', r:'applenuts', name:'Snack — apple + almonds', when:'afternoon', items:[['Apple',150],['Almonds',20]] }
+      : { id:'m3', r:'yogurtfruit', name:'Snack — yogurt + fruit', when:'pre-train', items:[['Greek yogurt',170],['Apple',150]] };
   const evening = type==='climb'
-    ? { id:'m5', name:'Evening — vanilla shake + yogurt', when:'before bed', items:[['Gold Standard Whey (Vanilla)',31],['Greek yogurt',170]] }
+    ? { id:'m5', r:'shakeyogurt', name:'Evening — vanilla shake + yogurt', when:'before bed', items:[['Gold Standard Whey (Vanilla)',31],['Greek yogurt',170]] }
     : type==='rest'
-      ? { id:'m5', name:'Evening — yogurt + peanut butter', when:'before bed', items:[['Greek yogurt',170],['Peanut butter',15]] }
-      : { id:'m5', name:'Evening — vanilla shake + almonds', when:'before bed', items:[['Gold Standard Whey (Vanilla)',31],['Almonds',15]] };
+      ? { id:'m5', r:'yogurtpb', name:'Evening — yogurt + peanut butter', when:'before bed', items:[['Greek yogurt',170],['Peanut butter',15]] }
+      : { id:'m5', r:'shakenuts', name:'Evening — vanilla shake + almonds', when:'before bed', items:[['Gold Standard Whey (Vanilla)',31],['Almonds',15]] };
   return [
     bfast,
     slotMeal(k,'lunch','m2','~12:30'),
@@ -282,7 +308,7 @@ function planDayMeals(k){
     evening,
   ];
 }
-const PLAN_V=6;
+const PLAN_V=7;
 function ensurePlan(){
   if(store.plan && store.plan.v===PLAN_V) return;
   const days={};
@@ -343,9 +369,11 @@ function planHtml(){
   const tabs='<div class="pdTabs">'+WEEK.map(d=>'<button class="pdTab'+(d===k?' on':'')+(d===todayDayKey()?' today':'')+'" data-planday="'+d+'">'+DAY_LABEL[d]+'</button>').join('')+'</div>';
   const rows=meals.map(m=>{
     const t=mealTotals(m);
-    return '<div class="planMeal" data-mealid="'+m.id+'"><button class="mealGrip" data-mealgrip="'+m.id+'" aria-label="Drag to reorder" title="Drag to reorder">&#10495;</button>'
+    const hasR=!!(m.r&&RECIPES[m.r]);
+    return '<div class="planMeal" data-mealid="'+m.id+'"'+(hasR?' data-recipe="'+esc(m.r)+'"':'')+'><button class="mealGrip" data-mealgrip="'+m.id+'" aria-label="Drag to reorder" title="Drag to reorder">&#10495;</button>'
       +'<div class="planHead"><div><div class="foodName">'+esc(m.name)+'</div>'
-      +'<div class="meta">'+esc(m.when)+' · '+round(t.cal)+' kcal · '+round(t.p)+'P / '+round(t.c)+'C / '+round(t.f)+'F</div></div>'
+      +'<div class="meta">'+esc(m.when)+' · '+round(t.cal)+' kcal · '+round(t.p)+'P / '+round(t.c)+'C / '+round(t.f)+'F'
+      +(hasR?'<span class="rcpCue"> · tap for recipe</span>':'')+'</div></div>'
       +'<button class="btn btn-primary" data-logmeal="'+m.id+'" style="white-space:nowrap">log it</button></div>'
       +'<div class="meta planItems">'+m.items.map(it=>{ const [n,g]=it; return esc(n)+' '+g+'g'; }).join(' · ')+'</div></div>';
   }).join('');
@@ -360,7 +388,7 @@ function planHtml(){
   return '<section class="card"><span class="cardName">Meal plan — '+DAY_FOCUS[DAY_TYPE[k]]+'</span>'
     + tabs + cook
     +'<div id="planMeals">'+rows+'</div>'
-    +'<div class="meta" style="margin-top:10px">'+DAY_LABEL[k]+' totals: <b style="color:var(--fg)">'+round(day.cal)+' kcal · '+round(day.p)+'g protein</b> / '+round(day.c)+'C / '+round(day.f)+'F — target ≤'+PLAN_TARGET.cal+' kcal, ≥'+PLAN_TARGET.p+'g protein. Tap "log it" as you eat; drag ⠿ to reorder meals. Lunch and dinner come out of three cooks a week (Sun / Tue / Thu), four servings each — the same plate repeats until the batch runs out.</div>'
+    +'<div class="meta" style="margin-top:10px">'+DAY_LABEL[k]+' totals: <b style="color:var(--fg)">'+round(day.cal)+' kcal · '+round(day.p)+'g protein</b> / '+round(day.c)+'C / '+round(day.f)+'F — target ≤'+PLAN_TARGET.cal+' kcal, ≥'+PLAN_TARGET.p+'g protein. Tap a meal for its recipe, "log it" as you eat, drag ⠿ to reorder. Lunch and dinner come out of three cooks a week (Sun / Tue / Thu), four servings each — the same plate repeats until the batch runs out.</div>'
     +'</section>';
 }
 function headerHtml(){return '<header class="header"><h1 class="title">Fuel</h1><p class="subtitle">protein · carbs · fat — drag ⠿ to reorder</p></header>';}
@@ -494,6 +522,145 @@ function groceryCardHtml(){
     +'<div class="groFoot"><div class="groNote">One week of the plan. Rice &amp; pasta are dry weights.</div>'
     +'<button class="groClear" data-groclear="1">reset</button></div></div>';
 }
+/* ---- recipes: every plan meal opens its own method ------------------
+   Tapping a meal opens a sheet with the exact weights for THAT serving
+   (read off the meal itself, so a day's carb scaling shows correctly) and,
+   for the three batch cooks, the full cook-day quantities alongside — the
+   whole point being you weigh the batch once and portion it out after.
+   Steps are written for how Nishk actually cooks: one pan, one tray, and
+   containers straight into the fridge. */
+function batchCook(bk){
+  const b=BATCHES[bk]; let carb=0,n=0;
+  WEEK.forEach(k=>['lunch','dinner'].forEach(sl=>{
+    const s=DAY_LD[k][sl]; if(s&&s.b===bk){ carb+=s.carb; n++; }
+  }));
+  return { n, items:[[b.protein[0],b.protein[1]*n],[b.carb,carb]]
+    .concat(b.veg.map(v=>[v[0],v[1]*n]),[[b.fat[0],b.fat[1]*n]]) };
+}
+const RECIPES={
+  batchA:{ kind:'Batch cook A — Sunday', title:'Chicken stir-fry, broccoli + peppers', batch:'A',
+    meta:'One pan, about 30 minutes. Cook it Sunday afternoon and it feeds you through Tuesday lunch.',
+    steps:[
+      'Rice first, it needs the longest. About 275g dry gets you the 760g cooked this batch needs. Rinse it until the water runs clear, then 1 part rice to 1.5 parts water. Boil, lid on, lowest heat 10 minutes, then off the heat 10 minutes without lifting the lid. Fluff with a fork.',
+      'While that sits, cube the chicken into roughly 2cm pieces so it cooks evenly. Salt it properly, then paprika, garlic powder and black pepper.',
+      'Get the pan genuinely hot before anything goes in. Half the oil, then the chicken in a single layer. Do not touch it for 3 minutes, you want colour. Then toss until just cooked through, about 7 minutes total. Onto a plate.',
+      'Rest of the oil, then broccoli florets and sliced peppers on high heat for 4 to 5 minutes. Keep them squeaky, they carry on softening in the fridge.',
+      'Splash of water and the lid on for 1 minute to steam the broccoli stems through.',
+      'Chicken back in with soy sauce and a little sesame oil, toss for a minute, off the heat.',
+      'Plate tonight’s serving, then split the rest into three containers. Keep the rice separate and weigh each day’s portion out of the pot, because the grams differ by day.',
+    ],
+    store:'Fridge, 4 days. Reheat with a splash of water in the pan or the chicken goes stringy. Add the rice cold and let the steam warm it.' },
+
+  batchB:{ kind:'Batch cook B — Tuesday', title:'Beef mince ragu, green beans + mushrooms', batch:'B',
+    meta:'A pan of ragu that gets better overnight. Covers Tuesday dinner through Thursday lunch.',
+    steps:[
+      'Dry pan, no oil, and brown the mince hard in two batches. Crowding it steams the meat grey. Leave it alone until a crust forms, then break it up.',
+      'Push the mince aside, add half the oil and the sliced mushrooms. Cook until they stop squeaking and turn golden, about 6 minutes. Salt them at the end, not the start, or they weep.',
+      'Tin of chopped tomatoes, a heavy spoon of tomato paste, garlic, oregano and a bay leaf. Simmer uncovered 20 to 25 minutes until it is thick enough to sit on a spoon.',
+      'Green beans in boiling salted water for 4 minutes, drain, then toss with the rest of the oil and salt. Keep them separate from the ragu so they stay green.',
+      'Pasta is better cooked fresh each day, it only takes 10 minutes, and 325g dry covers the whole batch. If you do batch it, boil it a minute under, rinse cold, and toss with a little oil so it does not weld.',
+      'Eat tonight’s plate, then three containers of ragu and beans. Weigh the pasta per day, the grams differ.',
+    ],
+    store:'Fridge, 4 days, and the ragu tastes better on day two. It also freezes properly if a day gets skipped.' },
+
+  batchC:{ kind:'Batch cook C — Thursday', title:'Salmon tray bake, asparagus + zucchini', batch:'C',
+    meta:'One tray, no pan to wash. Covers Thursday dinner through Saturday lunch.',
+    steps:[
+      'Oven to 200C fan, 400F. Give it time to come up to temperature properly.',
+      'Sweet potato in 2cm cubes, half the oil, salt and paprika. Spread on the tray in a single layer, nothing overlapping, and roast 25 minutes.',
+      'Push the potato to the edges. Salmon into the middle, skin down, the rest of the oil brushed over, salt and lemon. Asparagus and sliced zucchini in the gaps.',
+      'Back in for 12 to 14 minutes. Check the thickest part flakes when you press it and pull it out the moment it does. Overcooked salmon is the one thing you cannot fix later.',
+      'Cool uncovered for 15 minutes before you put lids on. Trapped steam turns the potato to mush.',
+      'Eat tonight’s plate, then three containers, weighing the sweet potato per day.',
+    ],
+    store:'Fridge, 3 days maximum for cooked salmon, which is exactly what this batch spans. Eat it cold on the lighter days, it is genuinely better than reheated.' },
+
+  oats:{ kind:'Breakfast', title:'Vanilla protein oats', meta:'Five minutes, one bowl.',
+    steps:[
+      'Oats with about 200ml water or milk, microwave 90 seconds, stir, then another 45 seconds.',
+      'Let it cool for a minute. Whey stirred into boiling oats goes grainy and splits, which is the usual reason protein oats taste bad.',
+      'Stir the whey in with a splash more liquid until smooth.',
+      'Sliced banana and the peanut butter on top. Do not stir the peanut butter in, it is better in pockets.',
+    ] },
+
+  yogurtbowl:{ kind:'Breakfast — rest day', title:'Yogurt whey bowl', meta:'Two minutes, no cooking. The lighter rest-day start.',
+    steps:[
+      'Whey into the yogurt a third at a time, mixing each addition smooth before the next. All at once and you get lumps you cannot beat out.',
+      'Slice the banana over the top.',
+      'If it is too stiff to eat, loosen with a splash of milk rather than water.',
+    ] },
+
+  eggsrice:{ kind:'No-cook slot — Saturday', title:'Eggs & rice, greens alongside', meta:'The batch is finished. This is the ten-minute fallback, or take the night off and eat out.',
+    steps:[
+      'Rice from a pouch or whatever is left in the pot.',
+      'Four eggs, low heat, the oil in the pan first. Stir slowly and pull them off while they still look slightly underdone, they carry on setting.',
+      'Eggs over the rice, greens on the side, soy sauce and chilli.',
+    ],
+    store:'This slot is deliberately free. If you eat out instead, log it with the barcode or plate photo and the day still tracks.' },
+
+  avotoast:{ kind:'No-cook slot — Sunday', title:'Eggs, avocado toast + greens', meta:'Clears the fridge before the Sunday cook. Ten minutes.',
+    steps:[
+      'Bread in the toaster.',
+      'Four eggs fried or poached, whichever you feel like.',
+      'Mash the avocado straight onto the toast with salt, lemon and chilli flakes.',
+      'Eggs on top, greens on the side.',
+    ] },
+
+  preclimb:{ kind:'Pre-climb', title:'Quick carbs', meta:'45 minutes before you get on the wall.',
+    steps:[
+      'Banana sliced, peanut butter on top. That is the whole thing.',
+      'Eat it 45 minutes out so the sugars have landed but your stomach is empty. Do not add fibre or extra fat beyond this or you will climb heavy.',
+    ] },
+
+  applenuts:{ kind:'Snack — rest day', title:'Apple + almonds', meta:'Nothing to make.',
+    steps:['Apple, almonds. Eat the almonds slowly, 20g goes fast and it is the most calorie-dense thing in the day.'] },
+
+  yogurtfruit:{ kind:'Snack — training day', title:'Yogurt + fruit', meta:'Two minutes, before you train.',
+    steps:['Dice the apple into the yogurt rather than eating them separately, it eats more like a dessert.','Cinnamon over the top if you have it.'] },
+
+  shakeyogurt:{ kind:'Evening — climb day', title:'Vanilla shake + yogurt', meta:'Before bed, after a session on the wall.',
+    steps:['Whey in about 250ml cold water, shaken hard. Water rather than milk keeps it light this late.','Yogurt alongside, or blend it in with ice if you want it thicker.'] },
+
+  shakenuts:{ kind:'Evening — lift day', title:'Vanilla shake + almonds', meta:'Before bed.',
+    steps:['Whey in about 250ml cold water.','Almonds alongside. The fat slows the protein down overnight, which is the point of pairing them.'] },
+
+  yogurtpb:{ kind:'Evening — rest day', title:'Yogurt + peanut butter', meta:'Before bed.',
+    steps:['Let the yogurt sit out a few minutes first. Peanut butter will not stir into fridge-cold yogurt, it just clumps.','Stir it through and eat.'] },
+};
+/* Serving rows show what you weigh onto the plate (cooked). Cook rows show
+   what you actually buy and boil, so rice and pasta flip to dry weight. */
+function ingRows(items,cls,asShop){
+  return items.map(it=>{ const [n,g]=it;
+    return '<div class="rcpIng'+(cls?' '+cls:'')+'"><span>'+esc(shopName(n))+'</span>'
+      +'<span class="g">'+esc(asShop?shopAmount(n,g):g+'g')+'</span></div>';
+  }).join('');
+}
+let recipeKey=null, recipeMeal=null;
+function recipeHtml(){
+  const R=RECIPES[recipeKey]; if(!R) return '';
+  const cook=R.batch?batchCook(R.batch):null;
+  const t=recipeMeal?mealTotals(recipeMeal):null;
+  return '<div class="rcpBack" data-rcpback="1"><div class="rcpSheet" role="dialog" aria-modal="true">'
+    +'<button class="rcpX" data-rcpclose="1" aria-label="Close recipe" title="Close">&times;</button>'
+    +'<div class="rcpKind">'+esc(R.kind)+'</div>'
+    +'<h2 class="rcpTitle">'+esc(R.title)+'</h2>'
+    +'<div class="rcpMeta">'+esc(R.meta)+(t?' <b style="color:var(--fg)">'+round(t.cal)+' kcal · '+round(t.p)+'P / '+round(t.c)+'C / '+round(t.f)+'F</b> per serving.':'')+'</div>'
+    +(recipeMeal?'<div class="rcpSec">This serving</div>'+ingRows(recipeMeal.items):'')
+    +(cook?'<div class="rcpSec">Buy &amp; cook — all '+cook.n+' servings</div>'+ingRows(cook.items,'cook',true):'')
+    +'<div class="rcpSec">Method</div><ol class="rcpSteps">'+R.steps.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ol>'
+    +(R.store?'<div class="rcpStore">'+esc(R.store)+'</div>':'')
+    +'</div></div>';
+}
+function renderRecipe(){
+  const h=document.getElementById('rcp'); if(!h) return;
+  h.innerHTML=recipeHtml();
+  document.body.style.overflow=recipeKey?'hidden':'';
+}
+function openRecipe(meal){
+  if(!meal||!meal.r||!RECIPES[meal.r]) return;
+  recipeKey=meal.r; recipeMeal=meal; renderRecipe();
+}
+function closeRecipe(){ recipeKey=null; recipeMeal=null; renderRecipe(); }
 function renderSide(){
   markFuelDay();
   groceryWeekRoll();
@@ -721,6 +888,7 @@ function render(){
         +'<button class="cardGrip" data-cardgrip="'+k+'" aria-label="Drag to reorder" title="Drag to reorder">&#10495;</button>'
         +'<div class="cardBody">'+cardHtml(k)+'</div></div>').join('');
   renderSide();
+  renderRecipe();
 }
 
 /* ---- drag & drop: tile cards and plan meals (ghost follows pointer) -- */
@@ -886,6 +1054,7 @@ document.addEventListener('click',e=>{
   if(e.target.closest('[data-groclear]')){ store._grocery={};persist();renderSide();return; }
   const pd=e.target.closest('[data-planday]');
   if(pd){planDay=pd.getAttribute('data-planday');render();return;}
+  if(e.target.closest('[data-rcpclose]')||e.target.closest('[data-rcpback]')===e.target){ closeRecipe();return; }
   const lm=e.target.closest('[data-logmeal]');
   if(lm){
     const dayK=planDay||todayDayKey();
@@ -895,8 +1064,17 @@ document.addEventListener('click',e=>{
     meal.items.forEach(it=>{ const [n,g]=it; const f=foodByName(n); if(!f)return; const k=g/100;
       log.push({name:f.name,grams:g,cal:f.cal*k,p:f.p*k,c:f.c*k,f:f.f*k}); });
     setTodaysLog(log);render();
+    return;
+  }
+  if(e.target.closest('[data-mealgrip]')) return;
+  const rc=e.target.closest('[data-recipe]');
+  if(rc){
+    const dayK=planDay||todayDayKey();
+    const meal=(store.plan.days[dayK].meals||[]).find(m=>m.id===rc.getAttribute('data-mealid'));
+    openRecipe(meal);
   }
 });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&recipeKey) closeRecipe(); });
 (async()=>{const d=await window.Vitality.load();store=(d&&typeof d==='object'&&!Array.isArray(d))?d:{};ensurePlan();planDay=todayDayKey();render();})();
 </script>
 </body>
