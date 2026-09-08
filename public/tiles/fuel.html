@@ -36,7 +36,6 @@
   .fieldInput{background:var(--bg);border:1px solid var(--border);color:var(--fg);border-radius:10px;padding:9px 11px;font:inherit}
   .fieldInput:focus{outline:none;border-color:var(--brand)}
   .goalEdit .fieldInput{width:92px}
-  .planTop{display:flex;align-items:center;gap:8px;margin-bottom:12px}
   .planMeal{position:relative;border:1px solid var(--border);border-radius:12px;background:var(--bg);padding:12px 14px;margin-bottom:10px}
   .planHead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
   .planItems{margin-top:7px;line-height:1.6}
@@ -167,8 +166,7 @@ const FOODS=[
    139 lb · 5'11" · ~20-25% BF (skinny-fat pattern) · trains 6 days/week.
    Strategy is RECOMP, not a hard cut: lift days ~2,300 kcal, climb days
    ~2,380 (extra carbs for the wall), rest day ~1,820 (lightest — protein
-   stays pinned). '@main' items resolve to chicken or tofu via the toggle;
-   one scoop = 31g Gold Standard vanilla whey. Meals are materialized into
+   stays pinned). One scoop = 31g Gold Standard vanilla whey. Meals are materialized into
    the store per day so each day's order is drag-and-droppable. */
 const PLAN_TARGET = { cal:2400, p:150 };
 const WEEK=['mon','tue','wed','thu','fri','sat','sun'];
@@ -177,27 +175,70 @@ const DAY_LABEL={mon:'Mon',tue:'Tue',wed:'Wed',thu:'Thu',fri:'Fri',sat:'Sat',sun
    climb Wed/Fri/Sun, Tue is the packed-class rest day (lightest). */
 const DAY_TYPE={mon:'lift',tue:'rest',wed:'climb',thu:'lift',fri:'climb',sat:'lift',sun:'climb'};
 const DAY_FOCUS={lift:'Lift day — training fuel',climb:'Climb day — carbs up for the wall',rest:'Rest day — lightest, protein stays'};
-/* Lunch + dinner rotate through the week, two veg per plate. Weekdays (at
-   school, off the chicken/tofu-only restriction) each get their own protein
-   for variety — beef, salmon, shrimp, turkey, steak, pork; carbs run higher
-   on climb days (Wed/Fri). Weekend stays on the '@main' chicken/tofu toggle.
-   Breakfasts and snacks stay stable for easy prep. */
-const DAY_LD={
-  mon:{ lunch:{ name:'Lunch — beef & rice bowl, peppers + broccoli', items:[['Beef mince (5%)',170],['White rice',250],['Bell pepper',100],['Broccoli',100],['Olive oil',6]] },
-        dinner:{ name:'Dinner — salmon, sweet potato, asparagus + green beans', items:[['Salmon',170],['Sweet potato',300],['Asparagus',100],['Green beans',100],['Olive oil',5]] } },
-  tue:{ lunch:{ name:'Lunch — big salmon salad (greens, cucumber, peppers, avocado)', items:[['Salmon',150],['Salad greens',100],['Cucumber',100],['Bell pepper',100],['Avocado',50],['Olive oil',6]] },
-        dinner:{ name:'Dinner — shrimp stir-fry, broccoli + mushrooms', items:[['Shrimp',180],['White rice',180],['Broccoli',100],['Mushrooms',100],['Olive oil',6]] } },
-  wed:{ lunch:{ name:'Lunch — chicken pasta, spinach + zucchini', items:[['Chicken breast',170],['Pasta (cooked)',240],['Spinach',100],['Zucchini',100],['Olive oil',8]] },
-        dinner:{ name:'Post-climb — pork loin, potatoes, carrots + green beans', items:[['Pork loin',170],['Potato',300],['Carrots',100],['Green beans',100],['Olive oil',6]] } },
-  thu:{ lunch:{ name:'Lunch — turkey burrito bowl, black beans + peppers', items:[['Ground turkey (93%)',170],['White rice',250],['Black beans',80],['Bell pepper',100],['Avocado',40]] },
-        dinner:{ name:'Dinner — sirloin steak, sweet potato + asparagus', items:[['Sirloin steak',170],['Sweet potato',280],['Asparagus',120],['Olive oil',5]] } },
-  fri:{ lunch:{ name:'Lunch — shrimp fried rice, edamame + carrots', items:[['Shrimp',180],['White rice',210],['Edamame',75],['Carrots',100],['Olive oil',6]] },
-        dinner:{ name:'Post-climb — salmon pasta, mushrooms + spinach', items:[['Salmon',170],['Pasta (cooked)',210],['Mushrooms',100],['Spinach',100],['Olive oil',6]] } },
-  sat:{ lunch:{ name:'Lunch — @main stir-fry rice, green beans + mushrooms', items:[['@main',150],['White rice',250],['Green beans',100],['Mushrooms',100],['Olive oil',8]] },
-        dinner:{ name:'Dinner — @main, sweet potato + asparagus', items:[['@main',150],['Sweet potato',300],['Asparagus',150],['Olive oil',8]] } },
-  sun:{ lunch:{ name:'Lunch — @main big salad (greens, cucumber, peppers, avocado)', items:[['@main',150],['Salad greens',100],['Cucumber',100],['Bell pepper',100],['Avocado',70],['Olive oil',8]] },
-        dinner:{ name:'Dinner — @main, sweet potato + asparagus', items:[['@main',150],['Sweet potato',250],['Asparagus',150],['Olive oil',8]] } },
+/* Nishk cooks in batches — he is not making twelve different meals a week,
+   and he doesn't want a different meat every day. So: THREE cook sessions a
+   week (Sun / Tue / Thu), each making FOUR servings that run straight
+   through — the night it's cooked, the next day's lunch, that night's
+   dinner, and the day after's lunch. Three meats in the whole rotation:
+   chicken, beef mince, salmon. Two no-cook slots at the weekend
+   where the batch has run out and nothing is worth cooking for.
+
+     Batch A  cook Sun  ->  Sun dinner · Mon lunch · Mon dinner · Tue lunch
+     Batch B  cook Tue  ->  Tue dinner · Wed lunch · Wed dinner · Thu lunch
+     Batch C  cook Thu  ->  Thu dinner · Fri lunch · Fri dinner · Sat lunch
+     no-cook            ->  Sat dinner · Sun lunch
+
+   Protein, veg and oil are IDENTICAL across a batch's four servings — that's
+   the whole point of cooking once. The only thing that moves is the carb
+   portion, scaled to the day type (climb days up, the Tue rest day down),
+   which is exactly how you'd plate it out of the same container. */
+const BATCHES={
+  A:{ cook:'Sun', dish:'chicken stir-fry, broccoli + peppers',
+      covers:'tonight, Mon lunch + dinner, Tue lunch',
+      protein:['Chicken breast',170], carb:'White rice',
+      veg:[['Broccoli',110],['Bell pepper',110]], fat:['Olive oil',7] },
+  B:{ cook:'Tue', dish:'beef mince ragu, green beans + mushrooms',
+      covers:'tonight, Wed lunch + dinner, Thu lunch',
+      protein:['Beef mince (5%)',185], carb:'Pasta (cooked)',
+      veg:[['Green beans',110],['Mushrooms',100]], fat:['Olive oil',6] },
+  C:{ cook:'Thu', dish:'salmon tray bake, asparagus + zucchini',
+      covers:'tonight, Fri lunch + dinner, Sat lunch',
+      protein:['Salmon',190], carb:'Sweet potato',
+      veg:[['Asparagus',110],['Zucchini',100]], fat:['Olive oil',5] },
 };
+/* Which batch fills each slot, which serving of the four it is, and the carb
+   grams for that day's load. A null slot is a no-cook meal (see NOCOOK). */
+const DAY_LD={
+  mon:{ lunch:{b:'A',n:2,carb:200}, dinner:{b:'A',n:3,carb:190} },
+  tue:{ lunch:{b:'A',n:4,carb:105}, dinner:{b:'B',n:1,carb:115} },
+  wed:{ lunch:{b:'B',n:2,carb:220}, dinner:{b:'B',n:3,carb:220} },
+  thu:{ lunch:{b:'B',n:4,carb:215}, dinner:{b:'C',n:1,carb:195} },
+  fri:{ lunch:{b:'C',n:2,carb:262}, dinner:{b:'C',n:3,carb:262} },
+  sat:{ lunch:{b:'C',n:4,carb:215}, dinner:null },
+  sun:{ lunch:null, dinner:{b:'A',n:1,carb:265} },
+};
+/* The two slots the batches don't reach — deliberately zero-effort. */
+const NOCOOK={
+  sat:{ dinner:{ name:'Dinner — free slot (batch is done; eat out, or eggs & rice)',
+                 items:[['Egg',200],['White rice',250],['Salad greens',80],['Olive oil',6]] } },
+  sun:{ lunch:{ name:'Lunch — no-cook eggs, avocado toast + greens',
+                items:[['Egg',200],['Bread (slice)',90],['Avocado',70],['Salad greens',80]] } },
+};
+/* Which batch gets cooked on which day — surfaced as a nudge in the tile. */
+const COOK_DAY={ sun:'A', tue:'B', thu:'C' };
+
+/* Build one lunch/dinner slot out of its batch (or the no-cook fallback). */
+function slotMeal(k,slot,id,when){
+  const s=DAY_LD[k][slot];
+  if(!s) return { id, when:when+' · no cook', ...NOCOOK[k][slot] };
+  const b=BATCHES[s.b];
+  return {
+    id,
+    name:(slot==='lunch'?'Lunch':'Dinner')+' — '+b.dish,
+    when:when+' · batch '+s.b+', serving '+s.n+'/4 ('+(s.n===1?'cook it '+b.cook:'cooked '+b.cook)+')',
+    items:[b.protein,[b.carb,s.carb]].concat(b.veg,[b.fat]),
+  };
+}
 function planDayMeals(k){
   const type=DAY_TYPE[k];
   const bfast = type==='rest'
@@ -213,16 +254,15 @@ function planDayMeals(k){
     : type==='rest'
       ? { id:'m5', name:'Evening — yogurt + peanut butter', when:'before bed', items:[['Greek yogurt',170],['Peanut butter',15]] }
       : { id:'m5', name:'Evening — vanilla shake + almonds', when:'before bed', items:[['Gold Standard Whey (Vanilla)',31],['Almonds',15]] };
-  const ld=DAY_LD[k];
   return [
     bfast,
-    { id:'m2', when:'~12:30', ...ld.lunch },
+    slotMeal(k,'lunch','m2','~12:30'),
     snack,
-    { id:'m4', when:(type==='climb'?'after the gym':type==='lift'?'post-train':'evening'), ...ld.dinner },
+    slotMeal(k,'dinner','m4',(type==='climb'?'after the gym':type==='lift'?'post-train':'evening')),
     evening,
   ];
 }
-const PLAN_V=4;
+const PLAN_V=6;
 function ensurePlan(){
   if(store.plan && store.plan.v===PLAN_V) return;
   const days={};
@@ -232,18 +272,9 @@ function ensurePlan(){
 }
 function todayDayKey(){ return WEEK[(new Date().getDay()+6)%7]; }
 let planDay=null; /* set at boot to today's weekday */
-function planProtein(){ return store.planProtein==='tofu' ? 'tofu' : 'chicken'; }
-/* '@main' resolves to the chosen protein; tofu portions scale ~1.85x so the
-   protein grams roughly match chicken's */
-function resolveItem(it){
-  const [n,g]=it;
-  if(n!=='@main') return it;
-  return planProtein()==='tofu' ? ['Tofu (extra-firm)', Math.round(g*1.85/5)*5] : ['Chicken breast', g];
-}
-function mealName(m){ return m.name.replace('@main', planProtein()==='tofu'?'tofu':'chicken'); }
 function foodByName(n){ return FOODS.find(f=>f.name===n); }
 function mealTotals(meal){
-  return meal.items.reduce((s,it)=>{ const [n,g]=resolveItem(it); const f=foodByName(n); if(!f) return s; const k=g/100;
+  return meal.items.reduce((s,it)=>{ const [n,g]=it; const f=foodByName(n); if(!f) return s; const k=g/100;
     s.cal+=f.cal*k; s.p+=f.p*k; s.c+=f.c*k; s.f+=f.f*k; return s; },{cal:0,p:0,c:0,f:0});
 }
 let store={};
@@ -289,21 +320,27 @@ function planHtml(){
   const k=planDay||todayDayKey();
   const meals=store.plan.days[k].meals;
   const day=meals.reduce((s,m)=>{ const t=mealTotals(m); s.cal+=t.cal; s.p+=t.p; s.c+=t.c; s.f+=t.f; return s; },{cal:0,p:0,c:0,f:0});
-  const chip=(pk,l)=>'<button class="btn'+(planProtein()===pk?' btn-primary':'')+'" data-planprot="'+pk+'" style="padding:6px 14px;font-size:12px">'+l+'</button>';
   const tabs='<div class="pdTabs">'+WEEK.map(d=>'<button class="pdTab'+(d===k?' on':'')+(d===todayDayKey()?' today':'')+'" data-planday="'+d+'">'+DAY_LABEL[d]+'</button>').join('')+'</div>';
   const rows=meals.map(m=>{
     const t=mealTotals(m);
     return '<div class="planMeal" data-mealid="'+m.id+'"><button class="mealGrip" data-mealgrip="'+m.id+'" aria-label="Drag to reorder" title="Drag to reorder">&#10495;</button>'
-      +'<div class="planHead"><div><div class="foodName">'+esc(mealName(m))+'</div>'
+      +'<div class="planHead"><div><div class="foodName">'+esc(m.name)+'</div>'
       +'<div class="meta">'+esc(m.when)+' · '+round(t.cal)+' kcal · '+round(t.p)+'P / '+round(t.c)+'C / '+round(t.f)+'F</div></div>'
       +'<button class="btn btn-primary" data-logmeal="'+m.id+'" style="white-space:nowrap">log it</button></div>'
-      +'<div class="meta planItems">'+m.items.map(it=>{ const [n,g]=resolveItem(it); return esc(n)+' '+g+'g'; }).join(' · ')+'</div></div>';
+      +'<div class="meta planItems">'+m.items.map(it=>{ const [n,g]=it; return esc(n)+' '+g+'g'; }).join(' · ')+'</div></div>';
   }).join('');
+  /* Cook-day nudge: on Sun/Tue/Thu a batch gets made, and it has to cover
+     four servings — say so, so the portion is right the first time. */
+  const cb=COOK_DAY[k];
+  const cook = cb
+    ? '<div class="meta" style="margin:12px 0 0;padding:9px 11px;border:1px solid var(--brand-line);border-radius:10px;background:var(--brand-soft)">'
+      +'<b style="color:var(--fg)">Cook day — batch '+cb+' &times;4 servings:</b> '
+      +esc(BATCHES[cb].dish)+'. Covers '+esc(BATCHES[cb].covers)+'.</div>'
+    : '';
   return '<section class="card"><span class="cardName">Meal plan — '+DAY_FOCUS[DAY_TYPE[k]]+'</span>'
-    + tabs
-    +'<div class="planTop"><div class="meta">Primary protein:</div>'+chip('chicken','Chicken')+chip('tofu','Tofu')+'</div>'
+    + tabs + cook
     +'<div id="planMeals">'+rows+'</div>'
-    +'<div class="meta" style="margin-top:10px">'+DAY_LABEL[k]+' totals: <b style="color:var(--fg)">'+round(day.cal)+' kcal · '+round(day.p)+'g protein</b> / '+round(day.c)+'C / '+round(day.f)+'F — target ≤'+PLAN_TARGET.cal+' kcal, ≥'+PLAN_TARGET.p+'g protein. Tap "log it" as you eat; drag ⠿ to reorder meals.'+(planProtein()==='tofu'?' Tofu portions auto-scale to match chicken\'s protein.':'')+'</div>'
+    +'<div class="meta" style="margin-top:10px">'+DAY_LABEL[k]+' totals: <b style="color:var(--fg)">'+round(day.cal)+' kcal · '+round(day.p)+'g protein</b> / '+round(day.c)+'C / '+round(day.f)+'F — target ≤'+PLAN_TARGET.cal+' kcal, ≥'+PLAN_TARGET.p+'g protein. Tap "log it" as you eat; drag ⠿ to reorder meals. Lunch and dinner come out of three cooks a week (Sun / Tue / Thu), four servings each — the same plate repeats until the batch runs out.</div>'
     +'</section>';
 }
 function headerHtml(){return '<header class="header"><h1 class="title">Fuel</h1><p class="subtitle">protein · carbs · fat — drag ⠿ to reorder</p></header>';}
@@ -740,8 +777,6 @@ document.addEventListener('click',e=>{
   if(del){const log=todaysLog();log.splice(Number(del.getAttribute('data-del')),1);setTodaysLog(log);render();return;}
   const hb=e.target.closest('[data-histday]');
   if(hb){const k=hb.getAttribute('data-histday');histSel=histSel===k?null:k;render();return;}
-  const pp=e.target.closest('[data-planprot]');
-  if(pp){store.planProtein=pp.getAttribute('data-planprot');persist();render();return;}
   const pd=e.target.closest('[data-planday]');
   if(pd){planDay=pd.getAttribute('data-planday');render();return;}
   const lm=e.target.closest('[data-logmeal]');
@@ -750,7 +785,7 @@ document.addEventListener('click',e=>{
     const meal=store.plan.days[dayK].meals.find(m=>m.id===lm.getAttribute('data-logmeal'));
     if(!meal)return;
     const log=todaysLog();
-    meal.items.forEach(it=>{ const [n,g]=resolveItem(it); const f=foodByName(n); if(!f)return; const k=g/100;
+    meal.items.forEach(it=>{ const [n,g]=it; const f=foodByName(n); if(!f)return; const k=g/100;
       log.push({name:f.name,grams:g,cal:f.cal*k,p:f.p*k,c:f.c*k,f:f.f*k}); });
     setTodaysLog(log);render();
   }
