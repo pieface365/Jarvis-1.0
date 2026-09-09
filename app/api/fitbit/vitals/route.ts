@@ -84,19 +84,28 @@ export async function GET(req: Request) {
   }
 
   const results = await Promise.allSettled([
-    listDataPoints('sleep', { stopBefore: startKey, dateOf: sleepDate }).then(({ points }) =>
+    listDataPoints('sleep', { stopBefore: startKey, dateOf: sleepDate }).then(({ points }) => {
+      /* A nap is its own sleep record, so one date can carry several. Total
+         them instead of letting the last one written win: assigning per
+         record made the answer depend on page order, and a 2h nap either
+         erased the night or was erased by it (Aug 21 published 7.7h of a
+         real 9.9h). Efficiency is recomputed from the combined minutes. */
+      const byDate: Record<string, { asleep: number; inBed: number }> = {}
       points.forEach((p: any) => {
         const s = payload(p, 'sleep')
         if (!s) return
         const date = sleepDate(p)
         const asleep = num(s.summary?.minutesAsleep)
-        const inBed = num(s.summary?.minutesInSleepPeriod)
-        if (asleep != null) {
-          set(date, 'sleepHours', Math.round((asleep / 60) * 10) / 10)
-          if (inBed) set(date, 'sleepPerf', Math.round((asleep / inBed) * 100))
-        }
-      }),
-    ),
+        if (!date || asleep == null) return
+        const tot = (byDate[date] ||= { asleep: 0, inBed: 0 })
+        tot.asleep += asleep
+        tot.inBed += num(s.summary?.minutesInSleepPeriod) ?? 0
+      })
+      Object.entries(byDate).forEach(([date, tot]) => {
+        set(date, 'sleepHours', Math.round((tot.asleep / 60) * 10) / 10)
+        if (tot.inBed) set(date, 'sleepPerf', Math.round((tot.asleep / tot.inBed) * 100))
+      })
+    }),
     listDataPoints('heart-rate-variability', { stopBefore: startKey, dateOf: hrvDate }).then(
       ({ points, complete }) => {
         // 26-128 samples a night — average them per day

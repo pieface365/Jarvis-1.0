@@ -204,7 +204,9 @@ function estRecovery(h){
    minutesAsleep/minutesInSleepPeriod, which the sync computes. It rates
    how little you stirred in bed and says nothing about how long you slept,
    which is why a 5h night scores 96 there and 66 in the Fitbit app. */
-function dayReadiness(h){ const v=num(h&&h.readiness); return v!=null?v:estRecovery(h); }
+/* Round and clamp to Fitbit's own 1-100 range so the ring, the widget and
+   the Train handoff can't show three different numbers for one typed score. */
+function dayReadiness(h){ const v=num(h&&h.readiness); return v!=null?Math.max(1,Math.min(100,Math.round(v))):estRecovery(h); }
 function isFitbitReadiness(h){ return num(h&&h.readiness)!=null; }
 function daySleepScore(h){ const v=num(h&&h.sleepScore); return v!=null?v:adjSleepPerf(h); }
 function isFitbitSleep(h){ return num(h&&h.sleepScore)!=null; }

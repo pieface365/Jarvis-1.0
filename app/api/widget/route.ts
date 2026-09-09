@@ -68,7 +68,7 @@ function adjSleepPerf(h: Obj): number | null {
 
 function dayReadiness(h: Obj): number | null {
   const manual = num(h.readiness)
-  if (manual != null) return Math.max(1, Math.min(99, Math.round(manual)))
+  if (manual != null) return Math.max(1, Math.min(100, Math.round(manual)))
   return estRecovery(h)
 }
 

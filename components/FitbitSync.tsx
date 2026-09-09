@@ -82,7 +82,7 @@ export default function FitbitSync({ userId }: { userId: string }) {
           /* Fitbit's own Daily Readiness, typed into the Vitals tile, is the
              real number — the Health API can't supply it. When it's there it
              wins outright, so Train and Vitals never disagree. */
-          if (typeof h.readiness === 'number') return Math.max(1, Math.min(99, Math.round(h.readiness)))
+          if (typeof h.readiness === 'number') return Math.max(1, Math.min(100, Math.round(h.readiness)))
           const parts: number[] = []
           const w: number[] = []
           if (typeof h.hrv === 'number') { parts.push(clamp01((h.hrv - 20) / 70) * 100); w.push(0.5) }
