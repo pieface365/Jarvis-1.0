@@ -50,6 +50,8 @@
   .recFill{fill:none;stroke:currentColor;stroke-width:10;stroke-linecap:round;transition:stroke-dashoffset 800ms var(--ease-premium);filter:drop-shadow(0 0 4px currentColor) drop-shadow(0 0 11px currentColor)}
   .ringWrap{display:flex;flex-direction:column;align-items:center;gap:10px}
   .ringSub{font-weight:600;font-size:1.1rem;font-variant-numeric:tabular-nums;color:var(--fg)}
+  .askFitbit{display:flex;gap:9px;align-items:flex-start;margin-bottom:12px;padding:10px 12px;border:1px solid var(--brand-line,rgba(110,231,183,.28));border-radius:11px;background:rgba(110,231,183,.06);font-size:12.5px;line-height:1.5}
+  .askFitbit b{color:var(--brand)}
   .ringNote{font-family:var(--font-mono);font-size:8.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:3px;text-align:center;white-space:nowrap}
   .recInner{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;max-width:120px}
   .recNum{color:var(--fg);font-weight:700;font-size:2.2rem;line-height:1;font-variant-numeric:tabular-nums}
@@ -450,7 +452,11 @@ function entryHtml(){
     +   '<button class="dnBtn" data-datenav="-1" aria-label="Previous day">&#8249;</button>'
     +   '<input class="dnDate" id="dn-date" type="date" value="'+(editDate||todayKey())+'" max="'+todayKey()+'">'
     +   '<button class="dnBtn" data-datenav="1" aria-label="Next day"'+(isToday?' disabled':'')+'>&#8250;</button>'
-    + '</div></div><div class="entryGrid">'
+    + '</div></div>'
+    + (isToday && !isFitbitReadiness(todaysEntry()) && !isFitbitSleep(todaysEntry())
+        ? '<div class="askFitbit"><span>&#9757;</span><span>The rings are showing an <b>estimate</b>. Open the Fitbit app, read today\'s <b>Readiness</b> and <b>Sleep score</b>, and type them in the first two boxes — the rings then show your real numbers.</span></div>'
+        : '')
+    + '<div class="entryGrid">'
     + f('in-readiness','Readiness · % (Fitbit)','—','1')
     + f('in-sleepScore','Sleep score · % (Fitbit)','—','1')
     + f('in-hrv','HRV · ms','—','1')

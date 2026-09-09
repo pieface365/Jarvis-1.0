@@ -50,7 +50,11 @@ function pickSlot(rows: Row[], slot: string): Obj | null {
   return match && typeof match === 'object' && !Array.isArray(match) ? (match as Obj) : null
 }
 
-/* ── vitals: recovery estimate (same weighting as public/tiles/vitals.html) ─ */
+/* ── vitals: readiness (same rules as public/tiles/vitals.html) ────────────
+   Fitbit's Daily Readiness can't be synced (the Google Health API rejects the
+   data type), so it's typed into the Vitals tile. When it's there it IS the
+   number, and the weighted estimate below is only the fallback — the widget
+   must agree with the tile, not quietly show a different figure. */
 
 const FEEL_REC: Record<number, number> = { 1: 20, 2: 50, 3: 75, 4: 95 }
 const FEEL_SLEEP_ADJ: Record<number, number> = { 1: -10, 2: 0, 3: 4, 4: 8 }
@@ -60,6 +64,12 @@ function adjSleepPerf(h: Obj): number | null {
   if (p == null) return null
   const a = typeof h.feel === 'number' ? FEEL_SLEEP_ADJ[h.feel] ?? 0 : 0
   return Math.max(1, Math.min(100, Math.round(p + a)))
+}
+
+function dayReadiness(h: Obj): number | null {
+  const manual = num(h.readiness)
+  if (manual != null) return Math.max(1, Math.min(99, Math.round(manual)))
+  return estRecovery(h)
 }
 
 function estRecovery(h: Obj): number | null {
@@ -91,7 +101,15 @@ function latestVitals(store: Obj | null) {
   const e = key ? store[key] : null
   if (!key || !e || typeof e !== 'object') return null
   const h = e as Obj
-  return { date: key, hrv: num(h.hrv), rhr: num(h.rhr), sleepHours: num(h.sleepHours), recovery: estRecovery(h) }
+  return {
+    date: key,
+    hrv: num(h.hrv),
+    rhr: num(h.rhr),
+    sleepHours: num(h.sleepHours),
+    recovery: dayReadiness(h),
+    sleepScore: num(h.sleepScore) ?? adjSleepPerf(h),
+    source: num(h.readiness) != null ? 'fitbit' : 'estimated',
+  }
 }
 
 /* ── fuel: today's totals vs. goal ──────────────────────────────────────── */
