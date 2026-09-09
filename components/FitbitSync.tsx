@@ -72,6 +72,10 @@ export default function FitbitSync({ userId }: { userId: string }) {
         const clamp01 = (x: number) => Math.max(0, Math.min(1, x))
         const recovery = (() => {
           if (!h) return null
+          /* Fitbit's own Daily Readiness, typed into the Vitals tile, is the
+             real number — the Health API can't supply it. When it's there it
+             wins outright, so Train and Vitals never disagree. */
+          if (typeof h.readiness === 'number') return Math.max(1, Math.min(99, Math.round(h.readiness)))
           const parts: number[] = []
           const w: number[] = []
           if (typeof h.hrv === 'number') { parts.push(clamp01((h.hrv - 20) / 70) * 100); w.push(0.5) }
@@ -97,6 +101,8 @@ export default function FitbitSync({ userId }: { userId: string }) {
           const readiness = {
             date: todayKey, recovery,
             hrv: h.hrv ?? null, rhr: h.rhr ?? null, sleepHours: h.sleepHours ?? null, hrvBase,
+            sleepScore: h.sleepScore ?? null,
+            source: typeof h.readiness === 'number' ? ('fitbit' as const) : ('estimated' as const),
           }
           const train = await loadTileData(userId, 'train')
           if (train && typeof train === 'object' && !Array.isArray(train)) {
@@ -111,7 +117,9 @@ export default function FitbitSync({ userId }: { userId: string }) {
               prev.hrv === readiness.hrv &&
               prev.rhr === readiness.rhr &&
               prev.sleepHours === readiness.sleepHours &&
-              prev.hrvBase === readiness.hrvBase
+              prev.hrvBase === readiness.hrvBase &&
+              prev.sleepScore === readiness.sleepScore &&
+              prev.source === readiness.source
             if (!same) {
               // existing state (any version — the tile's boot migrates): ride along
               ;(train as any).readiness = readiness

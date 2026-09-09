@@ -50,6 +50,7 @@
   .recFill{fill:none;stroke:currentColor;stroke-width:10;stroke-linecap:round;transition:stroke-dashoffset 800ms var(--ease-premium);filter:drop-shadow(0 0 4px currentColor) drop-shadow(0 0 11px currentColor)}
   .ringWrap{display:flex;flex-direction:column;align-items:center;gap:10px}
   .ringSub{font-weight:600;font-size:1.1rem;font-variant-numeric:tabular-nums;color:var(--fg)}
+  .ringNote{font-family:var(--font-mono);font-size:8.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:3px;text-align:center;white-space:nowrap}
   .recInner{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;max-width:120px}
   .recNum{color:var(--fg);font-weight:700;font-size:2.2rem;line-height:1;font-variant-numeric:tabular-nums}
   .recNum small{font-size:.95rem;color:var(--muted-strong)}
@@ -189,6 +190,24 @@ function estRecovery(h){
   const sw=w.reduce((a,b)=>a+b,0); let s=0; for(let i=0;i<parts.length;i++)s+=parts[i]*w[i];
   return Math.max(1,Math.min(99,Math.round(s/sw)));
 }
+/* ---- the two scores the rings show ---------------------------------
+   Fitbit's Daily Readiness and Sleep Score are NOT reachable from the
+   Google Health API — asking for the `daily-readiness` or `sleep-score`
+   data types returns "not supported", and a sleep record carries only raw
+   minutes (no score field anywhere). So they're typed in from the Fitbit
+   app, and when present they ARE the number on the ring. The estimate
+   below is only the fallback for days you haven't entered.
+
+   Don't confuse sleepScore with sleepPerf: sleepPerf is EFFICIENCY,
+   minutesAsleep/minutesInSleepPeriod, which the sync computes. It rates
+   how little you stirred in bed and says nothing about how long you slept,
+   which is why a 5h night scores 96 there and 66 in the Fitbit app. */
+function dayReadiness(h){ const v=num(h&&h.readiness); return v!=null?v:estRecovery(h); }
+function isFitbitReadiness(h){ return num(h&&h.readiness)!=null; }
+function daySleepScore(h){ const v=num(h&&h.sleepScore); return v!=null?v:adjSleepPerf(h); }
+function isFitbitSleep(h){ return num(h&&h.sleepScore)!=null; }
+/* Fitbit's own sleep-score bands: 90+ excellent, 80+ good, 60+ fair */
+function scoreTone(p){ if(p==null)return 'muted'; if(p>=80)return 'good'; if(p>=60)return 'watch'; return 'low'; }
 function tone(r){ if(r==null)return 'muted'; if(r>=67)return 'good'; if(r>=34)return 'watch'; return 'low'; }
 function sleepTone(p){ if(p==null)return 'muted'; if(p>=85)return 'good'; if(p>=60)return 'watch'; return 'low'; }
 function fmtHM(h){ if(h==null)return '—'; const hh=Math.floor(h),mm=Math.round((h-hh)*60); return hh+'h '+String(mm).padStart(2,'0')+'m'; }
@@ -197,7 +216,9 @@ function fmtHM(h){ if(h==null)return '—'; const hh=Math.floor(h),mm=Math.round
 function entries(){
   return Object.keys(store).filter(k=>/^\d{4}-\d{2}-\d{2}$/.test(k)).sort().map(k=>{
     const e=store[k]||{};
-    return {dateKey:k,hrv:num(e.hrv),rhr:num(e.rhr),sleepHours:num(e.sleepHours),sleepPerf:num(e.sleepPerf),feel:(typeof e.feel==='number'?e.feel:null),weight:num(e.weight),recovery:estRecovery(e)};
+    return {dateKey:k,hrv:num(e.hrv),rhr:num(e.rhr),sleepHours:num(e.sleepHours),sleepPerf:num(e.sleepPerf),
+      readiness:num(e.readiness),sleepScore:num(e.sleepScore),
+      feel:(typeof e.feel==='number'?e.feel:null),weight:num(e.weight),recovery:dayReadiness(e)};
   });
 }
 
@@ -219,12 +240,12 @@ function chipDelta(key,val,goodDir,unit){
   return '<div class="statDelta" style="color:'+(good?'var(--pos)':'var(--neg)')+'">'+(d>0?'▲':'▼')+' '+shown+unit+' vs 7d</div>';
 }
 
-function ringWrap(value,toneStr,cap,sub){
+function ringWrap(value,toneStr,cap,sub,note){
   const circ=2*Math.PI*64;
   const ring='<div class="recRing" data-tone="'+toneStr+'"><svg viewBox="0 0 150 150" aria-hidden="true"><circle cx="75" cy="75" r="64" class="recTrack"/>'
     +(value!=null?'<circle cx="75" cy="75" r="64" class="recFill" style="stroke-dasharray:'+circ+';stroke-dashoffset:'+(circ*(1-value/100))+'"/>':'')
     +'</svg><div class="recInner"><div class="recNum">'+(value!=null?Math.round(value):'—')+(value!=null?'<small>%</small>':'')+'</div><div class="recCap">'+cap+'</div></div></div>';
-  return '<div class="ringWrap">'+ring+(sub?'<div class="ringSub">'+sub+'</div>':'')+'</div>';
+  return '<div class="ringWrap">'+ring+(sub?'<div class="ringSub">'+sub+'</div>':'')+(note?'<div class="ringNote">'+note+'</div>':'')+'</div>';
 }
 
 /* ---------- trend chart ---------- */
@@ -325,7 +346,9 @@ function pearson(pairs){
 const CORR_PAIRS=[
   ['sleepHours','hrv','Sleep (h)','HRV (ms)'],
   ['sleepHours','rhr','Sleep (h)','Resting HR'],
-  ['sleepPerf','hrv','Sleep score','HRV (ms)'],
+  ['sleepPerf','hrv','Sleep efficiency','HRV (ms)'],
+  ['sleepScore','hrv','Sleep score','HRV (ms)'],
+  ['sleepScore','sleepHours','Sleep score','Sleep (h)'],
   ['hrv','rhr','HRV (ms)','Resting HR'],
   ['feel','hrv','Feel (1–4)','HRV (ms)'],
   ['feel','sleepHours','Feel (1–4)','Sleep (h)'],
@@ -407,12 +430,12 @@ function tips(rec,h){
   if(rec!=null){
     if(rec>=67) out.push(['&#9889;','<b>Green light.</b> You\'re primed — good day for a hard session or a PR attempt.']);
     else if(rec>=34) out.push(['&#128993;','<b>Moderate.</b> Train, but keep it smart — quality over max intensity today.']);
-    else out.push(['&#128721;','<b>Low recovery.</b> Go easy — light movement, hydration, and protect tonight\'s sleep.']);
+    else out.push(['&#128721;','<b>Low readiness.</b> Go easy — light movement, hydration, and protect tonight\'s sleep.']);
   }
   if(h&&typeof h.sleepHours==='number'&&h.sleepHours<7) out.push(['&#128564;','<b>Short sleep ('+fmtHM(h.sleepHours)+').</b> Aim for 7–9h tonight — it\'s the biggest lever on tomorrow\'s recovery.']);
   if(h&&typeof h.hrv==='number'&&h.hrv<35) out.push(['&#128201;','<b>HRV is low ('+Math.round(h.hrv)+'ms).</b> A sign of stress or fatigue — prioritise rest and easy days.']);
   if(h&&typeof h.rhr==='number'&&h.rhr>65) out.push(['&#10084;&#65039;','<b>Resting HR is elevated ('+Math.round(h.rhr)+'bpm).</b> Could be stress, poor sleep, or coming down with something.']);
-  if(!out.length) out.push(['&#9989;','Enter today\'s HRV, resting HR or sleep above and your readiness, trends and tips fill in here.']);
+  if(!out.length) out.push(['&#9989;','Enter today\'s readiness and sleep score from the Fitbit app — or just HRV, resting HR and sleep — and your trends and tips fill in here.']);
   return out;
 }
 
@@ -428,30 +451,35 @@ function entryHtml(){
     +   '<input class="dnDate" id="dn-date" type="date" value="'+(editDate||todayKey())+'" max="'+todayKey()+'">'
     +   '<button class="dnBtn" data-datenav="1" aria-label="Next day"'+(isToday?' disabled':'')+'>&#8250;</button>'
     + '</div></div><div class="entryGrid">'
+    + f('in-readiness','Readiness · % (Fitbit)','—','1')
+    + f('in-sleepScore','Sleep score · % (Fitbit)','—','1')
     + f('in-hrv','HRV · ms','—','1')
     + f('in-rhr','Resting HR · bpm','—','1')
     + f('in-sleepHours','Sleep · hours','—','0.1')
-    + f('in-sleepPerf','Sleep score · %','—','1')
+    + f('in-sleepPerf','Sleep efficiency · %','—','1')
     + f('in-weight','Weight · lb','—','0.1')
     + '</div><div class="hint" id="hint">'+(isToday
-      ? 'Fill in what your band or app shows — recovery is estimated from HRV, resting HR and sleep.'
+      ? 'Readiness and sleep score come from the Fitbit app — the Health API doesn\'t expose either, so type them in and the rings show your real numbers. Leave them blank and readiness is estimated from HRV, resting HR and sleep instead. HRV, resting HR, sleep hours and efficiency sync automatically.'
       : 'Editing a past day — every value (and the feel tap below) writes to '+fmtEditDate()+'. Charts update live.')+'</div></section>';
 }
 function heroHtml(){
   const h=todaysEntry();
-  const rec=estRecovery(h);
+  const rec=dayReadiness(h);
+  const fitR=isFitbitReadiness(h);
   const t=tone(rec);
   const statusWord=t==='good'?'Primed':t==='watch'?'Moderate':t==='low'?'Run down':'Awaiting data';
-  const statusLine=rec==null?'Enter your HRV or sleep above to estimate today\'s readiness.'
+  const statusLine=rec==null?'Enter today\'s readiness score above, or your HRV and sleep to estimate it.'
     : t==='good'?'You\'re well recovered and ready to push.'
     : t==='watch'?'Partially recovered — train smart today.'
     : 'Your body needs rest — keep it light.';
-  const recRing=ringWrap(rec,t,'Recovery','');
-  const hasSleep=(typeof h.sleepPerf==='number'||typeof h.sleepHours==='number');
-  const sp=adjSleepPerf(h);
-  const sleepRing=hasSleep
-    ? ringWrap(sp,sleepTone(sp),'Sleep',typeof h.sleepHours==='number'?fmtHM(h.sleepHours):'')
-    : ringWrap(null,'muted','Sleep','');
+  const recRing=ringWrap(rec,t,'Readiness','',rec==null?'':(fitR?'from Fitbit':'estimated'));
+  const ss=daySleepScore(h);
+  const fitS=isFitbitSleep(h);
+  const sleepRing=ss!=null
+    ? ringWrap(ss,fitS?scoreTone(ss):sleepTone(ss),'Sleep',
+        typeof h.sleepHours==='number'?fmtHM(h.sleepHours):'',
+        fitS?'from Fitbit':'efficiency only')
+    : ringWrap(null,'muted','Sleep',typeof h.sleepHours==='number'?fmtHM(h.sleepHours):'','');
   return '<section class="card"><span class="cardName">Today</span>'
     +'<div class="hero">'+recRing+sleepRing+'</div>'
     +'<div class="statusBlock"><div class="statusWord" data-tone="'+t+'">'+statusWord+'</div><p class="statusLine">'+statusLine+'</p></div>'
@@ -464,7 +492,8 @@ function heroHtml(){
 /* ---------- week in review: last 7 days vs the 7 before ---------- */
 function weekHtml(){
   const rows=[
-    ['Recovery','recovery','%','up',v=>Math.round(v)],
+    ['Readiness','recovery','%','up',v=>Math.round(v)],
+    ['Sleep score','sleepScore','%','up',v=>Math.round(v)],
     ['Sleep','sleepHours','h/night','up',v=>Math.round(v*10)/10],
     ['HRV','hrv','ms','up',v=>Math.round(v)],
     ['Resting HR','rhr','bpm','down',v=>Math.round(v)],
@@ -508,11 +537,11 @@ function heatHtml(){
     const d=new Date(start); d.setDate(start.getDate()+c*7+r);
     if(d>now) continue;
     const k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-    const e=store[k]; const rec=e?estRecovery(e):null;
+    const e=store[k]; const rec=e?dayReadiness(e):null;
     const hasAny=e&&Object.keys(e).length>0;
     const fill=rec!=null?toneColor[tone(rec)]:(hasAny?'#3a3a42':'var(--track)');
     if(rec!=null) logged++;
-    const tip=fmtTipDate(k)+(rec!=null?' · Recovery '+rec+'%':' · no data')+((e&&typeof e.sleepHours==='number')?' · '+fmtHM(e.sleepHours):'');
+    const tip=fmtTipDate(k)+(rec!=null?' · Readiness '+rec+'%':' · no data')+((e&&typeof e.sleepHours==='number')?' · '+fmtHM(e.sleepHours):'');
     cells+='<rect class="tipHit" data-heatday="'+k+'" data-tip="'+esc2(tip)+'" x="'+(30+c*(cell+gap))+'" y="'+(r*(cell+gap))+'" width="'+cell+'" height="'+cell+'" rx="2.5" fill="'+fill+'"'
       +(k===todayKey()?' stroke="#6EE7B7" stroke-width="1.2"':'')
       +(rec==null?' opacity=".5"':'')+'/>';
@@ -629,7 +658,7 @@ document.addEventListener('input',e=>{
        synced values) survive an edit; writes go to the SELECTED day */
     const k0=editDate||todayKey();
     const e2={...(store[k0]||{})};
-    ['hrv','rhr','sleepHours','sleepPerf','weight'].forEach(k=>{const v=num($('in-'+k).value); if(v!=null)e2[k]=v; else delete e2[k];});
+    ['readiness','sleepScore','hrv','rhr','sleepHours','sleepPerf','weight'].forEach(k=>{const v=num($('in-'+k).value); if(v!=null)e2[k]=v; else delete e2[k];});
     store[k0]=e2;
     persist();
     renderOutput();
