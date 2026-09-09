@@ -124,23 +124,55 @@ export async function healthGet(pathAndQuery: string): Promise<any> {
 }
 
 /**
- * List a data type's recent points. No server-side filter: the filter grammar
- * matched nothing in practice (200 + empty), so we paginate newest-first and
- * let the caller date-filter. Pages can be empty yet still carry a
- * nextPageToken, so emptiness never stops the walk — only a missing token or
- * the caps do.
+ * List a data type's points, newest first, walking back until the window is
+ * covered.
+ *
+ * No server-side filter: the filter grammar matched nothing in practice (200 +
+ * empty), so we paginate and let the caller date-filter. Pages can be empty yet
+ * still carry a nextPageToken, so emptiness never stops the walk.
+ *
+ * The stop condition is a DATE, not a point count. It used to be `all.length <
+ * 400`, which quietly capped the walk two pages in — fine for the once-a-day
+ * types, but heart-rate-variability arrives 26-128 samples per night, so 400
+ * points was about six nights and the rest of the history was invisible. Worse,
+ * the cut landed mid-day, so the oldest date came back with only the samples
+ * that happened to fit and its daily average was computed from a fragment.
+ *
+ * Walking to a date fixes both: we stop only once a point OLDER than the window
+ * appears, which proves the window's oldest day was seen whole. `complete` says
+ * whether that proof holds — false means the page ceiling cut us short and the
+ * oldest date in the result may be partial.
  */
-export async function listDataPoints(dataType: string): Promise<any[]> {
+export async function listDataPoints(
+  dataType: string,
+  opts: {
+    /** YYYY-MM-DD; walk back until a point older than this shows up */
+    stopBefore?: string
+    /** pull the local calendar date out of a point */
+    dateOf?: (p: any) => string | null
+    /** hard ceiling so a bad token can't spin forever */
+    maxPages?: number
+  } = {},
+): Promise<{ points: any[]; complete: boolean }> {
+  const { stopBefore, dateOf, maxPages = 40 } = opts
   const base = `/users/me/dataTypes/${dataType}/dataPoints`
-  const all: any[] = []
+  const points: any[] = []
   let pageToken = ''
-  for (let page = 0; page < 8 && all.length < 400; page++) {
+  for (let page = 0; page < maxPages; page++) {
     const j = await healthGet(
       `${base}?pageSize=200${pageToken ? '&pageToken=' + encodeURIComponent(pageToken) : ''}`,
     )
-    all.push(...(j.dataPoints || []))
+    const got: any[] = j.dataPoints || []
+    points.push(...got)
+    // a point older than the window means everything after it is older too
+    if (stopBefore && dateOf) {
+      for (const p of got) {
+        const d = dateOf(p)
+        if (d && d < stopBefore) return { points, complete: true }
+      }
+    }
     pageToken = j.nextPageToken
-    if (!pageToken) break
+    if (!pageToken) return { points, complete: true } // ran out of history
   }
-  return all
+  return { points, complete: false }
 }

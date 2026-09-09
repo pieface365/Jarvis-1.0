@@ -665,6 +665,15 @@ document.addEventListener('input',e=>{
     const k0=editDate||todayKey();
     const e2={...(store[k0]||{})};
     ['readiness','sleepScore','hrv','rhr','sleepHours','sleepPerf','weight'].forEach(k=>{const v=num($('in-'+k).value); if(v!=null)e2[k]=v; else delete e2[k];});
+    /* Remember which field YOU typed, so the Fitbit sync may refresh its own
+       numbers (it corrects them as more samples land) without ever walking
+       over a value you set by hand. Only the field actually touched is
+       marked — the handler re-reads every input, and treating all of them as
+       manual would freeze the whole day. */
+    const touched=e.target.id.slice(3);
+    const man=new Set(Array.isArray(e2._m)?e2._m:[]);
+    if(e2[touched]!=null) man.add(touched); else man.delete(touched);
+    if(man.size) e2._m=[...man]; else delete e2._m;
     store[k0]=e2;
     persist();
     renderOutput();

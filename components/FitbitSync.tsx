@@ -45,15 +45,22 @@ export default function FitbitSync({ userId }: { userId: string }) {
         if (cancelled || !days || typeof days !== 'object') return
 
         const cur = await loadTileData(userId, 'vitals')
-        const store: Record<string, Record<string, number>> =
+        const store: Record<string, Record<string, any>> =
           cur && typeof cur === 'object' && !Array.isArray(cur)
-            ? { ...(cur as Record<string, Record<string, number>>) }
+            ? { ...(cur as Record<string, Record<string, any>>) }
             : {}
         let changed = false
         for (const [date, vals] of Object.entries(days as Record<string, Record<string, number>>)) {
           const entry = { ...(store[date] || {}) }
+          /* Fields you typed in the tile, which Fitbit must never overwrite. */
+          const manual: string[] = Array.isArray(entry._m) ? entry._m : []
           for (const [k, v] of Object.entries(vals)) {
-            if (entry[k] == null) {
+            if (manual.includes(k)) continue
+            /* Refresh rather than fill-once. Fitbit revises these as more
+               samples arrive overnight, and the old "only if empty" rule
+               froze whatever landed first — a heart-rate-variability average
+               taken from a partial night stayed wrong forever. */
+            if (entry[k] !== v) {
               entry[k] = v
               changed = true
             }

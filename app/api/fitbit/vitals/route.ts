@@ -63,12 +63,32 @@ export async function GET(req: Request) {
     ;(out[date] ||= {})[k] = v
   }
 
+  /* Each walk stops once it sees a day older than the window, which is what
+     guarantees the window's oldest day arrived whole. */
+  const sleepDate = (p: any) => {
+    const s = payload(p, 'sleep')
+    return s ? localDate(s.interval?.endTime, s.interval?.endUtcOffset) || pointDate(p) : null
+  }
+  const hrvDate = (p: any) => {
+    const h = payload(p, 'heartRateVariability')
+    return h ? localDate(h?.sampleTime?.physicalTime, h?.sampleTime?.utcOffset) || pointDate(p) : null
+  }
+  const rhrDate = (p: any) => {
+    const r = payload(p, 'dailyRestingHeartRate')
+    if (!r) return null
+    return r.date?.year
+      ? `${r.date.year}-${pad(r.date.month)}-${pad(r.date.day)}`
+      : typeof r.date === 'string'
+        ? r.date.slice(0, 10)
+        : pointDate(p)
+  }
+
   const results = await Promise.allSettled([
-    listDataPoints('sleep').then((points) =>
+    listDataPoints('sleep', { stopBefore: startKey, dateOf: sleepDate }).then(({ points }) =>
       points.forEach((p: any) => {
         const s = payload(p, 'sleep')
         if (!s) return
-        const date = localDate(s.interval?.endTime, s.interval?.endUtcOffset) || pointDate(p)
+        const date = sleepDate(p)
         const asleep = num(s.summary?.minutesAsleep)
         const inBed = num(s.summary?.minutesInSleepPeriod)
         if (asleep != null) {
@@ -77,31 +97,35 @@ export async function GET(req: Request) {
         }
       }),
     ),
-    listDataPoints('heart-rate-variability').then((points) => {
-      // possibly several samples per day (nightly readings) — average them
-      const byDate: Record<string, number[]> = {}
-      points.forEach((p: any) => {
-        const h = payload(p, 'heartRateVariability')
-        const v = num(h?.rootMeanSquareOfSuccessiveDifferencesMilliseconds)
-        const date =
-          localDate(h?.sampleTime?.physicalTime, h?.sampleTime?.utcOffset) || pointDate(p)
-        if (date && v != null) (byDate[date] ||= []).push(v)
-      })
-      Object.entries(byDate).forEach(([date, vals]) =>
-        set(date, 'hrv', Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10),
-      )
-    }),
-    listDataPoints('daily-resting-heart-rate').then((points) =>
-      points.forEach((p: any) => {
-        const r = payload(p, 'dailyRestingHeartRate')
-        if (!r) return
-        const date = r.date?.year
-          ? `${r.date.year}-${pad(r.date.month)}-${pad(r.date.day)}`
-          : typeof r.date === 'string'
-            ? r.date.slice(0, 10)
-            : pointDate(p)
-        set(date, 'rhr', num(r.beatsPerMinute ?? r.value?.beatsPerMinute))
-      }),
+    listDataPoints('heart-rate-variability', { stopBefore: startKey, dateOf: hrvDate }).then(
+      ({ points, complete }) => {
+        // 26-128 samples a night — average them per day
+        const byDate: Record<string, number[]> = {}
+        points.forEach((p: any) => {
+          const h = payload(p, 'heartRateVariability')
+          const v = num(h?.rootMeanSquareOfSuccessiveDifferencesMilliseconds)
+          const date = hrvDate(p)
+          if (date && v != null) (byDate[date] ||= []).push(v)
+        })
+        /* If the ceiling cut the walk short, the oldest date holds only the
+           samples that fit and would average to a number that isn't real.
+           Drop it rather than publish a fragment. */
+        if (!complete) {
+          const oldest = Object.keys(byDate).sort()[0]
+          if (oldest) delete byDate[oldest]
+        }
+        Object.entries(byDate).forEach(([date, vals]) =>
+          set(date, 'hrv', Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10),
+        )
+      },
+    ),
+    listDataPoints('daily-resting-heart-rate', { stopBefore: startKey, dateOf: rhrDate }).then(
+      ({ points }) =>
+        points.forEach((p: any) => {
+          const r = payload(p, 'dailyRestingHeartRate')
+          if (!r) return
+          set(rhrDate(p), 'rhr', num(r.beatsPerMinute ?? r.value?.beatsPerMinute))
+        }),
     ),
   ])
   const errors = results
