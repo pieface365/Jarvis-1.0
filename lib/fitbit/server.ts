@@ -114,6 +114,14 @@ export async function healthGet(pathAndQuery: string): Promise<any> {
     if (!token) throw Object.assign(new Error('token refresh failed'), { status: 401 })
     res = await attempt(token)
   }
+  /* Google throws an occasional 500 mid-pagination (seen 2026-09-09 on a
+     sleep page token). A single failed page rejects the whole walk and drops
+     that data type from the response for the entire sync, so give a
+     transient status a couple of short retries before surfacing it. */
+  for (let i = 0; i < 2 && (res.status === 429 || res.status >= 500); i++) {
+    await new Promise((r) => setTimeout(r, 400 * (i + 1)))
+    res = await attempt(token)
+  }
   if (!res.ok) {
     const body = (await res.text()).slice(0, 300)
     const err = new Error(`health api ${res.status} on ${pathAndQuery}: ${body}`) as Error & { status?: number }
