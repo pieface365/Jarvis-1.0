@@ -106,6 +106,9 @@
   .itemMeta{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
   .tag{ font-family:var(--font-mono); font-size:10px; font-weight:600; letter-spacing:0.02em; padding:3px 8px; border-radius:var(--radius-pill); border:1px solid; }
   .type{ font-family:var(--font-mono); font-size:9.5px; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); }
+  .itemAt{ font-family:var(--font-mono); font-size:10px; font-weight:600; color:var(--muted-strong); letter-spacing:.02em; white-space:nowrap; }
+  .itemWho{ font-family:var(--font-mono); font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted);
+    border:1px solid var(--border-strong); border-radius:var(--radius-pill); padding:1px 6px; white-space:nowrap; }
   .due{ font-family:var(--font-mono); font-size:11px; font-weight:600; font-variant-numeric:tabular-nums; margin-left:auto; white-space:nowrap; color:var(--muted-strong); }
   .due.overdue{ color:var(--neg); } .due.today{ color:var(--warn); } .due.soon{ color:var(--brand); }
   .del{ flex:none; appearance:none; background:transparent; border:0; color:var(--muted); cursor:pointer; padding:6px; border-radius:8px; display:grid; place-items:center; transition:all var(--dur) var(--ease); }
@@ -657,7 +660,9 @@
     var tag=it.subject?'<span class="tag" style="color:'+col+';border-color:'+col+'55;background:'+col+'14">'+esc(it.subject)+'</span>':'';
     return '<div class="item '+(it.done?'done':'')+' '+(!it.done&&dl.cls==='overdue'?'overdue':'')+'">'
       +'<button class="check '+(it.done?'on':'')+'" data-act="toggle" data-id="'+it.id+'" aria-label="Toggle done"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></button>'
-      +'<div class="itemMain"><span class="itemTitle">'+esc(it.title)+'</span><span class="itemMeta">'+tag+'<span class="type">'+esc(it.type||'')+'</span></span></div>'
+      +'<div class="itemMain"><span class="itemTitle">'+esc(it.title)+'</span><span class="itemMeta">'+tag+'<span class="type">'+esc(it.type||'')+'</span>'
+      +(it.who?'<span class="itemWho">'+esc(it.who)+'</span>':'')
+      +(it.at?'<span class="itemAt">'+esc(it.at)+'</span>':'')+'</span></div>'
       +'<span class="due '+(it.done?'':dl.cls)+'">'+esc(dl.text)+'</span>'
       +'<button class="del" data-act="del" data-id="'+it.id+'" aria-label="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></button></div>';
   }
@@ -1516,6 +1521,29 @@
       var hasLspace = (state.meetings||[]).some(function(m){ return /l'?space/i.test(m.name||''); });
       if(!hasLspace) state.meetings.push({ id:uid(), name:"L'SPACE Academy", days:[4], start:'19:00', end:'21:00', room:'Meeting' });
       state.seededLspace = true; persist();
+    }
+    // L'SPACE NPWEE deliverables. Dates are the programme's own (PT); 2026 is
+    // the only year where every weekday in the table lands right. Times are kept
+    // verbatim rather than converted to Eastern, so this reads the same as the
+    // official schedule everyone else is working from — note 11:59 PM PT is
+    // 2:59 AM ET the NEXT morning. Its own flag, and a name check, so it can't
+    // double-add on an install that already has them.
+    if(!state.seededNpwee){
+      var hasNpwee = state.items.some(function(it){ return /npwee/i.test(it.subject||''); });
+      if(!hasNpwee){
+        [
+          ['Idea Tracker',                                 '2026-09-27','11:59 PM PT','Team'],
+          ['Quad Charts',                                  '2026-10-07','11:59 PM PT','Team'],
+          ['Org Chart',                                    '2026-10-11','11:59 PM PT','Team'],
+          ['Shell Doc (Outline) of Solicitation Requirements','2026-10-18','11:59 PM PT','Team'],
+          ['Proposal and Team Roster',                     '2026-10-28','4:59 PM PT','Team'],
+          ['Review Panel — sign up for 1 (Nov 2–25)',       '2026-11-25','','Individual']
+        ].forEach(function(r){
+          state.items.push({ id:uid(), title:r[0], subject:"L'SPACE NPWEE", type:'Project',
+            due:r[1], at:r[2], who:r[3], done:false, createdAt:Date.now() });
+        });
+      }
+      state.seededNpwee = true; persist(); refreshClasses();
     }
     // Balanced training week, arranged around classes + gym hours. Rebuilt as
     // one plan so it stays consistent. 3 climbs / 3 lifts, Tue = full rest.
