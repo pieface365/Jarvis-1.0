@@ -159,10 +159,16 @@
   /* vertical time-grid (day + week) */
   .tgAllday{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:var(--space-4); }
   .evChip{ display:inline-flex; align-items:center; gap:7px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-pill); padding:4px 11px 4px 5px; font-size:12.5px; }
-  .tgScroll{ overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:6px; }
+  /* One column width for BOTH the header row and the columns under it. They
+     used to be set separately and the header never got the wider desktop
+     values, so every column sat further right than its own date — by Thursday
+     the drift was two columns and the day read as Saturday. */
+  .tgScroll{ overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:6px; --tgColW:112px; }
+  @media (min-width:640px){ .tgScroll{ --tgColW:150px; } }
+  @media (min-width:1000px){ .tgScroll{ --tgColW:190px; } }
   .tgHeadRow{ display:flex; gap:6px; margin-bottom:6px; width:max-content; }
   .tgGutterHead{ width:52px; flex:none; }
-  .tgHead{ width:112px; flex:none; text-align:center; }
+  .tgHead{ width:var(--tgColW); flex:none; text-align:center; }
   .tgHDow{ display:block; font-family:var(--font-mono); font-size:10px; letter-spacing:0.04em; text-transform:uppercase; color:var(--muted); }
   .tgHDate{ display:block; font-family:var(--font-display); font-weight:700; font-size:15px; margin-top:1px; }
   .tgHDots{ display:inline-flex; gap:3px; margin-top:3px; min-height:6px; }
@@ -174,9 +180,7 @@
   .tgCols{ display:flex; gap:6px; }
   .tgCols.one{ flex:1; }
   .tgCols.one .tgCol{ flex:1; }
-  .tgCols.week .tgCol{ width:112px; flex:none; }
-  @media (min-width:640px){ .tgCols.week .tgCol{ width:150px; } }
-  @media (min-width:1000px){ .tgCols.week .tgCol{ width:190px; } }
+  .tgCols.week .tgCol{ width:var(--tgColW); flex:none; }
   .tgCol{ position:relative; border:1px solid var(--border); border-radius:var(--radius-sm); }
   .tgBlock{ position:absolute; left:3px; right:3px; border:1px solid var(--border); border-left-width:3px; border-radius:7px; padding:5px 8px; overflow:hidden; display:flex; flex-direction:column; gap:1px; }
   .tgName{ font-size:12px; font-weight:600; line-height:1.15; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
