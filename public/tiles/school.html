@@ -228,6 +228,12 @@
   .llStep button:hover{ color:var(--fg); border-color:var(--brand-line); }
   .llStep .v{ font-family:var(--font-mono); font-size:12px; font-weight:700; min-width:20px; text-align:center; font-variant-numeric:tabular-nums; }
   .llStepLbl{ font-family:var(--font-mono); font-size:8.5px; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); display:block; margin-bottom:3px; text-align:center; }
+  .llUnitSel{ appearance:none; width:auto; display:inline; background:transparent; border:0; border-bottom:1px dotted var(--border-strong);
+    border-radius:0; padding:0 12px 0 0; margin:0; color:inherit; font-family:var(--font-mono); font-size:10.5px; cursor:pointer;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23848489' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 1px center; background-size:7px; transition:color var(--dur) var(--ease); }
+  .llUnitSel:hover{ color:var(--fg); }
+  .llUnitSel:focus{ outline:none; border-bottom-color:var(--brand-line); color:var(--fg); }
   .llPips{ display:inline-flex; gap:2px; vertical-align:middle; margin-left:4px; }
   .llPips i{ width:5px; height:5px; border-radius:50%; background:var(--border-strong); display:inline-block; }
   .llPips i.on{ background:var(--brand); }
@@ -457,7 +463,10 @@
       <div class="add">
         <div class="addGrid four">
           <div class="field wide"><label for="llName">Lecture / topic</label><input id="llName" type="text" list="classes" placeholder="e.g. Renal pharmacology" maxlength="70" /></div>
-          <div class="field"><label for="llCount">How many</label><input id="llCount" type="number" min="1" max="999" step="1" placeholder="8" /></div>
+          <div class="field"><label for="llCount">How many</label><input id="llCount" type="number" min="1" max="9999" step="1" placeholder="60" /></div>
+          <div class="field"><label for="llUnit">Of what</label>
+            <select id="llUnit"><option value="slides" selected>Slides</option><option value="pages">Pages</option><option value="lectures">Lectures</option><option value="chapters">Chapters</option></select>
+          </div>
           <div class="field"><label for="llDiff">Difficulty 1–5</label><input id="llDiff" type="number" min="1" max="5" step="1" placeholder="3" /></div>
         </div>
         <div class="btnRow"><button class="btn small" id="llAdd" type="button">Add to the list</button></div>
@@ -993,6 +1002,12 @@
      Ordered by how much work a topic actually is: how many lectures times
      how hard they are. Difficulty alone would put a single brutal lecture
      above twenty easy ones; count alone would do the reverse. */
+  /* What the count actually measures. Slides is the default because that's
+     what a lecture deck is counted in; the old rows predate the field and were
+     slides all along, so they adopt it too. */
+  var LL_UNITS = { slides:['slide','slides'], pages:['page','pages'], lectures:['lecture','lectures'], chapters:['chapter','chapters'] };
+  function llUnitOf(x){ return LL_UNITS[x && x.unit] ? x.unit : 'slides'; }
+  function llUnitWord(unit, n){ var u=LL_UNITS[unit]||LL_UNITS.slides; return n===1 ? u[0] : u[1]; }
   function llScore(x){ return (+x.count||0) * (+x.diff||0); }
   function clampInt(v, lo, hi, dflt){
     var n=Math.round(+v); if(!isFinite(n)) return dflt;
@@ -1000,20 +1015,36 @@
   }
   function addLectureLoad(){
     var name=$('llName').value.trim(); if(!name){ $('llName').focus(); return; }
-    var count=clampInt($('llCount').value, 1, 999, 1);
+    var count=clampInt($('llCount').value, 1, 9999, 1);
     var diff =clampInt($('llDiff').value, 1, 5, 3);
-    state.lectureLoad.push({ id:uid(), name:name, count:count, diff:diff });
+    var unit =llUnitOf({ unit: $('llUnit').value });
+    state.lectureLoad.push({ id:uid(), name:name, count:count, diff:diff, unit:unit });
     $('llName').value=''; $('llCount').value=''; $('llDiff').value=''; $('llName').focus();
     persist(); renderLectureLoad();
   }
   function bumpLoad(id, field, by){
     var x=(state.lectureLoad||[]).find(function(y){ return y.id===id; }); if(!x) return;
-    if(field==='count') x.count=clampInt(x.count+by, 1, 999, 1);
+    if(field==='count') x.count=clampInt(x.count+by, 1, 9999, 1);
     else x.diff=clampInt(x.diff+by, 1, 5, 3);
     persist(); renderLectureLoad();
   }
   function delLectureLoad(id){
     state.lectureLoad=(state.lectureLoad||[]).filter(function(x){ return x.id!==id; });
+    persist(); renderLectureLoad();
+  }
+  /* The unit reads as part of the sentence but is a real <select>, so a row
+     mislabelled on the way in can be fixed without deleting it. Options follow
+     the count's plurality, so it never says "1 slides". */
+  function unitSelHtml(x){
+    var cur=llUnitOf(x);
+    var opts=Object.keys(LL_UNITS).map(function(u){
+      return '<option value="'+u+'"'+(u===cur?' selected':'')+'>'+llUnitWord(u, x.count)+'</option>';
+    }).join('');
+    return '<select class="llUnitSel" data-llunit="'+x.id+'" aria-label="What the count measures">'+opts+'</select>';
+  }
+  function setLoadUnit(id, unit){
+    var x=(state.lectureLoad||[]).find(function(y){ return y.id===id; }); if(!x) return;
+    x.unit=llUnitOf({ unit:unit });
     persist(); renderLectureLoad();
   }
   function renderLectureLoad(){
@@ -1028,12 +1059,12 @@
     list.sort(function(a,b){ return llScore(b)-llScore(a) || (b.diff-a.diff) || a.name.localeCompare(b.name); });
     var top=llScore(list[0])||1;
     $('llList').innerHTML=list.map(function(x,i){
-      var sc=llScore(x), col=colorFor(x.name);
+      var col=colorFor(x.name), sc=llScore(x);
       var pips=''; for(var d=1;d<=5;d++) pips+='<i class="'+(d<=x.diff?'on':'')+'"></i>';
       return '<div class="llRow" style="border-left-color:'+col+';opacity:'+(0.55+0.45*(sc/top)).toFixed(2)+'">'
         + '<span class="llRank">'+(i+1)+'</span>'
         + '<div class="llMain"><div class="llName">'+esc(x.name)+'</div>'
-        + '<div class="llMeta">'+x.count+' lecture'+(x.count===1?'':'s')+' · difficulty '+x.diff
+        + '<div class="llMeta">'+x.count+' '+unitSelHtml(x)+' · difficulty '+x.diff
         + '<span class="llPips">'+pips+'</span></div></div>'
         + '<div><span class="llStepLbl">How many</span><span class="llStep">'
         + '<button data-act="llc" data-id="'+x.id+'" data-by="-1" type="button" aria-label="One fewer">−</button>'
@@ -1413,6 +1444,10 @@
   $('stBody').addEventListener('click', studySlotClick);
   $('sPad').addEventListener('input', padInput);
   $('llAdd').addEventListener('click', addLectureLoad);
+  document.addEventListener('change', function(e){
+    var sel=e.target.closest && e.target.closest('[data-llunit]');
+    if(sel) setLoadUnit(sel.getAttribute('data-llunit'), sel.value);
+  });
   $('llName').addEventListener('keydown', function(e){ if(e.key==='Enter') addLectureLoad(); });
   $('llCount').addEventListener('keydown', function(e){ if(e.key==='Enter') addLectureLoad(); });
   $('llDiff').addEventListener('keydown', function(e){ if(e.key==='Enter') addLectureLoad(); });
@@ -1460,7 +1495,8 @@
       else if(Array.isArray(saved)) state = { items: saved };
     } catch(e){}
     if(!state.items) state.items=[]; if(!state.classes) state.classes=[]; if(!state.grades) state.grades=[]; if(!state.lectures) state.lectures=[]; if(!state.meetings) state.meetings=[]; if(!state.training) state.training=[]; if(!state.events) state.events=[]; if(!state.study) state.study=[];
-    if(!state.lectureLoad) state.lectureLoad=[]; if(typeof state.studyNotes!=='string') state.studyNotes='';
+    if(!state.lectureLoad) state.lectureLoad=[];
+    state.lectureLoad.forEach(function(x){ if(!LL_UNITS[x.unit]) x.unit='slides'; }); if(typeof state.studyNotes!=='string') state.studyNotes='';
     // One-time seed of Nishk's Fall 2026 weekly class schedule (recurring meetings).
     if(!state.seededSchedule){
       var SEED_MEETINGS=[
