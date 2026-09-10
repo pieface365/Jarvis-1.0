@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { footprintFor, packTiles } from '@/lib/tiles/packLayout'
 import { tileStore } from '@/lib/tiles/tileStore'
 import { CORE_TILES, VEE_TILE, DEFAULT_HOME_ORDER, coreDefaultSize, type CoreTile } from '@/lib/tiles/coreTiles'
@@ -597,8 +597,18 @@ function VisionEmptyState({ onNewTile }: { onNewTile: () => void }) {
 
 /* ── bottom dock: hop between sections from anywhere (stays above an open
    tile, so Train → Fuel is one tap without passing through the dashboard) ── */
-function Dock({ activeId, onSelect }: { activeId: string; onSelect: (id: string) => void }) {
-  const items: { id: string; label: string; icon: React.ReactNode }[] = [
+function Dock({
+  activeId,
+  onSelect,
+  onCustomize,
+}: {
+  activeId: string
+  onSelect: (id: string) => void
+  /* Customize lives here rather than floating over the grid: as a fixed
+     button at bottom-left it sat on top of whatever tile was underneath. */
+  onCustomize?: () => void
+}) {
+  const items: { id: string; label: string; icon: React.ReactNode; action?: () => void; sep?: boolean }[] = [
     {
       id: 'home', label: 'Home',
       icon: (
@@ -622,6 +632,17 @@ function Dock({ activeId, onSelect }: { activeId: string; onSelect: (id: string)
         </svg>
       ),
     },
+    ...(onCustomize
+      ? [{
+          id: '__customize', label: 'Customize', sep: true, action: onCustomize,
+          icon: (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 20h9" />
+              <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+            </svg>
+          ),
+        }]
+      : []),
   ]
   return (
     <nav
@@ -638,25 +659,29 @@ function Dock({ activeId, onSelect }: { activeId: string; onSelect: (id: string)
       {items.map((it) => {
         const on = activeId === it.id
         return (
-          <button
-            key={it.id}
-            type="button"
-            onClick={() => onSelect(it.id)}
-            aria-current={on ? 'page' : undefined}
-            style={{
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-              minWidth: 58, padding: '7px 8px 5px', cursor: 'pointer', border: 'none', borderRadius: 12,
-              background: on ? 'rgba(255,255,255,.08)' : 'transparent',
-              color: on ? 'var(--mint, #6EE7B7)' : 'rgba(255,255,255,.45)',
-              transition: 'color .15s, background .15s',
-            }}
-          >
-            <span style={{ width: 18, height: 18, display: 'grid', placeItems: 'center' }}>{it.icon}</span>
-            <span style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 9, letterSpacing: '.08em', textTransform: 'uppercase' }}>
-              {it.label}
-            </span>
-            <span style={{ width: 16, height: 2, borderRadius: 2, background: on ? 'var(--mint, #6EE7B7)' : 'transparent' }} />
-          </button>
+          <Fragment key={it.id}>
+            {it.sep && (
+              <span aria-hidden style={{ width: 1, alignSelf: 'stretch', margin: '4px 5px', background: 'rgba(255,255,255,.10)' }} />
+            )}
+            <button
+              type="button"
+              onClick={() => (it.action ? it.action() : onSelect(it.id))}
+              aria-current={on ? 'page' : undefined}
+              style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                minWidth: 58, padding: '7px 8px 5px', cursor: 'pointer', border: 'none', borderRadius: 12,
+                background: on ? 'rgba(255,255,255,.08)' : 'transparent',
+                color: on ? 'var(--mint, #6EE7B7)' : 'rgba(255,255,255,.45)',
+                transition: 'color .15s, background .15s',
+              }}
+            >
+              <span style={{ width: 18, height: 18, display: 'grid', placeItems: 'center' }}>{it.icon}</span>
+              <span style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 9, letterSpacing: '.08em', textTransform: 'uppercase' }}>
+                {it.label}
+              </span>
+              <span style={{ width: 16, height: 2, borderRadius: 2, background: on ? 'var(--mint, #6EE7B7)' : 'transparent' }} />
+            </button>
+          </Fragment>
         )
       })}
     </nav>
@@ -667,9 +692,11 @@ interface DashboardGridProps {
   userId: string
   chrome?: DashboardChrome
   arranging?: boolean
+  /** opens the Customize panel — rendered as the last item in the dock */
+  onCustomize?: () => void
 }
 
-export default function DashboardGrid({ userId, arranging = false }: DashboardGridProps) {
+export default function DashboardGrid({ userId, arranging = false, onCustomize }: DashboardGridProps) {
   const ref = useRef<HTMLDivElement>(null)
   const [mounted, setMounted] = useState(false)
   const [cols, setCols] = useState(4)
@@ -1095,6 +1122,7 @@ export default function DashboardGrid({ userId, arranging = false }: DashboardGr
       />
 
       <Dock
+        onCustomize={onCustomize}
         activeId={coachOpen ? 'coach' : openId ?? 'home'}
         onSelect={(id) => {
           // clear any stale voice question so reopening by hand doesn't re-ask it

@@ -234,23 +234,13 @@ export default function Dashboard({ firstName, userId }: DashboardProps) {
           </div>
         </div>
 
-        <DashboardGrid userId={userId} chrome={chrome ?? DEFAULT_CHROME} arranging={arranging} />
+        <DashboardGrid
+          userId={userId}
+          chrome={chrome ?? DEFAULT_CHROME}
+          arranging={arranging}
+          onCustomize={() => setCustomizeOpen(true)}
+        />
       </div>
-
-      {/* Customize (pencil): every dashboard value becomes editable */}
-      <button
-        type="button"
-        onClick={() => setCustomizeOpen(true)}
-        aria-label="Customize dashboard"
-        title="Customize"
-        style={{
-          position: 'fixed', left: 24, bottom: 'calc(env(safe-area-inset-bottom) + 140px)', zIndex: 50,
-          background: 'transparent', color: 'var(--muted)', border: '1px solid var(--border)',
-          borderRadius: 999, padding: '10px 16px', fontWeight: 500, fontSize: 13, cursor: 'pointer',
-        }}
-      >
-        ✎ Customize
-      </button>
 
       {customizeOpen && chrome && (
         <CustomizePanel
