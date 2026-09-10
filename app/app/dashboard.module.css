@@ -772,3 +772,95 @@
     margin-inline: auto;
   }
 }
+
+/* ───────── Next-exam countdown (under the greeting) ─────────
+   Deliberately a card rather than another line of small caps: it has to read
+   at a glance when the dashboard opens, which a third muted line did not. */
+.examCard {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+  padding: 12px 20px 12px 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--mint);
+  border-radius: var(--radius-lg);
+  opacity: 0;
+  animation: fadeUp 700ms var(--ease-premium) 120ms forwards;
+}
+
+.examCount {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 44px;
+}
+
+.examNum {
+  font-family: var(--font-serif), 'Times New Roman', Georgia, serif;
+  font-style: italic;
+  font-size: 2.5rem;
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+  color: var(--mint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* "TODAY"/"TOMORROW" replace the numeral, so they can't run at 2.5rem */
+.examWord {
+  font-family: var(--font-serif), 'Times New Roman', Georgia, serif;
+  font-style: italic;
+  font-size: 1.5rem;
+  line-height: 1.1;
+  color: var(--mint);
+  white-space: nowrap;
+}
+
+.examUnit {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.examBody {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.examLabel {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.examTitle {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--fg);
+  line-height: 1.25;
+}
+
+.examMeta {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+/* three days or fewer: amber, so it stops reading as ambient furniture */
+.examUrgent { border-left-color: var(--amber); }
+.examUrgent .examNum,
+.examUrgent .examWord { color: var(--amber); }
+
+@media (max-width: 560px) {
+  .examCard { gap: var(--space-3); padding: 10px 14px 10px 12px; }
+  .examNum { font-size: 2rem; }
+  .examWord { font-size: 1.25rem; }
+}

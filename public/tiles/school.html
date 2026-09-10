@@ -234,6 +234,10 @@
   .llPips i.on{ background:var(--brand); }
   @media (max-width:560px){ .llRow{ flex-wrap:wrap; } .llMain{ flex-basis:100%; } }
   .stWeekHead{ font-family:var(--font-mono); font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:var(--muted); margin:var(--space-6) 0 var(--space-3); padding-left:2px; }
+  /* lecture load leads the tab now, so it shouldn't start with a gap */
+  #panel-study > .stWeekHead:first-child{ margin-top:0; }
+  /* and the day planner below it needs a clear break from the list */
+  #llList + .calTop{ margin-top:var(--space-8); padding-top:var(--space-6); border-top:1px solid var(--border); }
   .stDayInfo{ display:flex; align-items:center; gap:8px; margin-bottom:var(--space-3); font-family:var(--font-mono); font-size:11px; color:var(--muted); }
   .stDayInfo .hrs{ color:var(--muted-strong); font-weight:600; font-variant-numeric:tabular-nums; }
   /* the plannable column: clicking empty space opens the form at that time */
@@ -450,6 +454,17 @@
 
     <!-- ============ STUDY (weekly study plan) ============ -->
     <div id="panel-study" hidden>
+      <div class="stWeekHead">Lecture load — hardest and heaviest first</div>
+      <div class="add">
+        <div class="addGrid four">
+          <div class="field wide"><label for="llName">Lecture / topic</label><input id="llName" type="text" list="classes" placeholder="e.g. Renal pharmacology" maxlength="70" /></div>
+          <div class="field"><label for="llCount">How many</label><input id="llCount" type="number" min="1" max="999" step="1" placeholder="8" /></div>
+          <div class="field"><label for="llDiff">Difficulty 1–5</label><input id="llDiff" type="number" min="1" max="5" step="1" placeholder="3" /></div>
+        </div>
+        <div class="btnRow"><button class="btn small" id="llAdd" type="button">Add to the list</button></div>
+      </div>
+      <div id="llList"></div>
+
       <div class="calTop">
         <div class="stLead">Your standing weekly plan — a block repeats every week on the days you pick.</div>
         <button class="btn ghost small" id="stAddBtn" type="button">＋ Add</button>
@@ -489,17 +504,6 @@
         <span><i style="background:#84848c"></i>Class</span>
         <span><i style="background:#a78bfa"></i>Training</span>
       </div>
-
-      <div class="stWeekHead">Lecture load — hardest and heaviest first</div>
-      <div class="add">
-        <div class="addGrid four">
-          <div class="field wide"><label for="llName">Lecture / topic</label><input id="llName" type="text" list="classes" placeholder="e.g. Renal pharmacology" maxlength="70" /></div>
-          <div class="field"><label for="llCount">How many</label><input id="llCount" type="number" min="1" max="999" step="1" placeholder="8" /></div>
-          <div class="field"><label for="llDiff">Difficulty 1–5</label><input id="llDiff" type="number" min="1" max="5" step="1" placeholder="3" /></div>
-        </div>
-        <div class="btnRow"><button class="btn small" id="llAdd" type="button">Add to the list</button></div>
-      </div>
-      <div id="llList"></div>
 
       <div class="stWeekHead">This week</div>
       <div class="stTotals" id="stTotals"></div>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { tileStore } from '@/lib/tiles/tileStore'
 import { syncEnabled, syncLoad } from '@/lib/sync'
+import styles from '@/app/app/dashboard.module.css'
 
 /* Read the School tile the way the host does: local first, but the cloud row
    wins when sync is on — otherwise a phone that synced an exam wouldn't show
@@ -62,16 +63,17 @@ function nextExam(store: unknown): Exam | null {
   return upcoming[0] ?? null
 }
 
-function phrase(days: number): string {
-  if (days <= 0) return 'today'
-  if (days === 1) return 'tomorrow'
-  return `in ${days} days`
+/** The big figure and its unit. "today"/"tomorrow" replace the numeral. */
+function bigCount(days: number): { word: string | null; num: number | null; unit: string } {
+  if (days <= 0) return { word: 'Today', num: null, unit: '' }
+  if (days === 1) return { word: 'Tomorrow', num: null, unit: '' }
+  return { word: null, num: days, unit: 'days' }
 }
 
 /**
- * A quiet line under the greeting counting down to the next exam. Renders
- * nothing at all when none is scheduled, so the dashboard never carries an
- * empty placeholder.
+ * A card under the greeting counting down to the next exam. Renders nothing at
+ * all when none is scheduled, so the dashboard never carries an empty
+ * placeholder.
  */
 export default function ExamCountdown({ userId }: { userId: string }) {
   const [exam, setExam] = useState<Exam | null>(null)
@@ -94,36 +96,37 @@ export default function ExamCountdown({ userId }: { userId: string }) {
   if (!exam) return null
 
   const urgent = exam.days <= 3
+  const { word, num, unit } = bigCount(exam.days)
   const dateLabel = (() => {
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(exam.due)
     if (!m) return ''
     return new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString('en-US', {
+      weekday: 'short',
       month: 'short',
       day: 'numeric',
     })
   })()
 
   return (
-    <p
-      style={{
-        display: 'flex',
-        alignItems: 'baseline',
-        gap: 8,
-        flexWrap: 'wrap',
-        margin: '6px 0 0',
-        fontSize: 'var(--text-xs)',
-        fontWeight: 500,
-        letterSpacing: '0.12em',
-        textTransform: 'uppercase',
-        color: urgent ? 'var(--wall-accent, var(--mint))' : 'var(--muted)',
-      }}
-    >
-      <span style={{ fontWeight: 700 }}>{exam.title}</span>
-      <span style={{ opacity: 0.75 }}>
-        {exam.subject ? `${exam.subject} · ` : ''}
-        {dateLabel}
-      </span>
-      <span style={{ fontWeight: 700 }}>{phrase(exam.days)}</span>
-    </p>
+    <div className={`${styles.examCard} ${urgent ? styles.examUrgent : ''}`}>
+      <div className={styles.examCount}>
+        {word ? (
+          <span className={styles.examWord}>{word}</span>
+        ) : (
+          <>
+            <span className={styles.examNum}>{num}</span>
+            <span className={styles.examUnit}>{unit}</span>
+          </>
+        )}
+      </div>
+      <div className={styles.examBody}>
+        <span className={styles.examLabel}>Next exam</span>
+        <span className={styles.examTitle}>{exam.title}</span>
+        <span className={styles.examMeta}>
+          {exam.subject ? `${exam.subject} · ` : ''}
+          {dateLabel}
+        </span>
+      </div>
+    </div>
   )
 }
