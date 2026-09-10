@@ -228,7 +228,6 @@
   .llStep button:hover{ color:var(--fg); border-color:var(--brand-line); }
   .llStep .v{ font-family:var(--font-mono); font-size:12px; font-weight:700; min-width:20px; text-align:center; font-variant-numeric:tabular-nums; }
   .llStepLbl{ font-family:var(--font-mono); font-size:8.5px; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); display:block; margin-bottom:3px; text-align:center; }
-  .llScore{ flex:none; font-family:var(--font-mono); font-size:12px; font-weight:700; color:var(--muted-strong); font-variant-numeric:tabular-nums; min-width:34px; text-align:right; }
   .llPips{ display:inline-flex; gap:2px; vertical-align:middle; margin-left:4px; }
   .llPips i{ width:5px; height:5px; border-radius:50%; background:var(--border-strong); display:inline-block; }
   .llPips i.on{ background:var(--brand); }
@@ -1044,7 +1043,6 @@
         + '<button data-act="lld" data-id="'+x.id+'" data-by="-1" type="button" aria-label="Easier">−</button>'
         + '<span class="v">'+x.diff+'</span>'
         + '<button data-act="lld" data-id="'+x.id+'" data-by="1" type="button" aria-label="Harder">+</button></span></div>'
-        + '<span class="llScore" title="how many x difficulty">'+sc+'</span>'
         + '<button class="del" data-act="delload" data-id="'+x.id+'" aria-label="Remove">'+delSvg+'</button></div>';
     }).join('');
   }
