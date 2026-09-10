@@ -202,6 +202,37 @@
   .stSub i{ width:8px; height:8px; border-radius:50%; display:inline-block; }
   .stSub b{ font-family:var(--font-mono); font-weight:700; color:var(--muted-strong); font-variant-numeric:tabular-nums; }
   .stLead{ font-size:var(--text-sm); color:var(--muted); }
+  /* scratchpad beside the day grid */
+  .stSplit{ display:flex; gap:var(--space-4); align-items:flex-start; }
+  .stPadCol{ flex:none; width:236px; display:flex; flex-direction:column; gap:6px; }
+  .stGridCol{ flex:1; min-width:0; }
+  .stPadHead{ font-family:var(--font-mono); font-size:9px; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted); padding-left:2px; display:flex; align-items:center; gap:6px; }
+  .stPadHead .saved{ margin-left:auto; color:var(--brand); opacity:0; transition:opacity var(--dur) var(--ease); }
+  .stPadHead .saved.on{ opacity:.9; }
+  #sPad{ width:100%; min-height:280px; resize:vertical; background:var(--surface-2); border:1px solid var(--border-strong);
+    color:var(--fg); font-family:var(--font-ui); font-size:var(--text-sm); line-height:1.55; padding:12px;
+    border-radius:var(--radius-md); outline:none; transition:border-color var(--dur) var(--ease); }
+  #sPad:focus{ border-color:var(--brand-line); }
+  #sPad::placeholder{ color:var(--muted); }
+  @media (max-width:760px){ .stSplit{ flex-direction:column; } .stPadCol{ width:100%; } #sPad{ min-height:150px; } }
+  /* lecture load — ordered by how much work each one actually is */
+  .llRow{ display:flex; align-items:center; gap:var(--space-3); background:var(--surface); border:1px solid var(--border);
+    border-left:3px solid var(--brand); border-radius:var(--radius-md); padding:var(--space-3) var(--space-4); margin-bottom:var(--space-2); }
+  .llRank{ flex:none; width:22px; font-family:var(--font-mono); font-size:11px; font-weight:700; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .llMain{ flex:1; min-width:0; }
+  .llName{ font-size:var(--text-sm); font-weight:600; }
+  .llMeta{ font-family:var(--font-mono); font-size:10.5px; color:var(--muted); margin-top:2px; }
+  .llStep{ display:inline-flex; align-items:center; gap:4px; }
+  .llStep button{ appearance:none; width:22px; height:22px; flex:none; background:var(--surface-2); border:1px solid var(--border-strong);
+    color:var(--muted); border-radius:6px; cursor:pointer; font-size:13px; line-height:1; padding:0; transition:all var(--dur) var(--ease); }
+  .llStep button:hover{ color:var(--fg); border-color:var(--brand-line); }
+  .llStep .v{ font-family:var(--font-mono); font-size:12px; font-weight:700; min-width:20px; text-align:center; font-variant-numeric:tabular-nums; }
+  .llStepLbl{ font-family:var(--font-mono); font-size:8.5px; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); display:block; margin-bottom:3px; text-align:center; }
+  .llScore{ flex:none; font-family:var(--font-mono); font-size:12px; font-weight:700; color:var(--muted-strong); font-variant-numeric:tabular-nums; min-width:34px; text-align:right; }
+  .llPips{ display:inline-flex; gap:2px; vertical-align:middle; margin-left:4px; }
+  .llPips i{ width:5px; height:5px; border-radius:50%; background:var(--border-strong); display:inline-block; }
+  .llPips i.on{ background:var(--brand); }
+  @media (max-width:560px){ .llRow{ flex-wrap:wrap; } .llMain{ flex-basis:100%; } }
   .stWeekHead{ font-family:var(--font-mono); font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:var(--muted); margin:var(--space-6) 0 var(--space-3); padding-left:2px; }
   .stDayInfo{ display:flex; align-items:center; gap:8px; margin-bottom:var(--space-3); font-family:var(--font-mono); font-size:11px; color:var(--muted); }
   .stDayInfo .hrs{ color:var(--muted-strong); font-weight:600; font-variant-numeric:tabular-nums; }
@@ -445,13 +476,30 @@
       </div>
 
       <div class="stDayInfo" id="stDayInfo"></div>
-      <div id="stBody"></div>
+      <div class="stSplit">
+        <div class="stPadCol">
+          <div class="stPadHead">Scratchpad <span class="saved" id="sPadSaved">saved</span></div>
+          <textarea id="sPad" placeholder="Think out loud…&#10;&#10;What actually needs doing this week? What are you behind on? Rough it out here first — it saves as you type."></textarea>
+        </div>
+        <div class="stGridCol" id="stBody"></div>
+      </div>
 
       <div class="calLegend">
         <span><i style="background:#5EE6D0"></i>Study</span>
         <span><i style="background:#84848c"></i>Class</span>
         <span><i style="background:#a78bfa"></i>Training</span>
       </div>
+
+      <div class="stWeekHead">Lecture load — hardest and heaviest first</div>
+      <div class="add">
+        <div class="addGrid four">
+          <div class="field wide"><label for="llName">Lecture / topic</label><input id="llName" type="text" list="classes" placeholder="e.g. Renal pharmacology" maxlength="70" /></div>
+          <div class="field"><label for="llCount">How many</label><input id="llCount" type="number" min="1" max="999" step="1" placeholder="8" /></div>
+          <div class="field"><label for="llDiff">Difficulty 1–5</label><input id="llDiff" type="number" min="1" max="5" step="1" placeholder="3" /></div>
+        </div>
+        <div class="btnRow"><button class="btn small" id="llAdd" type="button">Add to the list</button></div>
+      </div>
+      <div id="llList"></div>
 
       <div class="stWeekHead">This week</div>
       <div class="stTotals" id="stTotals"></div>
@@ -926,8 +974,82 @@
     persist(); refreshClasses(); renderStudy();
   }
 
+  /* ---- scratchpad ---------------------------------------------------
+     Free text, saved through the same debounced persist as everything else.
+     The textarea is never re-rendered, so the caret stays where you left it. */
+  var padSavedT=null;
+  function padInput(){
+    state.studyNotes = $('sPad').value;
+    persist();
+    var f=$('sPadSaved'); if(!f) return;
+    f.classList.add('on'); clearTimeout(padSavedT);
+    padSavedT=setTimeout(function(){ f.classList.remove('on'); }, 1200);
+  }
+
+  /* ---- lecture load -------------------------------------------------
+     Ordered by how much work a topic actually is: how many lectures times
+     how hard they are. Difficulty alone would put a single brutal lecture
+     above twenty easy ones; count alone would do the reverse. */
+  function llScore(x){ return (+x.count||0) * (+x.diff||0); }
+  function clampInt(v, lo, hi, dflt){
+    var n=Math.round(+v); if(!isFinite(n)) return dflt;
+    return Math.max(lo, Math.min(hi, n));
+  }
+  function addLectureLoad(){
+    var name=$('llName').value.trim(); if(!name){ $('llName').focus(); return; }
+    var count=clampInt($('llCount').value, 1, 999, 1);
+    var diff =clampInt($('llDiff').value, 1, 5, 3);
+    state.lectureLoad.push({ id:uid(), name:name, count:count, diff:diff });
+    $('llName').value=''; $('llCount').value=''; $('llDiff').value=''; $('llName').focus();
+    persist(); renderLectureLoad();
+  }
+  function bumpLoad(id, field, by){
+    var x=(state.lectureLoad||[]).find(function(y){ return y.id===id; }); if(!x) return;
+    if(field==='count') x.count=clampInt(x.count+by, 1, 999, 1);
+    else x.diff=clampInt(x.diff+by, 1, 5, 3);
+    persist(); renderLectureLoad();
+  }
+  function delLectureLoad(id){
+    state.lectureLoad=(state.lectureLoad||[]).filter(function(x){ return x.id!==id; });
+    persist(); renderLectureLoad();
+  }
+  function renderLectureLoad(){
+    var list=(state.lectureLoad||[]).slice();
+    if(!list.length){
+      $('llList').innerHTML='<div class="empty"><div class="big">Nothing on the list</div>'
+        +'<div class="small">Add a lecture or topic with how many there are and how hard it is. The list reorders itself so the heaviest work sits at the top.</div></div>';
+      return;
+    }
+    // heaviest first; a tie falls to the harder one, then alphabetical so the
+    // order never wobbles between renders
+    list.sort(function(a,b){ return llScore(b)-llScore(a) || (b.diff-a.diff) || a.name.localeCompare(b.name); });
+    var top=llScore(list[0])||1;
+    $('llList').innerHTML=list.map(function(x,i){
+      var sc=llScore(x), col=colorFor(x.name);
+      var pips=''; for(var d=1;d<=5;d++) pips+='<i class="'+(d<=x.diff?'on':'')+'"></i>';
+      return '<div class="llRow" style="border-left-color:'+col+';opacity:'+(0.55+0.45*(sc/top)).toFixed(2)+'">'
+        + '<span class="llRank">'+(i+1)+'</span>'
+        + '<div class="llMain"><div class="llName">'+esc(x.name)+'</div>'
+        + '<div class="llMeta">'+x.count+' lecture'+(x.count===1?'':'s')+' · difficulty '+x.diff
+        + '<span class="llPips">'+pips+'</span></div></div>'
+        + '<div><span class="llStepLbl">How many</span><span class="llStep">'
+        + '<button data-act="llc" data-id="'+x.id+'" data-by="-1" type="button" aria-label="One fewer">−</button>'
+        + '<span class="v">'+x.count+'</span>'
+        + '<button data-act="llc" data-id="'+x.id+'" data-by="1" type="button" aria-label="One more">+</button></span></div>'
+        + '<div><span class="llStepLbl">Difficulty</span><span class="llStep">'
+        + '<button data-act="lld" data-id="'+x.id+'" data-by="-1" type="button" aria-label="Easier">−</button>'
+        + '<span class="v">'+x.diff+'</span>'
+        + '<button data-act="lld" data-id="'+x.id+'" data-by="1" type="button" aria-label="Harder">+</button></span></div>'
+        + '<span class="llScore" title="how many x difficulty">'+sc+'</span>'
+        + '<button class="del" data-act="delload" data-id="'+x.id+'" aria-label="Remove">'+delSvg+'</button></div>';
+    }).join('');
+  }
+
   function renderStudy(){
     var d=studyDate(), list=state.study||[];
+    var pad=$('sPad');
+    if(pad && document.activeElement!==pad) pad.value = state.studyNotes || '';
+    renderLectureLoad();
     // match the calendar's vertical scale
     var vw = window.innerWidth || document.documentElement.clientWidth || 400;
     HOUR_PX = vw >= 1000 ? 96 : vw >= 640 ? 78 : 54;
@@ -1287,6 +1409,11 @@
   $('stToday').addEventListener('click', studyGoToday);
   $('stAddBtn').addEventListener('click', function(){ if($('stForm').hidden) openStudyForm(null); else closeStudyForm(); });
   $('stBody').addEventListener('click', studySlotClick);
+  $('sPad').addEventListener('input', padInput);
+  $('llAdd').addEventListener('click', addLectureLoad);
+  $('llName').addEventListener('keydown', function(e){ if(e.key==='Enter') addLectureLoad(); });
+  $('llCount').addEventListener('keydown', function(e){ if(e.key==='Enter') addLectureLoad(); });
+  $('llDiff').addEventListener('keydown', function(e){ if(e.key==='Enter') addLectureLoad(); });
   $('gAdd').addEventListener('click', addGrade);
   $('gTotal').addEventListener('keydown', function(e){ if(e.key==='Enter') addGrade(); });
 
@@ -1306,6 +1433,9 @@
     else if(act==='delgrade') delGrade(id);
     else if(act==='delmeet') delMeeting(id);
     else if(act==='delstudy') delStudy(id);
+    else if(act==='llc') bumpLoad(id,'count',+b.getAttribute('data-by'));
+    else if(act==='lld') bumpLoad(id,'diff',+b.getAttribute('data-by'));
+    else if(act==='delload') delLectureLoad(id);
     else if(act==='deltrain') delTraining(id);
     else if(act==='delevent') delEvent(id);
     else if(act==='ledit') editRow(b.getAttribute('data-src'), id);
@@ -1328,6 +1458,7 @@
       else if(Array.isArray(saved)) state = { items: saved };
     } catch(e){}
     if(!state.items) state.items=[]; if(!state.classes) state.classes=[]; if(!state.grades) state.grades=[]; if(!state.lectures) state.lectures=[]; if(!state.meetings) state.meetings=[]; if(!state.training) state.training=[]; if(!state.events) state.events=[]; if(!state.study) state.study=[];
+    if(!state.lectureLoad) state.lectureLoad=[]; if(typeof state.studyNotes!=='string') state.studyNotes='';
     // One-time seed of Nishk's Fall 2026 weekly class schedule (recurring meetings).
     if(!state.seededSchedule){
       var SEED_MEETINGS=[

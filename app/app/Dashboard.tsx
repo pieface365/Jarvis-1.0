@@ -5,6 +5,7 @@ import styles from './dashboard.module.css'
 import DashboardHeader from './DashboardHeader'
 import WelcomeBackdrop from '@/components/WelcomeBackdrop'
 import FitbitSync from '@/components/FitbitSync'
+import ExamCountdown from '@/components/ExamCountdown'
 import CustomizePanel from '@/components/CustomizePanel'
 import DashboardHeaderGem from './DashboardHeaderGem'
 import DashboardGrid from './DashboardGrid'
@@ -208,7 +209,11 @@ export default function Dashboard({ firstName, userId }: DashboardProps) {
       <div className={styles.shell}>
         <div className={styles.headerRow}>
           {showGem && <DashboardHeaderGem className={styles.headerGem} />}
-          <DashboardHeader firstName={firstName} greeting={chrome?.greeting} date={chrome?.date} />
+          <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+            <DashboardHeader firstName={firstName} greeting={chrome?.greeting} date={chrome?.date} />
+            {/* counts down to the next exam in the School tile; renders nothing when there isn't one */}
+            <ExamCountdown userId={userId} />
+          </div>
           {/* The V (top-right): click to start from scratch (hard reset → black). */}
           <div
             className={styles.profileAvatar}
