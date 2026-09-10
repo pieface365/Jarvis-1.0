@@ -201,10 +201,15 @@
   .stSub{ display:inline-flex; align-items:center; gap:7px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-pill); padding:5px 12px; font-size:12px; font-weight:600; }
   .stSub i{ width:8px; height:8px; border-radius:50%; display:inline-block; }
   .stSub b{ font-family:var(--font-mono); font-weight:700; color:var(--muted-strong); font-variant-numeric:tabular-nums; }
-  .stDay{ margin-bottom:var(--space-5); }
-  .stDay.rest .stRowWrap{ opacity:.62; }
-  .stHrs{ margin-left:auto; font-family:var(--font-mono); font-size:10px; color:var(--muted); font-variant-numeric:tabular-nums; }
-  .stRest{ background:var(--surface); border:1px dashed var(--border-strong); border-radius:var(--radius-md); padding:var(--space-3) var(--space-4); font-size:var(--text-sm); color:var(--muted); }
+  .stLead{ font-size:var(--text-sm); color:var(--muted); }
+  .stWeekHead{ font-family:var(--font-mono); font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:var(--muted); margin:var(--space-6) 0 var(--space-3); padding-left:2px; }
+  .stDayInfo{ display:flex; align-items:center; gap:8px; margin-bottom:var(--space-3); font-family:var(--font-mono); font-size:11px; color:var(--muted); }
+  .stDayInfo .hrs{ color:var(--muted-strong); font-weight:600; font-variant-numeric:tabular-nums; }
+  /* the plannable column: clicking empty space opens the form at that time */
+  .tgCol.plan{ cursor:copy; }
+  /* classes and training are context here — visible for planning around, not editable */
+  .tgBlock.ctx{ opacity:.42; }
+  .tgBlock.ctx .tgName{ font-weight:600; }
 
   /* layer toggle */
   .layerTog{ display:flex; gap:8px; margin-top:var(--space-2); }
@@ -414,23 +419,43 @@
 
     <!-- ============ STUDY (weekly study plan) ============ -->
     <div id="panel-study" hidden>
-      <div class="stTotals" id="stTotals"></div>
-      <div class="stSubs" id="stSubs"></div>
+      <div class="calTop">
+        <div class="stLead">Your standing weekly plan \u2014 a block repeats every week on the days you pick.</div>
+        <button class="btn ghost small" id="stAddBtn" type="button">\uff0b Add</button>
+      </div>
 
-      <div class="add">
+      <div class="calHead">
+        <button class="calNav" id="stPrev" type="button" aria-label="Previous day">\u2039</button>
+        <div class="calTitle" id="stTitle"></div>
+        <button class="calNav" id="stNext" type="button" aria-label="Next day">\u203a</button>
+        <button class="calTodayBtn" id="stToday" type="button">Today</button>
+      </div>
+
+      <div class="add" id="stForm" hidden>
         <div class="addGrid four">
           <div class="field wide"><label for="sSubject">Subject</label><input id="sSubject" type="text" list="classes" placeholder="e.g. Self Care" maxlength="60" /></div>
           <div class="field"><label for="sStart">Start</label><input id="sStart" type="time" /></div>
           <div class="field"><label for="sEnd">End</label><input id="sEnd" type="time" /></div>
-          <div class="field wide"><label for="sNote">Focus — what are you doing in this block?</label><input id="sNote" type="text" placeholder="e.g. Ch. 6 practice questions" maxlength="80" /></div>
+          <div class="field wide"><label for="sNote">Focus \u2014 what are you doing in this block?</label><input id="sNote" type="text" placeholder="e.g. Ch. 6 practice questions" maxlength="80" /></div>
         </div>
         <div class="dayToggles" id="sDays">
           <button data-d="1" type="button">Mon</button><button data-d="2" type="button">Tue</button><button data-d="3" type="button">Wed</button><button data-d="4" type="button">Thu</button><button data-d="5" type="button">Fri</button><button data-d="6" type="button">Sat</button><button data-d="0" type="button">Sun</button>
         </div>
-        <div class="btnRow"><button class="btn small" id="sAdd" type="button">Add study block</button></div>
+        <div class="btnRow"><button class="btn sub small" id="sCancel" type="button">Cancel</button><button class="btn small" id="sAdd" type="button">Add study block</button></div>
       </div>
 
-      <div id="studyWeek"></div>
+      <div class="stDayInfo" id="stDayInfo"></div>
+      <div id="stBody"></div>
+
+      <div class="calLegend">
+        <span><i style="background:#5EE6D0"></i>Study</span>
+        <span><i style="background:#84848c"></i>Class</span>
+        <span><i style="background:#a78bfa"></i>Training</span>
+      </div>
+
+      <div class="stWeekHead">This week</div>
+      <div class="stTotals" id="stTotals"></div>
+      <div class="stSubs" id="stSubs"></div>
     </div>
 
     <!-- ============ GRADES ============ -->
@@ -691,8 +716,11 @@
       blocks.push({ s:s2, e:e, col:colorFor(t.subject)||STUDY_COL, name:esc(t.subject||'Study'), icon:'\ud83d\udcd6 ',
         meta:esc(fmtTime(t.start)+(t.end?'\u2013'+fmtTime(t.end):'')+(t.note?' \u00b7 '+t.note:'')), cls:' study', act:'delstudy', id:t.id });
     });
-    if(!blocks.length) return '';
-    // lane layout so any overlapping blocks sit side-by-side instead of on top of each other
+    return renderBlocks(blocks, r);
+  }
+  // lane layout so any overlapping blocks sit side-by-side instead of on top of
+  // each other. Split out of colBlocks so the Study day grid draws identically.
+  function packLanes(blocks){
     blocks.sort(function(a,b){ return a.s-b.s || a.e-b.e; });
     var laneEnd=[];
     blocks.forEach(function(b){
@@ -701,13 +729,17 @@
       if(placed<0){ placed=laneEnd.length; laneEnd.push(b.e); }
       b.lane=placed;
     });
-    var n=laneEnd.length;
+    return laneEnd.length;
+  }
+  function renderBlocks(blocks, r){
+    if(!blocks.length) return '';
+    var n=packLanes(blocks);
     return blocks.map(function(b){
       var top=(b.s-r.startH*60)/60*HOUR_PX, hgt=Math.max(30,(b.e-b.s)/60*HOUR_PX);
       var pos = n>1 ? 'left:calc(3px + '+(b.lane*100/n)+'%);width:calc('+(100/n)+'% - 5px);right:auto;' : '';
       return '<div class="tgBlock'+b.cls+'" style="top:'+top+'px;height:'+hgt+'px;'+pos+'border-left-color:'+b.col+';background:'+b.col+'22">'
         +'<span class="tgName">'+b.icon+b.name+'</span><span class="tgMeta">'+b.meta+'</span>'
-        +'<button class="tgDel" data-act="'+b.act+'" data-id="'+b.id+'" aria-label="Remove">'+delSvg+'</button></div>';
+        +(b.act?'<button class="tgDel" data-act="'+b.act+'" data-id="'+b.id+'" aria-label="Remove">'+delSvg+'</button>':'')+'</div>';
     }).join('');
   }
   function chipHtml(e){ var col=colorFor(e.cls); return '<span class="evChip"><span class="kind '+e.kind+'">'+e.kind+'</span>'+esc(e.title)+(e.cls?' <b style="color:'+col+';font-weight:600">'+esc(e.cls)+'</b>':'')+'</span>'; }
@@ -816,6 +848,73 @@
     var h=Math.floor(m/60), mm=m%60;
     return (h?h+'h':'') + (mm?(h?' ':'')+mm+'m':'');
   }
+  var studySel = null;
+  function studyDate(){ if(!studySel) studySel = isoOf(todayMid()); return parseDue(studySel); }
+  function studyGo(n){ var d=studyDate(); d.setDate(d.getDate()+n); studySel=isoOf(d); renderStudy(); }
+  function studyGoToday(){ studySel=isoOf(todayMid()); renderStudy(); }
+  function hhmm(m){ return pad2(Math.floor(m/60))+':'+pad2(m%60); }
+
+  /* The day column: classes and training are drawn as dimmed context so you can
+     see the gaps you're planning into, and only study blocks are editable. */
+  function studyDayBlocks(d){
+    var blocks=[];
+    meetingsForDate(d).filter(function(m){ return m.start; }).forEach(function(m){
+      var a=toMin(m.start), b=toMin(m.end)||(a+60);
+      blocks.push({ s:a, e:b, col:colorFor(m.name), name:esc(m.name), icon:'',
+        meta:esc(fmtTime(m.start)+(m.end?'–'+fmtTime(m.end):'')+(m.room?' · '+m.room:'')), cls:' ctx', act:'', id:'' });
+    });
+    eventsForDate(d).filter(function(ev){ return ev.start; }).forEach(function(ev){
+      var a=toMin(ev.start), b=toMin(ev.end)||(a+60);
+      blocks.push({ s:a, e:b, col:colorFor(ev.cls||ev.name), name:esc(ev.name||''), icon:'📌 ',
+        meta:esc(fmtTime(ev.start)+(ev.end?'–'+fmtTime(ev.end):'')), cls:' ctx', act:'', id:'' });
+    });
+    trainingForDate(d).filter(function(t){ return t.start; }).forEach(function(t){
+      var a=toMin(t.start), b=toMin(t.end)||(a+60);
+      blocks.push({ s:a, e:b, col:TRAIN_COL[t.kind]||'#a78bfa', name:esc(t.name||''), icon:(TRAIN_ICON[t.kind]||'')+' ',
+        meta:esc(fmtTime(t.start)+(t.end?'–'+fmtTime(t.end):'')), cls:' ctx train', act:'', id:'' });
+    });
+    studyForDate(d).filter(function(t){ return t.start; }).forEach(function(t){
+      var a=toMin(t.start), b=toMin(t.end)||(a+60);
+      blocks.push({ s:a, e:b, col:colorFor(t.subject)||STUDY_COL, name:esc(t.subject||'Study'), icon:'📖 ',
+        meta:esc(fmtTime(t.start)+(t.end?'–'+fmtTime(t.end):'')+(t.note?' · '+t.note:'')), cls:' study', act:'delstudy', id:t.id });
+    });
+    return blocks;
+  }
+  // day-specific range, so an evening block stretches the grid to fit
+  function studyRange(blocks){
+    var minM=8*60, maxM=18*60;
+    blocks.forEach(function(b){ if(b.s!=null) minM=Math.min(minM,b.s); if(b.e!=null) maxM=Math.max(maxM,b.e); });
+    var startH=Math.floor(minM/60);
+    return { startH:startH, endH:Math.max(Math.ceil(maxM/60), startH+1) };
+  }
+
+  function openStudyForm(startMin){
+    $('stForm').hidden = false;
+    if(startMin!=null){
+      $('sStart').value = hhmm(startMin);
+      $('sEnd').value   = hhmm(Math.min(23*60+59, startMin+60));
+    }
+    // preselect the day you're looking at; the toggles still let you add more
+    var dow = studyDate().getDay();
+    Array.prototype.forEach.call($('sDays').children, function(b){ b.classList.toggle('on', +b.getAttribute('data-d')===dow); });
+    $('sSubject').focus();
+  }
+  function closeStudyForm(){
+    $('stForm').hidden = true;
+    $('sSubject').value=''; $('sStart').value=''; $('sEnd').value=''; $('sNote').value='';
+    Array.prototype.forEach.call($('sDays').children, function(b){ b.classList.remove('on'); });
+  }
+  // click an empty part of the column -> plan a block at that time (30-min snap)
+  function studySlotClick(e){
+    if(e.target.closest('.tgBlock')) return;
+    var col=e.target.closest('.tgCol'); if(!col) return;
+    var rect=col.getBoundingClientRect();
+    var startH=+col.getAttribute('data-starth'), px=+col.getAttribute('data-hourpx')||HOUR_PX;
+    var mins=startH*60 + ((e.clientY-rect.top)/px)*60;
+    mins=Math.max(0, Math.min(23*60+30, Math.round(mins/30)*30));
+    openStudyForm(mins);
+  }
+
   function addStudy(){
     var subject=$('sSubject').value.trim(); if(!subject){ $('sSubject').focus(); return; }
     var days=[]; Array.prototype.forEach.call($('sDays').children, function(b){ if(b.classList.contains('on')) days.push(+b.getAttribute('data-d')); });
@@ -823,14 +922,30 @@
     var st=$('sStart').value||'', en=$('sEnd').value||'';
     if(st && en && toMin(en)<=toMin(st)){ $('sEnd').focus(); return; } // end must follow start
     state.study.push({ id:uid(), subject:subject, days:days, start:st, end:en, note:$('sNote').value.trim() });
-    $('sSubject').value=''; $('sStart').value=''; $('sEnd').value=''; $('sNote').value='';
-    Array.prototype.forEach.call($('sDays').children, function(b){ b.classList.remove('on'); });
-    $('sSubject').focus();
+    closeStudyForm();
     persist(); refreshClasses(); renderStudy();
   }
+
   function renderStudy(){
-    var list = state.study||[];
-    // a block on 3 days is 3 sessions a week
+    var d=studyDate(), list=state.study||[];
+    // match the calendar's vertical scale
+    var vw = window.innerWidth || document.documentElement.clientWidth || 400;
+    HOUR_PX = vw >= 1000 ? 96 : vw >= 640 ? 78 : 54;
+
+    var isToday = isoOf(d)===isoOf(todayMid());
+    $('stTitle').textContent = d.toLocaleDateString('en-US',{ weekday:'long', month:'long', day:'numeric' });
+
+    var blocks=studyDayBlocks(d), r=studyRange(blocks), h=(r.endH-r.startH)*HOUR_PX;
+    var planned=0; blocks.forEach(function(b){ if(b.cls.indexOf('study')>=0) planned+=(b.e-b.s); });
+    $('stDayInfo').innerHTML = (isToday?'<span class="today-pill">TODAY</span>':'')
+      + '<span class="hrs">'+(planned?fmtHrs(planned)+' planned':'Nothing planned yet')+'</span>'
+      + '<span>· tap an empty slot to add a block</span>';
+    $('stBody').innerHTML =
+        '<div class="tgWrap"><div class="tgGutter" style="height:'+h+'px">'+hourLabels(r)+'</div>'
+      + '<div class="tgCols one"><div class="tgCol plan" data-starth="'+r.startH+'" data-hourpx="'+HOUR_PX+'" style="height:'+h+'px;'+gridBg()+'">'
+      + renderBlocks(blocks, r) + '</div></div></div>';
+
+    // ---- weekly roll-up ----
     var bySub={}, total=0, sessions=0;
     list.forEach(function(t){
       var n=(t.days||[]).length, m=blockMins(t)*n;
@@ -845,32 +960,10 @@
     $('stTotals').innerHTML =
         '<div class="stat"><span class="statNum">'+fmtHrs(total)+'</span><span class="statLabel">Per week</span></div>'
       + '<div class="stat"><span class="statNum">'+sessions+'</span><span class="statLabel">Session'+(sessions===1?'':'s')+'</span></div>'
-      + '<div class="stat"><span class="statNum">'+(total?DAYS[heaviest].slice(0,3):'\u2014')+'</span><span class="statLabel">Heaviest day</span></div>';
+      + '<div class="stat"><span class="statNum">'+(total?DAYS[heaviest].slice(0,3):'—')+'</span><span class="statLabel">Heaviest day</span></div>';
     var subs=Object.keys(bySub).sort(function(a,b){ return bySub[b]-bySub[a]; });
     $('stSubs').innerHTML = subs.map(function(n){
       return '<span class="stSub"><i style="background:'+colorFor(n)+'"></i>'+esc(n)+' <b>'+fmtHrs(bySub[n])+'</b></span>';
-    }).join('');
-
-    if(!list.length){
-      $('studyWeek').innerHTML = '<div class="empty"><div class="big">No study plan yet</div>'
-        + '<div class="small">Add a block above \u2014 pick a subject, the days you want it, and what you\u2019ll actually work on. Blocks repeat every week and appear on your Schedule.</div></div>';
-      return;
-    }
-    var ti=todayIdx();
-    $('studyWeek').innerHTML = STUDY_ORDER.map(function(dow, idx){
-      var rows=list.filter(function(t){ return (t.days||[]).indexOf(dow)>=0; })
-        .slice().sort(function(a,b){ return (a.start||'99').localeCompare(b.start||'99'); });
-      var head='<div class="dayName">'+DAYS[idx]+(idx===ti?' <span class="today-pill">TODAY</span>':'')
-        +'<span class="stHrs">'+(perDay[idx]?fmtHrs(perDay[idx]):'')+'</span></div>';
-      if(!rows.length) return '<div class="stDay rest">'+head+'<div class="stRest">Rest \u2014 nothing planned</div></div>';
-      return '<div class="stDay">'+head+'<div class="stRowWrap">'+rows.map(function(t){
-        var col=colorFor(t.subject);
-        return '<div class="classRow" style="border-left-color:'+col+'">'
-          + '<div class="classMain"><div class="className">'+esc(t.subject)+'</div>'
-          + (t.note?'<div class="classRoom">'+esc(t.note)+'</div>':'')+'</div>'
-          + '<span class="classTime">'+(t.start?esc(fmtTime(t.start)+(t.end?'\u2013'+fmtTime(t.end):'')):'Any time')+'</span>'
-          + '<button class="del" data-act="delstudy" data-id="'+t.id+'" aria-label="Remove">'+delSvg+'</button></div>';
-      }).join('')+'</div></div>';
     }).join('');
   }
 
@@ -1160,7 +1253,11 @@
   $('calToday').addEventListener('click', calGoToday);
   $('calViews').addEventListener('click', function(e){ var b=e.target.closest('.segBtn'); if(!b) return; calView=b.getAttribute('data-v'); renderSchedule(); });
   // re-fit the time-grid when the (desktop) window is resized across a breakpoint
-  var rsT; window.addEventListener('resize', function(){ if(!$('panel-schedule') || $('panel-schedule').hidden) return; clearTimeout(rsT); rsT=setTimeout(renderSchedule, 150); });
+  var rsT; window.addEventListener('resize', function(){
+    var sched=$('panel-schedule') && !$('panel-schedule').hidden, stud=$('panel-study') && !$('panel-study').hidden;
+    if(!sched && !stud) return;
+    clearTimeout(rsT); rsT=setTimeout(sched?renderSchedule:renderStudy, 150);
+  });
   // Month view: tap a day to drill into Day view
   $('calBody').addEventListener('click', function(e){ var c=e.target.closest('.calCell'); if(!c||c.classList.contains('empty')) return; calSel=c.getAttribute('data-date'); calView='day'; renderSchedule(); });
   $('addClassBtn').addEventListener('click', function(){ $('addClassForm').hidden = !$('addClassForm').hidden; });
@@ -1181,9 +1278,15 @@
     b.classList.toggle('on'); renderSchedule();
   });
   $('sAdd').addEventListener('click', addStudy);
+  $('sCancel').addEventListener('click', closeStudyForm);
   $('sDays').addEventListener('click', function(e){ var b=e.target.closest('button'); if(b) b.classList.toggle('on'); });
   $('sNote').addEventListener('keydown', function(e){ if(e.key==='Enter') addStudy(); });
   $('sSubject').addEventListener('keydown', function(e){ if(e.key==='Enter') addStudy(); });
+  $('stPrev').addEventListener('click', function(){ studyGo(-1); });
+  $('stNext').addEventListener('click', function(){ studyGo(1); });
+  $('stToday').addEventListener('click', studyGoToday);
+  $('stAddBtn').addEventListener('click', function(){ if($('stForm').hidden) openStudyForm(null); else closeStudyForm(); });
+  $('stBody').addEventListener('click', studySlotClick);
   $('gAdd').addEventListener('click', addGrade);
   $('gTotal').addEventListener('keydown', function(e){ if(e.key==='Enter') addGrade(); });
 
