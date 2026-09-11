@@ -1565,6 +1565,17 @@
     // Rebalance existing installs to the 3-climb / 3-lift plan (supersedes the
     // earlier night/venue seeds). Training layer only — classes/tasks untouched.
     if(!state.trainingBalanceV1){ state.training = buildTrainingPlan(); state.trainingBalanceV1 = true; persist(); }
+    // Cencora Student Programs Webinar — a one-off, so it's an event rather than
+    // a recurring meeting. No end time was given; leaving `end` empty draws the
+    // default hour block without claiming a finish that wasn't stated.
+    if(!state.seededCencora){
+      var hasCencora = (state.events||[]).some(function(e){ return /cencora/i.test(e.name||''); });
+      if(!hasCencora){
+        state.events.push({ id:uid(), cls:'', name:'Cencora Student Programs Webinar',
+          date:'2026-10-02', start:'16:00', end:'', note:'Webinar' });
+      }
+      state.seededCencora = true; persist();
+    }
     // One-time mandatory Gerontology evening sessions (specific dates, timed).
     if(!state.seededGeroMandatory){
       [['2026-10-08'],['2026-10-22']].forEach(function(d){
